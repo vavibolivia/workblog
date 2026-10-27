@@ -165,7 +165,7 @@ function Node({ node, activeId, activePathIds }: { node: CategoryNode; activeId:
 
   return (
     <li className={onPath ? 'on-path' : undefined} data-depth={node.depth}>
-      <div className={`cat-tree__row cat-tree__row--d${node.depth}${active ? ' active' : ''}${onPath && !active ? ' on-path' : ''}${over ? ` is-drop-${over}` : ''}${dragging ? ' is-dragging' : ''}`}
+      <div className={`cat-tree__row cat-tree__row--d${node.depth} ${hasKids ? 'cat-tree__row--branch' : 'cat-tree__row--leaf'}${active ? ' active' : ''}${onPath && !active ? ' on-path' : ''}${over ? ` is-drop-${over}` : ''}${dragging ? ' is-dragging' : ''}`}
            draggable={tree.isAdmin}
            onDragStart={(e) => { e.stopPropagation(); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(node.id)); tree.setDragId(node.id) }}
            onDragEnd={() => { tree.setDragId(null); setOver(null) }}
@@ -186,7 +186,7 @@ function Node({ node, activeId, activePathIds }: { node: CategoryNode; activeId:
            onContextMenu={(e) => { e.preventDefault(); tree.openMenu(node, e.clientX, e.clientY) }}>
         {hasKids
           ? <button type="button" className="cat-tree__toggle" aria-label={expanded ? '접기' : '펼치기'} aria-expanded={expanded} onClick={() => setUserOpen(!expanded)}>{expanded ? '▾' : '▸'}</button>
-          : <span className="cat-tree__toggle" aria-hidden>·</span>}
+          : <span className="cat-tree__toggle cat-tree__leaf" aria-hidden title="하위 카테고리 없음" />}
         <Link to={`/?categoryId=${node.id}`} className="cat-tree__link" data-depth={node.depth} onClick={onNameClick}
               onDragStart={(e) => { if (!tree.isAdmin) e.preventDefault() }}>
           <span className="ellipsis">{node.name}</span>

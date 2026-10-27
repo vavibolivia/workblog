@@ -230,6 +230,18 @@ code, pre, kbd { font-family: var(--mono); }
 .side-section + .side-section { border-top: 1px solid var(--line); }
 .side-section h4 { font-size: 13px; color: var(--muted); font-weight: 600; margin-bottom: 8px; }
 .cat-tree ul { padding-left: 14px; }
+/* 트리 연결선: 하위 목록 왼쪽 세로줄 + 각 항목 가로줄(마지막 항목은 └ 모양) — 어느 단계든 부모·끝 노드 관계가 보이게 */
+.cat-tree ul { position: relative; margin-left: 9px; padding-left: 13px; }
+.cat-tree ul > li { position: relative; }
+.cat-tree ul > li::before { content: ''; position: absolute; left: -13px; top: 0; bottom: 0; border-left: 1px solid var(--line-strong, #cbd5e1); }
+.cat-tree ul > li:last-child::before { bottom: auto; height: 17px; }
+.cat-tree ul > li::after { content: ''; position: absolute; left: -13px; top: 17px; width: 11px; border-top: 1px solid var(--line-strong, #cbd5e1); }
+/* 끝 노드(하위 없음): 작은 속 빈 원 · 하위 있는 노드: 굵게 + ▸/▾ */
+.cat-tree__leaf { display: inline-flex; justify-content: center; align-items: center; }
+.cat-tree__leaf::before { content: ''; width: 6px; height: 6px; border-radius: 50%; border: 1.5px solid var(--muted); box-sizing: border-box; }
+.cat-tree__row--branch .cat-tree__link { font-weight: 600; color: var(--ink); }
+.cat-tree__row--branch .cat-tree__toggle { color: var(--ink-2); font-size: 13px; }
+.cat-tree__row--leaf.active .cat-tree__leaf::before, .cat-tree__row--leaf.on-path .cat-tree__leaf::before { border-color: var(--path); background: var(--path); }
 .cat-tree__row { display: flex; align-items: center; gap: 2px; border-radius: var(--radius-s); }
 .cat-tree__row:hover { background: var(--canvas); }
 .cat-tree__row.active { background: var(--sky-50); }
