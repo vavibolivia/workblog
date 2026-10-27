@@ -102,4 +102,16 @@ class LoginAttemptGuardTest {
         g.tryAcquire("dan", "ip"); g.release("dan", "ip", false);
         assertThat(g.tryAcquire("dan", "ip")).isPresent();
     }
+
+    @Test
+    void userWideLockSparesKnownGoodIp() {
+        LoginAttemptGuard g = new LoginAttemptGuard(new MutableClock());
+        g.tryAcquire("erin", "10.0.0.1"); g.release("erin", "10.0.0.1", true);   // 주인 PC 로 성공한 적 있음
+        for (int i = 0; i < LoginAttemptGuard.MAX_USER_FAILURES; i++) {
+            String ip = "172.16." + (i / 4) + "." + i;
+            g.tryAcquire("erin", ip); g.release("erin", ip, false);
+        }
+        assertThat(g.tryAcquire("erin", "8.8.8.8")).isPresent();   // 처음 보는 IP 는 잠김
+        assertThat(g.tryAcquire("erin", "10.0.0.1")).isEmpty();    // 주인 PC 는 로그인 가능
+    }
 }

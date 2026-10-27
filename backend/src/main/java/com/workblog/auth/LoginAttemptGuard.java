@@ -27,6 +27,9 @@ public class LoginAttemptGuard {
 
     private final Clock clock;
     private final Map<String, State> states = new ConcurrentHashMap<>();
+    /** 아이디별로 로그인에 성공한 적이 있는 IP(최근 성공 시각). 아이디 단위 잠금에서 제외 */
+    private final Map<String, Instant> knownGood = new ConcurrentHashMap<>();
+    static final Duration KNOWN_GOOD_TTL = Duration.ofDays(30);
 
     private static final class State {
         int failures;
@@ -45,8 +48,11 @@ public class LoginAttemptGuard {
      */
     public Optional<Duration> tryAcquire(String username, String ip) {
         if (states.size() > MAX_ENTRIES) prune();
-        Optional<Duration> userLock = userLock(username);
-        if (userLock.isPresent()) return userLock;
+        // 아이디 단위 잠금은 이 아이디로 성공한 적 없는 IP 에만(공격자가 계정 주인의 평소 PC 를 막지 못하게)
+        if (!isKnownGood(username, ip)) {
+            Optional<Duration> userLock = userLock(username);
+            if (userLock.isPresent()) return userLock;
+        }
         State s = states.computeIfAbsent(key(username, ip), k -> new State());
         synchronized (s) {
             Instant now = clock.instant();
@@ -56,6 +62,11 @@ public class LoginAttemptGuard {
             s.inFlight++;
             return Optional.empty();
         }
+    }
+
+    private boolean isKnownGood(String username, String ip) {
+        Instant t = knownGood.get(key(username, ip));
+        return t != null && clock.instant().isBefore(t.plus(KNOWN_GOOD_TTL));
     }
 
     /** 아이디 단위 잠금(모든 IP 합산) 남은 시간 */
@@ -91,9 +102,13 @@ public class LoginAttemptGuard {
     public boolean release(String username, String ip, boolean success) {
         String k = key(username, ip);
         State s = success ? states.get(k) : states.computeIfAbsent(k, x -> new State());
-        if (s == null) { states.remove("U|" + key(username)); return false; }
+        if (success) {
+            if (knownGood.size() > MAX_ENTRIES) { Instant cut = clock.instant().minus(KNOWN_GOOD_TTL); knownGood.values().removeIf(t -> t.isBefore(cut)); }
+            if (knownGood.size() <= MAX_ENTRIES) knownGood.put(k, clock.instant());
+            states.remove("U|" + key(username));
+        }
+        if (s == null) return false;
         if (!success) userFailure(username);
-        else states.remove("U|" + key(username));
         synchronized (s) {
             s.inFlight = Math.max(0, s.inFlight - 1);
             if (success) {
