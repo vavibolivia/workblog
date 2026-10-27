@@ -82,4 +82,24 @@ class LoginAttemptGuardTest {
         g.tryAcquire("amy", "ip"); g.release("amy", "ip", true);
         for (int i = 0; i < LoginAttemptGuard.MAX_FAILURES - 1; i++) { assertThat(g.tryAcquire("amy", "ip")).isEmpty(); g.release("amy", "ip", false); }
     }
+
+    @Test
+    void userWideLimitAcrossIps() {
+        LoginAttemptGuard g = new LoginAttemptGuard(new MutableClock());
+        for (int i = 0; i < LoginAttemptGuard.MAX_USER_FAILURES; i++) {
+            String ip = "10.0." + (i / 4) + "." + i;   // IP 를 바꿔 가며 한도 회피 시도
+            assertThat(g.tryAcquire("carl", ip)).isEmpty();
+            g.release("carl", ip, false);
+        }
+        assertThat(g.tryAcquire("carl", "9.9.9.9")).isPresent();
+    }
+
+    @Test
+    void abortKeepsFailures() {
+        LoginAttemptGuard g = new LoginAttemptGuard(new MutableClock());
+        for (int i = 0; i < LoginAttemptGuard.MAX_FAILURES - 1; i++) { g.tryAcquire("dan", "ip"); g.release("dan", "ip", false); }
+        g.tryAcquire("dan", "ip"); g.abort("dan", "ip");
+        g.tryAcquire("dan", "ip"); g.release("dan", "ip", false);
+        assertThat(g.tryAcquire("dan", "ip")).isPresent();
+    }
 }

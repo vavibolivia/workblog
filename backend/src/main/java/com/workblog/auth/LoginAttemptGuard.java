@@ -20,6 +20,8 @@ import java.util.concurrent.ConcurrentHashMap;
 public class LoginAttemptGuard {
     public static final int MAX_FAILURES = 5;
     public static final Duration LOCK = Duration.ofMinutes(10);
+    /** 아이디 단위 상한: IP 를 바꿔 가며 시도해도 합쳐서 이만큼 실패하면 아이디 자체를 {@link #LOCK}간 잠근다 */
+    public static final int MAX_USER_FAILURES = 20;
     /** 이 수를 넘으면 잠기지 않은 오래된 기록부터 정리(메모리 보호) */
     static final int MAX_ENTRIES = 10_000;
 
@@ -43,6 +45,8 @@ public class LoginAttemptGuard {
      */
     public Optional<Duration> tryAcquire(String username, String ip) {
         if (states.size() > MAX_ENTRIES) prune();
+        Optional<Duration> userLock = userLock(username);
+        if (userLock.isPresent()) return userLock;
         State s = states.computeIfAbsent(key(username, ip), k -> new State());
         synchronized (s) {
             Instant now = clock.instant();
@@ -54,11 +58,42 @@ public class LoginAttemptGuard {
         }
     }
 
+    /** 아이디 단위 잠금(모든 IP 합산) 남은 시간 */
+    private Optional<Duration> userLock(String username) {
+        State u = states.get("U|" + key(username));
+        if (u == null) return Optional.empty();
+        synchronized (u) {
+            Instant now = clock.instant();
+            if (u.lockedUntil != null && now.isBefore(u.lockedUntil)) return Optional.of(Duration.between(now, u.lockedUntil));
+            if (u.lockedUntil != null) { u.lockedUntil = null; u.failures = 0; }
+            return Optional.empty();
+        }
+    }
+
+    private void userFailure(String username) {
+        State u = states.computeIfAbsent("U|" + key(username), k -> new State());
+        synchronized (u) {
+            Instant now = clock.instant();
+            u.failures++;
+            u.lastFailure = now;
+            if (u.failures >= MAX_USER_FAILURES && u.lockedUntil == null) u.lockedUntil = now.plus(LOCK);
+        }
+    }
+
+    /** 결과 없이 예약만 푼다(비활성 계정 등 비밀번호 판정이 아닌 오류). 실패 횟수는 그대로 둔다. */
+    public void abort(String username, String ip) {
+        State s = states.get(key(username, ip));
+        if (s == null) return;
+        synchronized (s) { s.inFlight = Math.max(0, s.inFlight - 1); }
+    }
+
     /** 예약한 시도를 끝낸다. 실패로 이번에 잠기면 true. */
     public boolean release(String username, String ip, boolean success) {
         String k = key(username, ip);
-        State s = states.get(k);
-        if (s == null) return false;
+        State s = success ? states.get(k) : states.computeIfAbsent(k, x -> new State());
+        if (s == null) { states.remove("U|" + key(username)); return false; }
+        if (!success) userFailure(username);
+        else states.remove("U|" + key(username));
         synchronized (s) {
             s.inFlight = Math.max(0, s.inFlight - 1);
             if (success) {
@@ -112,7 +147,7 @@ public class LoginAttemptGuard {
             State s = e.getValue();
             synchronized (s) {
                 boolean locked = s.lockedUntil != null && clock.instant().isBefore(s.lockedUntil);
-                return !locked && (s.lastFailure == null || s.lastFailure.isBefore(cutoff));
+                return !locked && s.inFlight == 0 && (s.lastFailure == null || s.lastFailure.isBefore(cutoff));
             }
         });
     }

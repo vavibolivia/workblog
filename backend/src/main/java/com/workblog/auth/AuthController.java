@@ -22,7 +22,8 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
-    public record LoginRequest(@NotBlank String username, @NotBlank String password) {}
+    public record LoginRequest(@NotBlank @jakarta.validation.constraints.Size(max = 100) String username,
+                               @NotBlank @jakarta.validation.constraints.Size(max = 72) String password) {} // BCrypt 는 72바이트까지만 판정
     public record LoginResponse(String token, long expiresIn, UserResponse user) {}
     /** 가입 결과: 즉시 승인이면 token 이 채워지고, 승인 대기면 token 은 null. */
     public record SignupResponse(boolean approved, String message, String token, Long expiresIn, UserResponse user) {}
@@ -60,7 +61,7 @@ public class AuthController {
             if (guard.release(req.username(), ip, false)) throw locked(LoginAttemptGuard.LOCK);
             throw e;
         } catch (RuntimeException e) {
-            guard.release(req.username(), ip, true); // 비활성 계정 등 다른 사유는 실패 횟수에 넣지 않음
+            guard.abort(req.username(), ip); // 비활성 계정 등: 예약만 풀고 실패 횟수는 지우지 않음
             throw e;
         }
         guard.release(req.username(), ip, true);
