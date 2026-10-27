@@ -49,16 +49,21 @@ public class AuthController {
     @Operation(summary = "로그인", description = "웹 세션용 JWT 를 발급한다. 외부 프로그램은 개인 API 토큰 사용을 권장한다. "
             + "같은 아이디로 5회 연속 실패하면 10분간 잠기고 그동안은 429(남은 시간 안내)를 준다.")
     @PostMapping("/login")
-    public LoginResponse login(@Valid @RequestBody LoginRequest req) {
-        guard.remainingLock(req.username()).ifPresent(d -> { throw locked(d); });
+    public LoginResponse login(@Valid @RequestBody LoginRequest req, jakarta.servlet.http.HttpServletRequest http) {
+        // 잠금 단위는 (아이디, 접속 IP): 다른 곳에서 일부러 틀려 계정 주인을 잠그지 못하게
+        String ip = http.getRemoteAddr();
+        guard.tryAcquire(req.username(), ip).ifPresent(d -> { throw locked(d); });
         Authentication auth;
         try {
             auth = authManager.authenticate(new UsernamePasswordAuthenticationToken(req.username(), req.password()));
         } catch (BadCredentialsException e) {
-            if (guard.recordFailure(req.username())) throw locked(LoginAttemptGuard.LOCK);
+            if (guard.release(req.username(), ip, false)) throw locked(LoginAttemptGuard.LOCK);
+            throw e;
+        } catch (RuntimeException e) {
+            guard.release(req.username(), ip, true); // 비활성 계정 등 다른 사유는 실패 횟수에 넣지 않음
             throw e;
         }
-        guard.recordSuccess(req.username());
+        guard.release(req.username(), ip, true);
         User user = ((AuthPrincipal) auth.getPrincipal()).getUser();
         return new LoginResponse(jwt.issue(user), jwt.expirationSeconds(), UserResponse.from(user));
     }

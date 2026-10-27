@@ -55,4 +55,31 @@ class LoginAttemptGuardTest {
         assertThat(LoginAttemptGuard.humanize(Duration.ofMinutes(10))).isEqualTo("10분");
         assertThat(LoginAttemptGuard.humanize(Duration.ofMillis(200))).isEqualTo("1초");
     }
+
+    @Test
+    void lockIsPerUsernameAndIp_otherIpStillAllowed() {
+        LoginAttemptGuard g = new LoginAttemptGuard(new MutableClock());
+        for (int i = 0; i < LoginAttemptGuard.MAX_FAILURES; i++) {
+            assertThat(g.tryAcquire("admin", "10.0.0.9")).isEmpty();
+            g.release("admin", "10.0.0.9", false);
+        }
+        assertThat(g.tryAcquire("admin", "10.0.0.9")).isPresent();   // 공격자 IP 는 잠김
+        assertThat(g.tryAcquire("admin", "10.0.0.1")).isEmpty();     // 계정 주인 IP 는 그대로 로그인 가능
+    }
+
+    @Test
+    void concurrentAttemptsCannotExceedLimit() {
+        LoginAttemptGuard g = new LoginAttemptGuard(new MutableClock());
+        int granted = 0;
+        for (int i = 0; i < 20; i++) if (g.tryAcquire("bob", "1.2.3.4").isEmpty()) granted++;  // 끝나기 전에 한꺼번에 시도
+        assertThat(granted).isEqualTo(LoginAttemptGuard.MAX_FAILURES);
+    }
+
+    @Test
+    void successClearsFailures() {
+        LoginAttemptGuard g = new LoginAttemptGuard(new MutableClock());
+        for (int i = 0; i < LoginAttemptGuard.MAX_FAILURES - 1; i++) { g.tryAcquire("amy", "ip"); g.release("amy", "ip", false); }
+        g.tryAcquire("amy", "ip"); g.release("amy", "ip", true);
+        for (int i = 0; i < LoginAttemptGuard.MAX_FAILURES - 1; i++) { assertThat(g.tryAcquire("amy", "ip")).isEmpty(); g.release("amy", "ip", false); }
+    }
 }
