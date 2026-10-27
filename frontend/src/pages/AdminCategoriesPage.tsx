@@ -76,7 +76,7 @@ export default function AdminCategoriesPage() {
           {n.depth === CATEGORY_MAX_DEPTH && <span className="chip chip--draft" style={{ height: 20, fontSize: 11 }}>마지막 단계</span>}
         </div>
       </td>
-      <td className="small muted">{n.postCount}{n.totalCount !== n.postCount ? ` (하위 포함 ${n.totalCount})` : ''}</td>
+      <td className="small muted">{n.postCount}</td>
       <td>
         <div className="row" style={{ gap: 4, justifyContent: 'flex-end' }}>
           <button type="button" className="btn btn--sm btn--ghost" disabled={i === 0} onClick={() => move(n, -1)} aria-label="위로">↑</button>

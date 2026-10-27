@@ -5,7 +5,8 @@ import { useAuth } from '../lib/auth'
 import { useToast } from '../lib/toast'
 
 /**
- * 사이드바용 접고 펴는 카테고리 트리. 글 수는 하위 포함(totalCount).
+ * 사이드바용 접고 펴는 카테고리 트리.
+ * 글 수 표기 규칙(모든 단계 동일): 숫자 = 이 카테고리에 직접 단 글(postCount)만. 하위 카테고리 글은 더하지 않는다.
  * - 우클릭(또는 행의 ⋯ 버튼): 이 카테고리 글 보기 · 이 카테고리에 글쓰기, 관리자는 하위 추가·이름 바꾸기·순서·이동·삭제
  * - 관리자는 행을 끌어 다른 카테고리 위에 놓으면 그 하위로, 맨 위 '최상위로' 띠에 놓으면 1단계로 옮긴다(최대 5단계 규칙은 서버가 검사).
  */
@@ -109,7 +110,7 @@ export default function CategoryTree({ nodes, activeId, activePathIds = [], onCh
       <ul className="cat-tree">{nodes.map((n) => <Node key={n.id} node={n} activeId={activeId} activePathIds={activePathIds} />)}</ul>
       {menu && (
         <div ref={menuRef} className="menu cat-menu" role="menu" style={{ left: Math.min(menu.x, window.innerWidth - 240), top: Math.min(menu.y, window.innerHeight - 330) }}>
-          <div className="menu__head"><strong className="ellipsis">{menu.node.name}</strong><span className="small muted">{menu.node.depth}단계 · 글 {menu.node.totalCount}</span></div>
+          <div className="menu__head"><strong className="ellipsis">{menu.node.name}</strong><span className="small muted">{menu.node.depth}단계 · 글 {menu.node.postCount}</span></div>
           <button type="button" role="menuitem" onClick={() => act('open')}>이 카테고리 글 보기</button>
           <button type="button" role="menuitem" onClick={() => act('write')}>이 카테고리에 글쓰기</button>
           {isAdmin && <>
@@ -189,7 +190,7 @@ function Node({ node, activeId, activePathIds }: { node: CategoryNode; activeId:
         <Link to={`/?categoryId=${node.id}`} className="cat-tree__link" data-depth={node.depth} onClick={onNameClick}
               onDragStart={(e) => { if (!tree.isAdmin) e.preventDefault() }}>
           <span className="ellipsis">{node.name}</span>
-          <span className="cat-tree__count">{node.totalCount}</span>
+          <span className="cat-tree__count" title={`이 카테고리에 직접 단 글 ${node.postCount}`}>{node.postCount}</span>
         </Link>
         <button type="button" className="cat-tree__more" aria-label={`${node.name} 메뉴`} title="메뉴 (우클릭도 가능)"
                 onClick={(e) => { const r = (e.currentTarget as HTMLElement).getBoundingClientRect(); tree.openMenu(node, r.left, r.bottom + 4) }}>⋯</button>
