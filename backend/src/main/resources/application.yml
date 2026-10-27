@@ -1,0 +1,65 @@
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  application:
+    name: workblog
+  web:
+    resources:
+      # jar 안 정적 파일(프론트) + 서버 폴더(자체 호스팅 draw.io 등). 서버: /project/workblog/static-extra (컨테이너 /app/static-extra)
+      static-locations: classpath:/static/,file:${EXTRA_STATIC_DIR:./static-extra}/
+      # 캐시 기간은 두지 않는다(index.html 이 오래 캐시되면 새 설치가 화면에 늦게 반영). 빌드 자산은 이름에 해시가 있어 조건부 요청으로 충분.
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/workblog}
+    username: ${DB_USERNAME:workblog}
+    password: ${DB_PASSWORD:workblog}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  servlet:
+    multipart:
+      max-file-size: ${MAX_FILE_MB:25}MB
+      max-request-size: ${MAX_FILE_MB:25}MB
+
+workblog:
+  jwt:
+    # HS256 secret, >= 32 bytes. Override in production.
+    secret: ${JWT_SECRET:workblog-dev-secret-change-me-please-0123456789}
+    expiration-minutes: ${JWT_EXPIRATION_MINUTES:720}
+  admin:
+    username: ${ADMIN_USERNAME:admin}
+    password: ${ADMIN_PASSWORD:admin1234}
+    display-name: ${ADMIN_DISPLAY_NAME:관리자}
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:3000}
+  storage:
+    # 첨부파일 저장 폴더. 서버에서는 /project/workblog/data/files (컨테이너 /app/data/files)
+    dir: ${STORAGE_DIR:./data/files}
+    max-file-mb: ${MAX_FILE_MB:25}
+  signup:
+    # 회원 가입 (2026-10-27 R13). 당분간 즉시 승인.
+    enabled: ${SIGNUP_ENABLED:true}
+    approval: ${SIGNUP_APPROVAL:false}
+  drawio:
+    # 다이어그램(draw.io) 편집기. 브라우저가 이 주소를 열 수 있어야 한다. 자체 호스팅 시 http://<host>/drawio 등으로 교체.
+    url: ${DRAWIO_URL:https://embed.diagrams.net}
+
+# API 문서: Swagger UI /swagger-ui/index.html, OpenAPI JSON /v3/api-docs
+springdoc:
+  swagger-ui:
+    operations-sorter: alpha
+    tags-sorter: alpha
+    doc-expansion: none
+  default-produces-media-type: application/json
+
+logging:
+  level:
+    com.workblog: INFO

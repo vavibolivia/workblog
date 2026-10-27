@@ -1,0 +1,24 @@
+# build outputs
+backend/target/
+backend/src/main/resources/static/
+frontend/dist/
+frontend/node_modules/
+# local env / secrets
+*.env
+.env*
+!.env.example
+*.log
+
+# internal records / company data (never published)
+data/
+backend/data/
+docs/WORKLOG.md
+docs/LEADER_REVIEW.md
+docs/00-REQUIREMENTS.md
+scripts/import_server_info.py
+.claude/
+*.xlsx
+*.p12
+*.jks
+__pycache__/
+*.pyc

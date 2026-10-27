@@ -1,0 +1,16 @@
+[Unit]
+Description=WorkBlog container workblog (사내 지식 공유, :8070)
+After=basic.target
+
+[Service]
+Environment=PODMAN_SYSTEMD_UNIT=%n
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/podman start workblog
+ExecStartPost=/bin/bash -c 'for i in $(seq 1 90); do (echo > /dev/tcp/127.0.0.1/8070) 2>/dev/null && exit 0; sleep 2; done; echo "workblog: 8070 가 열리지 않았다" >&2; exit 1'
+ExecStop=/usr/bin/podman stop -t 15 workblog
+TimeoutStartSec=200
+TimeoutStopSec=70
+
+[Install]
+WantedBy=default.target
