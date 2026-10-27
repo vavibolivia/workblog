@@ -5,6 +5,7 @@ import { useAuth } from '../lib/auth'
 import { useToast } from '../lib/toast'
 import Sidebar from '../components/Sidebar'
 import Modal from '../components/Modal'
+import { passwordHint, passwordProblem } from '../lib/password'
 
 export default function ProfilePage() {
   const { user, refresh } = useAuth()
@@ -23,6 +24,8 @@ export default function ProfilePage() {
   const savePw = async (e: FormEvent) => {
     e.preventDefault()
     if (pw1 !== pw2) { toast('새 비밀번호가 서로 다릅니다.', 'error'); return }
+    const problem = passwordProblem(pw1)
+    if (problem) { toast(`새 비밀번호는 ${problem}`, 'error'); return }
     setBusy(true)
     try { await api.users.changePassword(cur, pw1); setCur(''); setPw1(''); setPw2(''); toast('비밀번호를 변경했습니다.', 'success') }
     catch (er) { toast(errorMessage(er), 'error') } finally { setBusy(false) }
@@ -52,8 +55,8 @@ export default function ProfilePage() {
           <div className="card__body stack">
             <div className="field"><label htmlFor="pw-cur">현재 비밀번호</label><input id="pw-cur" type="password" className="input" value={cur} onChange={(e) => setCur(e.target.value)} required autoComplete="current-password" /></div>
             <div className="form-row">
-              <div className="field"><label htmlFor="pw-1">새 비밀번호</label><input id="pw-1" type="password" className="input" value={pw1} onChange={(e) => setPw1(e.target.value)} required minLength={4} autoComplete="new-password" /></div>
-              <div className="field"><label htmlFor="pw-2">새 비밀번호 확인</label><input id="pw-2" type="password" className="input" value={pw2} onChange={(e) => setPw2(e.target.value)} required minLength={4} autoComplete="new-password" /></div>
+              <div className="field"><label htmlFor="pw-1">새 비밀번호</label><input id="pw-1" type="password" className="input" value={pw1} onChange={(e) => setPw1(e.target.value)} required minLength={8} autoComplete="new-password" aria-describedby="pw-1-hint" /><span id="pw-1-hint" className={`field__hint${pw1 && passwordProblem(pw1) ? ' field__hint--bad' : ''}`}>{pw1 ? (passwordProblem(pw1) ?? '사용할 수 있습니다.') : passwordHint()}</span></div>
+              <div className="field"><label htmlFor="pw-2">새 비밀번호 확인</label><input id="pw-2" type="password" className="input" value={pw2} onChange={(e) => setPw2(e.target.value)} required minLength={8} autoComplete="new-password" /></div>
             </div>
             <div><button type="submit" className="btn" disabled={busy}>비밀번호 변경</button></div>
           </div>
@@ -115,8 +118,8 @@ function TokenCard() {
   return (
     <section className="card" aria-labelledby="token-title">
       <div className="card__head">
-        <h3 id="token-title">API 토큰 (외부 프로그램·Claude Code 연동)</h3>
-        <Link to="/help/claude-code" className="small" style={{ color: 'var(--sky)', fontWeight: 600 }}>사용법 보기</Link>
+        <h3 id="token-title">API 토큰 (CLI·외부 프로그램)</h3>
+        <Link to="/help/cli" className="small" style={{ color: 'var(--sky)', fontWeight: 600 }}>사용법 보기</Link>
       </div>
       <div className="card__body stack">
         <p className="small muted">웹 로그인 대신 외부 프로그램이 내 이름으로 글을 읽고 쓸 때 쓰는 개인 토큰입니다. 토큰 원문은 발급 직후 한 번만 보입니다.</p>

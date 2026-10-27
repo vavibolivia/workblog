@@ -63,6 +63,7 @@ export default function PostCard({ post, q, view = 'list' }: { post: PostSummary
         </div>
         <h3><Link to={`/posts/${post.id}`}><Highlight text={post.title} q={q} /></Link></h3>
         <p className="post-card__snippet"><Highlight text={post.summary || post.snippet} q={q} /></p>
+        {post.matchedAttachment && <p className="post-card__attach-match"><span className="attach-kind">첨부</span><span className="ellipsis"><Highlight text={post.matchedAttachment} q={q} /></span></p>}
         <div className="post-card__foot">
           <div className="post-card__author">
             <Avatar name={post.author.displayName} size="xs" />

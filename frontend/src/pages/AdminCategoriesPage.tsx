@@ -12,6 +12,8 @@ export default function AdminCategoriesPage() {
   const [dialog, setDialog] = useState<Dialog>(null)
   const [name, setName] = useState('')
   const [parentId, setParentId] = useState<number | null>(null)
+  /** 열람 부서 제한(쉼표 구분). 편집 폼에서만 */
+  const [depts, setDepts] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<CategoryNode | null>(null)
@@ -26,7 +28,7 @@ export default function AdminCategoriesPage() {
   const isDescendantOrSelf = (anc: CategoryNode, id: number): boolean => anc.id === id || anc.children.some((c) => isDescendantOrSelf(c, id))
 
   const openNew = (parent: CategoryNode | null) => { setErr(null); setName(''); setParentId(parent?.id ?? null); setDialog({ kind: 'new', parent }) }
-  const openEdit = (node: CategoryNode) => { setErr(null); setName(node.name); setParentId(node.parentId); setDialog({ kind: 'edit', node }) }
+  const openEdit = (node: CategoryNode) => { setErr(null); setName(node.name); setParentId(node.parentId); setDepts((node.restrictedDepartments ?? []).join(', ')); setDialog({ kind: 'edit', node }) }
 
   /** 편집 중인 노드를 옮길 수 있는 부모 후보: 자기/자손 제외, 깊이 제한 통과 */
   const parentOptions = useMemo(() => {
@@ -46,7 +48,8 @@ export default function AdminCategoriesPage() {
         toast(`'${name.trim()}' 카테고리를 만들었습니다.`, 'success')
       } else {
         const moving = parentId !== dialog.node.parentId
-        await api.categories.update(dialog.node.id, { name: name.trim(), parentId: parentId ?? undefined, moveToRoot: moving && parentId === null })
+        const restrictedDepartments = depts.split(',').map((d) => d.trim()).filter(Boolean)
+        await api.categories.update(dialog.node.id, { name: name.trim(), parentId: parentId ?? undefined, moveToRoot: moving && parentId === null, restrictedDepartments })
         toast('저장했습니다.', 'success')
       }
       setDialog(null); load()
@@ -134,6 +137,16 @@ export default function AdminCategoriesPage() {
                 이 위치에서 새 깊이는 {(parentId == null ? 0 : (findCategory(tree, parentId)?.depth ?? 0)) + 1}단계입니다. {CATEGORY_MAX_DEPTH}단계를 넘는 위치는 목록에 없습니다.
               </span>
             </div>
+            {dialog.kind === 'edit' && (
+              <div className="field">
+                <label htmlFor="c-depts">열람 부서 제한 <span className="muted" style={{ fontWeight: 400 }}>(선택)</span></label>
+                <input id="c-depts" className="input" value={depts} onChange={(e) => setDepts(e.target.value)} maxLength={1000} placeholder="예) 인프라팀, 운영팀 (비우면 전체 공개)" />
+                <span className="field__hint">
+                  쉼표로 구분한 부서의 구성원만 이 카테고리와 하위 카테고리의 글을 보고 검색할 수 있습니다. 작성자와 관리자는 항상 봅니다.
+                  서버 정보처럼 민감한 글에 쓰세요. 부서 이름은 사용자 정보의 부서와 똑같이 적어야 합니다(대소문자·앞뒤 공백 무시).
+                </span>
+              </div>
+            )}
             {err && <div className="alert alert--error">{err}</div>}
           </form>
         </Modal>

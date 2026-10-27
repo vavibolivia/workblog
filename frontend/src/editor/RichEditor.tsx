@@ -8,6 +8,7 @@ import Superscript from '@tiptap/extension-superscript'
 import { TableKit } from '@tiptap/extension-table'
 import Placeholder from '@tiptap/extension-placeholder'
 import { Indent } from './Indent'
+import { CELL_COLORS, StyledTableCell, StyledTableHeader } from './TableCellStyle'
 import { FigureImage } from './FigureImage'
 import DrawioDialog from './DrawioDialog'
 import { IcDiagram, IcDocument, IcEraser, IcExcel, IcImage, IcLink, IcPaperclip, IcRedo, IcRule, IcTable, IcUndo } from '../components/Icons'
@@ -27,6 +28,9 @@ interface Props {
   /** 가져온 문서의 제목(제목 칸이 비어 있을 때 채우라고 알려 준다) */
   onImportedTitle?: (title: string) => void
   placeholder?: string
+  /** X5: 본문 안에서 Ctrl+S(임시 저장) / Ctrl+Enter(발행) */
+  onSaveShortcut?: () => void
+  onPublishShortcut?: () => void
 }
 
 type DrawioState = { initial?: { xmlpng?: string; xml?: string }; apply?: (src: string) => void } | null
@@ -55,7 +59,10 @@ function promptLink(editor: Editor) {
   editor.chain().focus().extendMarkRange('link').setLink({ href: /^(https?:\/\/|mailto:|\/)/i.test(href) ? href : `https://${href}` }).run()
 }
 
-export default function RichEditor({ value, onChange, onUpload, onAttached, onImportDocument, onImportedTitle, placeholder = '내용을 입력하세요' }: Props) {
+export default function RichEditor({ value, onChange, onUpload, onAttached, onImportDocument, onImportedTitle, placeholder = '내용을 입력하세요', onSaveShortcut, onPublishShortcut }: Props) {
+  // editorProps 는 처음 한 번만 잡히므로 최신 콜백은 ref 로 읽는다
+  const keysRef = useRef({ onSaveShortcut, onPublishShortcut })
+  keysRef.current = { onSaveShortcut, onPublishShortcut }
   const fileInput = useRef<HTMLInputElement>(null)
   const excelInput = useRef<HTMLInputElement>(null)
   const docInput = useRef<HTMLInputElement>(null)
@@ -75,7 +82,8 @@ export default function RichEditor({ value, onChange, onUpload, onAttached, onIm
       TextStyleKit,
       TextAlign.configure({ types: ['heading', 'paragraph'], alignments: ['left', 'center', 'right', 'justify'] }),
       Subscript, Superscript,
-      TableKit.configure({ table: { resizable: true, HTMLAttributes: { class: 'rich-table' } } }),
+      TableKit.configure({ table: { resizable: true, HTMLAttributes: { class: 'rich-table' } }, tableCell: false, tableHeader: false }),
+      StyledTableCell, StyledTableHeader,
       Indent,
       FigureImage.configure({
         onEditDiagram: (src, apply) => {
@@ -95,6 +103,12 @@ export default function RichEditor({ value, onChange, onUpload, onAttached, onIm
       handleKeyDown: (_view, event) => {
         if ((event.ctrlKey || event.metaKey) && !event.shiftKey && !event.altKey && event.key.toLowerCase() === 'k') {
           event.preventDefault(); promptLink(editorRef.current as Editor); return true
+        }
+        // Ctrl+S / Ctrl+Enter: 기본 동작(브라우저 저장·줄바꿈)을 막고 화면의 저장·발행을 부른다
+        if ((event.ctrlKey || event.metaKey) && !event.shiftKey && !event.altKey) {
+          const k = keysRef.current
+          if (event.key.toLowerCase() === 's' && k.onSaveShortcut) { event.preventDefault(); k.onSaveShortcut(); return true }
+          if (event.key === 'Enter' && k.onPublishShortcut) { event.preventDefault(); k.onPublishShortcut(); return true }
         }
         return false
       },
@@ -250,6 +264,25 @@ function Toolbar({ editor, onImage, onExcel, onFile, onDocument, onDiagram, onDi
               <button type="button" disabled={!editor.isActive('table')} onClick={() => c().toggleHeaderRow().run()}>머리글 행 전환</button>
               <button type="button" disabled={!editor.isActive('table')} onClick={() => c().toggleHeaderColumn().run()}>머리글 열 전환</button>
               <button type="button" disabled={!editor.can().mergeCells() && !editor.can().splitCell()} onClick={() => c().mergeOrSplit().run()}>셀 병합/분할</button>
+              <hr />
+              <span className="rte__menu-label">셀 배경색</span>
+              <div className="rte__cellcolors">
+                {CELL_COLORS.map(([name, hex]) => (
+                  <button key={hex} type="button" className="rte__color" title={name} aria-label={`셀 배경 ${name}`} style={{ background: hex }}
+                          disabled={!editor.isActive('table')} onClick={() => c().setCellAttribute('backgroundColor', hex).run()} />
+                ))}
+                <button type="button" className="rte__color rte__color--none" title="없음" aria-label="셀 배경 없음"
+                        disabled={!editor.isActive('table')} onClick={() => c().setCellAttribute('backgroundColor', null).run()}>×</button>
+              </div>
+              <span className="rte__menu-label">셀 정렬</span>
+              <div className="rte__cellalign">
+                {([['left', '왼쪽'], ['center', '가운데'], ['right', '오른쪽']] as const).map(([v, label]) => (
+                  <button key={v} type="button" disabled={!editor.isActive('table')}
+                          aria-pressed={editor.isActive('tableCell', { cellAlign: v }) || editor.isActive('tableHeader', { cellAlign: v })}
+                          onClick={() => c().setCellAttribute('cellAlign', v).run()}>{label}</button>
+                ))}
+              </div>
+              <hr />
               <button type="button" disabled={!editor.isActive('table')} className="danger" onClick={() => { c().deleteTable().run(); setTableMenu(false) }}>표 삭제</button>
             </div>
           )}

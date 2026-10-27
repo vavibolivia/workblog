@@ -83,6 +83,9 @@ try:
 except Exception as e: check("TOKEN works as X-API-Key", False, e)
 s, r = call("GET", "/api/tokens", tok=WBT); check("TOKEN cannot manage tokens with a token 403", s == 403, s)
 s, r = call("PUT", "/api/users/me/password", {"currentPassword": "pass1234", "newPassword": "pass9999"}, WBT); check("TOKEN cannot change password 403", s == 403, s)
+s, r = call("GET", "/api/TOKENS", tok=WBT); check("TOKEN gate is case-insensitive 403", s == 403, s)
+s, r = call("GET", "/api//tokens", tok=WBT); check("TOKEN gate handles double slash 400/403", s in (400, 403), s)
+s, r = call("POST", "/api/users", {"username": "tokmade", "password": "pass1234", "displayName": "x"}, WBT); check("TOKEN cannot manage users 403", s == 403, s)
 s, r = call("GET", "/api/tokens", tok=U); check("TOKEN list shows token with prefix only", s == 200 and any(t["id"] == tid and "token" not in t for t in r), r)
 s, r = call("DELETE", f"/api/tokens/{tid}", tok=O); check("TOKEN others cannot revoke 404", s == 404, s)
 s, r = call("DELETE", f"/api/tokens/{tid}", tok=U); check("TOKEN revoke 204", s == 204, s)
@@ -152,8 +155,9 @@ check("SORT comments: comment counts non-increasing", s == 200 and _cc == sorted
 s, r = call("GET", "/api/posts?sort=BOGUS", tok=U); check("SORT unknown value 400", s == 400, s)
 
 # ---- 문서 (R14) ----
-s, r = call("GET", "/api/guide"); check("GUIDE list public", s == 200 and {d["id"] for d in r} >= {"api", "claude-code"}, (s, r))
-s, b, h = _raw("/api/guide/claude-code", U); check("GUIDE claude-code markdown mentions token + CLI", s == 200 and b"wbt_" in b and b"workblog.py" in b, (s, b[:80]))
+s, r = call("GET", "/api/guide"); check("GUIDE list public", s == 200 and {d["id"] for d in r} >= {"api", "cli", "writing"}, (s, r))
+s, b, h = _raw("/api/guide/cli", U); check("GUIDE cli markdown mentions token + CLI", s == 200 and b"wbt_" in b and b"workblog.py" in b, (s, b[:80]))
+s, b, h = _raw("/api/guide/claude-code", U); check("GUIDE legacy claude-code id still served", s == 200 and b"workblog.py" in b, s)
 s, b, h = _raw("/api/guide/api", U); check("GUIDE api markdown lists PATCH/import/export", s == 200 and b"PATCH" in b and b"/api/posts/import" in b and b"/export" in b, (s, b[:80]))
 s, b, h = _raw("/api/guide/workblog.py", U); check("GUIDE CLI script served", s == 200 and b.startswith(b"#!/usr/bin/env python3"), (s, b[:40]))
 req = urllib.request.Request(B + "/v3/api-docs")

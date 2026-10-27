@@ -4,6 +4,7 @@ import { useAuth } from '../lib/auth'
 import { useToast } from '../lib/toast'
 import Modal from '../components/Modal'
 import { Avatar } from '../components/Avatar'
+import { passwordHint, passwordProblem } from '../lib/password'
 
 type Form = { username: string; password: string; displayName: string; email: string; department: string; role: Role; active: boolean }
 const empty: Form = { username: '', password: '', displayName: '', email: '', department: '', role: 'USER', active: true }
@@ -38,6 +39,8 @@ export default function AdminUsersPage() {
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
+    const pwProblem = form.password ? passwordProblem(form.password) : null
+    if (pwProblem) { setErr(`비밀번호는 ${pwProblem}`); return }
     setBusy(true); setErr(null)
     try {
       if (editing === 'new') {
@@ -107,7 +110,8 @@ export default function AdminUsersPage() {
               </div>
               <div className="field">
                 <label htmlFor="u-password">{editing === 'new' ? '초기 비밀번호' : '비밀번호 재설정'}</label>
-                <input id="u-password" type="password" className="input" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required={editing === 'new'} minLength={4} autoComplete="new-password" placeholder={editing === 'new' ? '4자 이상' : '변경할 때만 입력'} />
+                <input id="u-password" type="password" className="input" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required={editing === 'new'} minLength={8} autoComplete="new-password" placeholder={editing === 'new' ? passwordHint() : '변경할 때만 입력'} />
+                <span className="field__hint">{passwordHint()}. 기존 비밀번호로 로그인하는 것은 막지 않습니다.</span>
               </div>
             </div>
             <div className="form-row">

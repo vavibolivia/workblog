@@ -35,6 +35,10 @@ public class Category {
     @Column(name = "sort_order", nullable = false)
     private int sortOrder;
 
+    /** 열람 제한 부서(쉼표 구분). 빈 문자열이면 제한 없음. 하위 카테고리에도 적용된다({@link CategoryAccess}). */
+    @Column(name = "restricted_departments", nullable = false, length = 1000)
+    private String restrictedDepartments = "";
+
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -65,7 +69,10 @@ public class Category {
     public int getDepth() { return depth; }
     public String getPath() { return path; }
     public int getSortOrder() { return sortOrder; }
+    public String getRestrictedDepartments() { return restrictedDepartments == null ? "" : restrictedDepartments; }
+    public java.util.List<String> getRestrictedDepartmentList() { return CategoryAccess.parse(getRestrictedDepartments()); }
 
+    void setRestrictedDepartments(java.util.List<String> departments) { this.restrictedDepartments = CategoryAccess.join(departments); }
     void setName(String name) { this.name = name; }
     void setParent(Category parent) { this.parent = parent; }
     void setSortOrder(int sortOrder) { this.sortOrder = sortOrder; }

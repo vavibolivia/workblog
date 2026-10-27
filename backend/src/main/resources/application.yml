@@ -4,6 +4,9 @@ server:
 spring:
   application:
     name: workblog
+  config:
+    # 설치 프로그램이 만드는 설정 파일(키는 아래 ${...} 이름과 같다. 예: DB_URL=...). 없으면 무시.
+    import: optional:file:${WORKBLOG_CONFIG:./config/workblog.properties}
   web:
     resources:
       # jar 안 정적 파일(프론트) + 서버 폴더(자체 호스팅 draw.io 등). 서버: /project/workblog/static-extra (컨테이너 /app/static-extra)
@@ -30,6 +33,8 @@ spring:
       max-request-size: ${MAX_FILE_MB:25}MB
 
 workblog:
+  # 문서·CLI 에 넣을 이 서버의 공개 주소(예: http://host:8070). 비우면 요청 주소를 쓴다.
+  public-base-url: ${PUBLIC_BASE_URL:}
   jwt:
     # HS256 secret, >= 32 bytes. Override in production.
     secret: ${JWT_SECRET:workblog-dev-secret-change-me-please-0123456789}
@@ -48,9 +53,20 @@ workblog:
     # 회원 가입 (2026-10-27 R13). 당분간 즉시 승인.
     enabled: ${SIGNUP_ENABLED:true}
     approval: ${SIGNUP_APPROVAL:false}
+  security:
+    # 새 비밀번호 최소 길이(영문+숫자 필수, 기존 계정 로그인에는 적용 안 함). 로그인 5회 연속 실패 시 10분 잠금은 고정값.
+    password-min-length: ${PASSWORD_MIN_LENGTH:8}
   drawio:
     # 다이어그램(draw.io) 편집기. 브라우저가 이 주소를 열 수 있어야 한다. 자체 호스팅 시 http://<host>/drawio 등으로 교체.
     url: ${DRAWIO_URL:https://embed.diagrams.net}
+  ops:
+    # 운영 자동 정리(매일 03:30, com.workblog.ops). 휴지통 보존 일수 · 고아 첨부 보존 시간 · 자동 실행 여부
+    trash-retention-days: ${TRASH_RETENTION_DAYS:30}
+    orphan-attachment-hours: ${ORPHAN_ATTACHMENT_HOURS:24}
+    cleanup-enabled: ${CLEANUP_ENABLED:true}
+  review:
+    # 오래된 글 재검토(com.workblog.review): 마지막 수정·내용 확인에서 이 일수가 지난 발행 글에 안내. 0 이면 끔
+    stale-days: ${REVIEW_STALE_DAYS:180}
 
 # API 문서: Swagger UI /swagger-ui/index.html, OpenAPI JSON /v3/api-docs
 springdoc:

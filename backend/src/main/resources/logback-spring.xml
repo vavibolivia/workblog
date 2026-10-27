@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Spring Boot 기본 콘솔 출력은 그대로 두고(podman logs workblog), WARN 이상을 메모리 링 버퍼(ErrorLogBuffer, 200건)에 더 담아
+     관리자 상태 API(/api/admin/ops/status)에서 보여 준다. 로그 레벨은 application.yml 의 logging.level 이 그대로 적용된다. -->
+<configuration>
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+    <include resource="org/springframework/boot/logging/logback/console-appender.xml"/>
+
+    <appender name="ERROR_BUFFER" class="com.workblog.ops.ErrorLogBuffer">
+        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <level>WARN</level>
+        </filter>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="ERROR_BUFFER"/>
+    </root>
+</configuration>

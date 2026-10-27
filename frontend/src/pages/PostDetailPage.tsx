@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api, errorMessage, formatDate, formatFileSize, type PostDetail } from '../lib/api'
 import { useToast } from '../lib/toast'
@@ -9,6 +9,10 @@ import { Avatar } from '../components/Avatar'
 import CategoryPath from '../components/CategoryPath'
 import CommentSection from '../components/CommentSection'
 import ExportMenu from '../components/ExportMenu'
+import ViewersButton from '../components/ViewersButton'
+import Toc from '../components/Toc'
+import RelatedPosts from '../components/RelatedPosts'
+import StaleNotice from '../components/StaleNotice'
 
 export default function PostDetailPage() {
   const { id } = useParams()
@@ -19,6 +23,7 @@ export default function PostDetailPage() {
   const [err, setErr] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [busy, setBusy] = useState(false)
+  const bodyRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     setPost(null); setErr(null)
@@ -57,9 +62,12 @@ export default function PostDetailPage() {
         {err && <div className="alert alert--error">{err} <Link to="/" style={{ textDecoration: 'underline' }}>홈으로</Link></div>}
         {!post && !err && <div className="empty"><div className="spinner" style={{ margin: '0 auto' }} /></div>}
         {post && (
+          <div className="post-wrap">
+          <Toc bodyRef={bodyRef} deps={post.content} />
           <article className="post">
             <header className="post__head">
               {post.deletedAt && <div className="alert alert--warn" style={{ marginBottom: 14 }}>이 글은 {formatDate(post.deletedAt, true)}에 삭제되었습니다. 작성자와 관리자만 볼 수 있습니다.</div>}
+              {!post.deletedAt && post.status === 'PUBLISHED' && <StaleNotice postId={post.id} />}
               <div className="row row--between row--wrap">
                 <div className="row row--wrap" style={{ gap: 8 }}>
                   {post.pinned && <span className="chip chip--notice">공지</span>}
@@ -87,6 +95,7 @@ export default function PostDetailPage() {
                   )}
                   <Link to={`/posts/${post.id}/history`} className="btn btn--sm">변경 이력{post.version > 1 ? ` ${post.version}` : ''}</Link>
                   <ExportMenu postId={post.id} title={post.title} />
+                  {post.editable && <ViewersButton postId={post.id} />}
                   {post.editable && !post.deletedAt && <>
                     <Link to={`/posts/${post.id}/edit`} className="btn btn--sm btn--primary">수정</Link>
                     <button type="button" className="btn btn--sm btn--danger" onClick={() => setConfirmDelete(true)}>삭제</button>
@@ -96,7 +105,7 @@ export default function PostDetailPage() {
               </div>
               {post.summary && <p className="post__summary">{post.summary}</p>}
             </header>
-            <div className="post__body"><RichContent content={post.content} format={post.contentFormat} /></div>
+            <div className="post__body" ref={bodyRef}><RichContent content={post.content} format={post.contentFormat} /></div>
             {post.attachments.length > 0 && (
               <div className="post__attach">
                 <strong className="small">첨부파일 {post.attachments.length}</strong>
@@ -114,8 +123,10 @@ export default function PostDetailPage() {
             {post.tags.length > 0 && (
               <div className="post__tags">{post.tags.map((t) => <Link key={t} to={`/?tag=${encodeURIComponent(t)}`} className="chip">#{t}</Link>)}</div>
             )}
+            {!post.deletedAt && <RelatedPosts postId={post.id} />}
             <CommentSection postId={post.id} />
           </article>
+          </div>
         )}
       </main>
 

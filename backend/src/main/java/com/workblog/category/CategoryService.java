@@ -38,7 +38,7 @@ public class CategoryService {
             List<CategoryNode> kids = build(c.getId(), byParent, direct);
             long own = direct.getOrDefault(c.getId(), 0L);
             long total = own + kids.stream().mapToLong(CategoryNode::totalCount).sum();
-            out.add(new CategoryNode(c.getId(), c.getName(), c.getParentId(), c.getDepth(), c.getSortOrder(), own, total, kids));
+            out.add(new CategoryNode(c.getId(), c.getName(), c.getParentId(), c.getDepth(), c.getSortOrder(), own, total, kids, c.getRestrictedDepartmentList()));
         }
         return out;
     }
@@ -53,14 +53,20 @@ public class CategoryService {
         return repo.findById(id).orElseThrow(() -> ApiException.notFound("카테고리"));
     }
 
-    /** 글 저장 시 카테고리 결정: 지정 없으면 '일반'(없으면 생성). */
+    /**
+     * 글 저장 시 카테고리 결정. 지정이 있으면 그것.
+     * 없으면 최상위 '일반', '일반'이 삭제됐으면 최상위 첫 카테고리(순서 기준). 카테고리가 하나도 없을 때만 '일반'을 만든다.
+     * (2026-10-27 지시 "기본 카테고리 일반 삭제 가능하도록")
+     */
     public Category resolveForPost(Long categoryId) {
         if (categoryId != null) return get(categoryId);
-        return repo.findRootByName(Category.DEFAULT_NAME).orElseGet(() -> {
-            Category c = repo.save(new Category(Category.DEFAULT_NAME, null, 0));
-            c.refreshPath();
-            return c;
-        });
+        return repo.findRootByName(Category.DEFAULT_NAME)
+                .or(() -> repo.findAllOrdered().stream().filter(c -> c.getParent() == null).findFirst())
+                .orElseGet(() -> {
+                    Category c = repo.save(new Category(Category.DEFAULT_NAME, null, 0));
+                    c.refreshPath();
+                    return c;
+                });
     }
 
     /** "서버 정보 > AWS" 또는 "서버 정보/AWS" 형태의 이름 경로로 카테고리를 찾는다(대소문자 무시). 없으면 400. */
@@ -147,18 +153,34 @@ public class CategoryService {
         }
         c.setName(name);
         if (req.sortOrder() != null && !moving) c.setSortOrder(req.sortOrder());
-        return new CategoryNode(c.getId(), c.getName(), c.getParentId(), c.getDepth(), c.getSortOrder(), 0, 0, List.of());
+        if (req.restrictedDepartments() != null) {
+            String joined = CategoryAccess.join(req.restrictedDepartments());
+            if (joined.length() > 1000) throw ApiException.badRequest("열람 제한 부서 목록이 너무 깁니다(최대 1000자).");
+            c.setRestrictedDepartments(req.restrictedDepartments());
+        }
+        return new CategoryNode(c.getId(), c.getName(), c.getParentId(), c.getDepth(), c.getSortOrder(), 0, 0, List.of(), c.getRestrictedDepartmentList());
     }
 
     public void delete(Long id) {
         Category c = get(id);
         if (repo.existsByParentId(id)) throw ApiException.badRequest("하위 카테고리가 있어 삭제할 수 없습니다. 하위 카테고리를 먼저 옮기거나 삭제하세요.");
         if (repo.countAllPosts(id) > 0) throw ApiException.badRequest("이 카테고리에 연결된 글이 있어 삭제할 수 없습니다. 글을 다른 카테고리로 옮긴 뒤 삭제하세요.");
-        if (c.getParent() == null && Category.DEFAULT_NAME.equals(c.getName())) throw ApiException.badRequest("기본 카테고리 '일반'은 삭제할 수 없습니다.");
         repo.delete(c);
     }
 
     /** 같은 부모 안에서 순서 한 칸 이동. direction = -1(위) / 1(아래) */
+    /** 끌어 놓기: 필요하면 부모를 옮기고(update 의 검사 그대로), 새 형제 목록의 index 자리에 끼워 순서를 다시 매긴다. */
+    public void place(Long id, Long parentId, int index) {
+        Category c = get(id);
+        if (!Objects.equals(parentId, c.getParentId())) {
+            update(id, new UpdateCategoryRequest(c.getName(), parentId, parentId == null, null));
+        }
+        List<Category> siblings = new ArrayList<>(repo.findAllOrdered().stream()
+                .filter(s -> Objects.equals(s.getParentId(), parentId) && !s.getId().equals(id)).toList());
+        siblings.add(Math.max(0, Math.min(index, siblings.size())), c);
+        for (int i = 0; i < siblings.size(); i++) siblings.get(i).setSortOrder(i + 1);
+    }
+
     public void reorder(Long id, int direction) {
         Category c = get(id);
         List<Category> siblings = repo.findAllOrdered().stream()

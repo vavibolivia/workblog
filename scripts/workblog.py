@@ -156,6 +156,11 @@ def main():
         if a.visibility: body["visibility"] = a.visibility
         if a.pinned: body["pinned"] = a.pinned == "true"
         if a.note: body["changeNote"] = a.note
+        # 본문에 넣은 사진(/api/files/<id>)은 첨부로 연결해야 글에 남는다(연결 안 된 업로드는 자동 정리 대상)
+        if "content" in body:
+            import re
+            ids = sorted(set(re.findall(r"/api/files/([0-9a-f-]{36})", body["content"])))
+            if ids: body["attachmentIds"] = ids
         return body
 
     if a.cmd == "me": out(c.call("GET", "/api/auth/me"))

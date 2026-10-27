@@ -27,8 +27,9 @@ public class HistoryController {
     public PageResponse<ActivityEntry> activity(@RequestParam(defaultValue = "0") int page,
                                                 @RequestParam(defaultValue = "20") int size,
                                                 @CurrentUser User viewer) {
+        String dept = viewer.getDepartment() == null ? "" : viewer.getDepartment().trim().toLowerCase(java.util.Locale.ROOT);
         var result = revisions.findActivity(viewer.getId(), viewer.isAdmin(), com.workblog.post.Post.Status.PUBLISHED, com.workblog.post.Post.Visibility.PUBLIC,
-                PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), 100)));
+                dept, PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), 100)));
         return PageResponse.of(result, ActivityEntry::from);
     }
 }

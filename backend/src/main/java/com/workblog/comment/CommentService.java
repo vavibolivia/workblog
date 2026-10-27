@@ -18,10 +18,12 @@ import java.util.Set;
 public class CommentService {
     private final CommentRepository comments;
     private final PostRepository posts;
+    private final com.workblog.notification.NotificationService notifications;
 
-    public CommentService(CommentRepository comments, PostRepository posts) {
+    public CommentService(CommentRepository comments, PostRepository posts, com.workblog.notification.NotificationService notifications) {
         this.comments = comments;
         this.posts = posts;
+        this.notifications = notifications;
     }
 
     // ---------- queries ----------
@@ -52,13 +54,16 @@ public class CommentService {
         Post post = loadViewable(postId, author);
         if (post.isDeleted()) throw ApiException.badRequest("삭제된 글에는 댓글을 달 수 없습니다.");
         Comment parent = null;
+        Comment replyTarget = null;
         if (req.parentId() != null) {
             parent = comments.findById(req.parentId()).orElseThrow(() -> ApiException.notFound("댓글"));
             if (!parent.getPost().getId().equals(postId)) throw ApiException.notFound("댓글");
+            replyTarget = parent;
             // 답글은 1단계만: 답글에 단 답글은 원 댓글 아래에 붙인다.
             if (parent.getParent() != null) parent = parent.getParent();
         }
         Comment c = comments.save(new Comment(post, parent, author, req.content().trim()));
+        notifications.onComment(c, replyTarget);
         return toResponse(c, author);
     }
 

@@ -19,9 +19,20 @@ import java.util.List;
 @RequestMapping("/api")
 public class PostController {
     private final PostService service;
+    private final com.workblog.attachment.AttachmentTextService attachmentTexts;
 
-    public PostController(PostService service) {
+    public PostController(PostService service, com.workblog.attachment.AttachmentTextService attachmentTexts) {
         this.service = service;
+        this.attachmentTexts = attachmentTexts;
+    }
+
+    /** 검색어가 첨부 파일 내용에 걸린 글에 matchedAttachment("파일명 — …일치 부분…")를 붙인다. */
+    private PageResponse<PostSummary> withAttachmentMatches(PageResponse<PostSummary> page, String q) {
+        if (q == null || q.isBlank() || page.content().isEmpty()) return page;
+        var found = attachmentTexts.matches(page.content().stream().map(PostSummary::id).toList(), q);
+        if (found.isEmpty()) return page;
+        return new PageResponse<>(page.content().stream().map(p -> found.containsKey(p.id()) ? p.withMatchedAttachment(found.get(p.id())) : p).toList(),
+                page.page(), page.size(), page.totalElements(), page.totalPages());
     }
 
     /** 목록 + 검색. q / categoryId(하위 포함) / tag / authorId / status 필터, sort(LATEST·POPULAR·VIEWS·OLDEST), 페이지네이션. */
@@ -36,7 +47,7 @@ public class PostController {
                                           @RequestParam(defaultValue = "0") int page,
                                           @RequestParam(defaultValue = "10") int size,
                                           @CurrentUser User viewer) {
-        return service.search(q, categoryId, tag, authorId, status, sort, page, size, viewer);
+        return withAttachmentMatches(service.search(q, categoryId, tag, authorId, status, sort, page, size, viewer), q);
     }
 
     @GetMapping("/search")
@@ -45,7 +56,7 @@ public class PostController {
                                             @RequestParam(defaultValue = "0") int page,
                                             @RequestParam(defaultValue = "10") int size,
                                             @CurrentUser User viewer) {
-        return service.search(q, null, null, null, null, sort, page, size, viewer);
+        return withAttachmentMatches(service.search(q, null, null, null, null, sort, page, size, viewer), q);
     }
 
     @GetMapping("/posts/{id}")

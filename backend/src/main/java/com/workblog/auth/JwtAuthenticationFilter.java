@@ -83,8 +83,20 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         chain.doFilter(req, res);
     }
 
+    /**
+     * API 토큰으로 막는 경로: 토큰 관리, 비밀번호 변경, 사용자 관리(생성·수정·삭제), 관리자 운영 API.
+     * 라우터가 쓰는 것과 같은 정규화 경로(디코딩·경로 매개변수 제거·중복 슬래시 정리, 대소문자 무시)로 판정해 우회(%2F, ;, //, 대소문자)를 막는다.
+     */
     private static boolean blockedForApiToken(HttpServletRequest req) {
-        String uri = req.getRequestURI();
-        return uri.startsWith("/api/tokens") || uri.equals("/api/users/me/password");
+        String path = new org.springframework.web.util.UrlPathHelper().getPathWithinApplication(req);
+        path = path.replaceAll("/{2,}", "/").toLowerCase(java.util.Locale.ROOT);
+        if (path.length() > 1 && path.endsWith("/")) path = path.substring(0, path.length() - 1);
+        String m = req.getMethod();
+        if (path.equals("/api/tokens") || path.startsWith("/api/tokens/")) return true;
+        if (path.equals("/api/users/me/password")) return true;
+        if (path.startsWith("/api/admin/")) return true;
+        boolean userAdmin = (path.equals("/api/users") && "POST".equalsIgnoreCase(m))
+                || (path.startsWith("/api/users/") && !path.startsWith("/api/users/me") && !"GET".equalsIgnoreCase(m));
+        return userAdmin;
     }
 }

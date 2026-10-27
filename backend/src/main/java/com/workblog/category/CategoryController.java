@@ -49,6 +49,14 @@ public class CategoryController {
         service.reorder(id, direction);
     }
 
+    /** 끌어 놓기: parentId(없으면 최상위) 아래 index 번째(0부터) 자리에 놓는다. 부모가 바뀌면 하위 트리째 이동(5단계 규칙 검사). */
+    @PostMapping("/{id}/place")
+    @PreAuthorize("hasRole('ADMIN')")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void place(@PathVariable Long id, @Valid @RequestBody PlaceCategoryRequest req) {
+        service.place(id, req.parentId(), req.index());
+    }
+
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     @ResponseStatus(HttpStatus.NO_CONTENT)

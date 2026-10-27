@@ -34,9 +34,11 @@ public class AttachmentService {
     private final AttachmentRepository repo;
     private final Path root;
     private final long maxBytes;
+    private final AttachmentTextService texts;
 
-    public AttachmentService(AttachmentRepository repo, WorkblogProperties props) {
+    public AttachmentService(AttachmentRepository repo, WorkblogProperties props, AttachmentTextService texts) {
         this.repo = repo;
+        this.texts = texts;
         this.root = Path.of(props.storage().dir()).toAbsolutePath().normalize();
         this.maxBytes = props.storage().maxFileMb() * 1024L * 1024L;
         try { Files.createDirectories(root); } catch (IOException e) { throw new IllegalStateException("저장소 폴더를 만들 수 없습니다: " + root, e); }
@@ -102,7 +104,10 @@ public class AttachmentService {
             throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, "파일을 저장하지 못했습니다.");
         }
         String rel = now.getYear() + "/" + String.format("%02d", now.getMonthValue()) + "/" + stored;
-        return repo.save(new Attachment(publicId, uploader, original, rel, contentType, size, kind));
+        Attachment saved = repo.save(new Attachment(publicId, uploader, original, rel, contentType, size, kind));
+        // 첨부 내용 검색용 텍스트(문서형만). 추출 실패는 업로드를 막지 않는다.
+        if (kind != Attachment.Kind.IMAGE) texts.extractNow(saved.getId(), rel, original);
+        return saved;
     }
 
     /** 파일 내용(내보내기에서 사진을 문서에 넣을 때). 없으면 null. */

@@ -316,15 +316,13 @@ class CategoryServiceTest {
     }
 
     @Test
-    void delete_default_root_general_is_400() {
+    void delete_default_root_general_allowed_when_empty() {
         Category c = node(1, Category.DEFAULT_NAME, null);
         when(repo.existsByParentId(1L)).thenReturn(false);
         when(repo.countAllPosts(1L)).thenReturn(0L);
 
-        assertThatThrownBy(() -> service.delete(1L))
-                .satisfies(t -> assertApi(t, HttpStatus.BAD_REQUEST))
-                .hasMessageContaining("일반");
-        verify(repo, never()).delete(c);
+        service.delete(1L);
+        verify(repo).delete(c);
     }
 
     @Test

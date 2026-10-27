@@ -3,8 +3,12 @@
 # 사용: bash build.sh   (JAVA_HOME 이 JDK 21 이 아니면 아래 기본값 사용)
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
-export JAVA_HOME="${JAVA_HOME_21:-/c/Program Files/Java/jdk-21.0.12}"
-export PATH="$JAVA_HOME/bin:$PATH"
+# JDK 21 찾기: JAVA_HOME_21 → (JAVA_HOME 이 21 이면 그대로) → Windows 기본 설치 경로
+if [ -n "${JAVA_HOME_21:-}" ]; then export JAVA_HOME="$JAVA_HOME_21"
+elif [ -n "${JAVA_HOME:-}" ] && "$JAVA_HOME/bin/java" -version 2>&1 | grep -q 'version "21'; then :
+elif [ -d "/c/Program Files/Java/jdk-21.0.12" ]; then export JAVA_HOME="/c/Program Files/Java/jdk-21.0.12"
+fi
+[ -n "${JAVA_HOME:-}" ] && export PATH="$JAVA_HOME/bin:$PATH"
 
 echo "== frontend build"
 (cd "$ROOT/frontend" && npm ci --no-audit --no-fund >/dev/null && npm run build)

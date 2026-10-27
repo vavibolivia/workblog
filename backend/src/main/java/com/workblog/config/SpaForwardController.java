@@ -6,7 +6,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 /** Serves the built React app for client-side routes when the frontend build is bundled into the jar. */
 @Controller
 public class SpaForwardController {
-    @GetMapping(value = {"/login", "/posts", "/posts/**", "/write", "/search", "/history", "/history/**", "/admin", "/admin/**", "/me", "/trash", "/signup", "/help", "/help/**"})
+    @GetMapping(value = {"/login", "/posts", "/posts/**", "/write", "/search", "/history", "/history/**", "/admin", "/admin/**", "/me", "/trash", "/signup", "/help", "/help/**", "/stats"})
     public String forward() {
         return "forward:/index.html";
     }

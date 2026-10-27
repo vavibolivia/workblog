@@ -159,6 +159,8 @@ s, r = call("GET", "/api/posts", tok=U); check("R1 deactivated user's token reje
 call("PUT", f"/api/users/{uid}", {"displayName": "홍길동", "active": True}, A)
 # ---- 댓글·답글 (scripts/smoke_comments.py, 같은 폴더) ----
 exec(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "smoke_comments.py"), encoding="utf-8").read())
+exec(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "smoke_knowledge.py"), encoding="utf-8").read())  # 템플릿·관련 글·재검토·첨부 검색
+exec(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "smoke_collab.py"), encoding="utf-8").read())  # 알림·충돌·감사·열람 제한·비밀번호·잠금
 # ---- 2026-10-27 기능(가입·토큰·PATCH·가져오기·내보내기·문서·영구삭제) + 정리 (scripts/smoke_v2.py) ----
 exec(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "smoke_v2.py"), encoding="utf-8").read())
 print(f"\nRESULT {ok} pass / {bad} fail")

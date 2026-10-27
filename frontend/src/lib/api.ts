@@ -53,6 +53,8 @@ export interface CategoryNode {
   postCount: number
   totalCount: number
   children: CategoryNode[]
+  /** 열람 제한 부서(이 카테고리에 직접 건 것, 하위에도 적용). 비면 제한 없음 */
+  restrictedDepartments?: string[]
 }
 
 export const CATEGORY_MAX_DEPTH = 5
@@ -94,11 +96,13 @@ export interface PostSummary {
   createdAt: string
   updatedAt: string
   publishedAt: string | null
+  /** 검색어가 첨부 파일 내용에 있을 때만: "파일명 — …일치 부분…" */
+  matchedAttachment?: string
 }
 
 export interface LikeResponse { liked: boolean; count: number }
 
-export interface PostDetail extends Omit<PostSummary, 'snippet' | 'thumbnailUrl'> {
+export interface PostDetail extends Omit<PostSummary, 'snippet' | 'thumbnailUrl' | 'matchedAttachment'> {
   content: string
   contentFormat: ContentFormat
   deletedAt: string | null
@@ -120,6 +124,8 @@ export interface PostRequest {
   /** 관리자만 반영된다 */
   pinned?: boolean
   changeNote?: string
+  /** 수정 때 불러온 버전. 서버 버전과 다르면 409(동시 편집 충돌). 빼면 검사 없이 덮어쓴다. */
+  baseVersion?: number
 }
 
 export interface RevisionSummary {
@@ -166,7 +172,7 @@ export interface TagCount { name: string; count: number }
 export interface ApiErrorBody { status: number; error: string; message: string }
 
 /** 로그인 전에도 볼 수 있는 가입 설정 */
-export interface AuthOptions { signupEnabled: boolean; signupRequiresApproval: boolean }
+export interface AuthOptions { signupEnabled: boolean; signupRequiresApproval: boolean; /** 새 비밀번호 최소 길이(영문+숫자 필수) */ passwordMinLength?: number }
 
 export interface SignupRequest { username: string; password: string; displayName: string; email?: string; department?: string }
 
@@ -188,6 +194,22 @@ export interface TokenInfo {
 }
 
 export interface GuideDoc { id: string; title: string }
+
+/** 글 통계(X6, `GET /api/stats?days=`). 발행·전체 공개 글 기준. */
+export interface StatsTotals { posts: number; publishedInPeriod: number; authors: number; comments: number; likes: number; views: number }
+export interface StatsDayCount { date: string; count: number }
+export interface StatsPostRow { id: number; title: string; author: string; viewCount: number; likeCount: number; commentCount: number }
+export interface StatsNameCount { name: string; count: number }
+export interface StatsResponse {
+  days: number
+  totals: StatsTotals
+  daily: StatsDayCount[]
+  mostViewed: StatsPostRow[]
+  mostLiked: StatsPostRow[]
+  byCategory: StatsNameCount[]
+  byDepartment: StatsNameCount[]
+  topAuthors: StatsNameCount[]
+}
 
 // ---------- client ----------
 const TOKEN_KEY = 'workblog.token'
@@ -275,9 +297,11 @@ export const api = {
   categories: {
     tree: () => http.get<CategoryNode[]>('/categories').then((r) => r.data),
     create: (name: string, parentId: number | null) => http.post<CategoryNode>('/categories', { name, parentId }).then((r) => r.data),
-    update: (id: number, body: { name: string; parentId?: number | null; moveToRoot?: boolean; sortOrder?: number }) =>
+    update: (id: number, body: { name: string; parentId?: number | null; moveToRoot?: boolean; sortOrder?: number; restrictedDepartments?: string[] }) =>
       http.put<CategoryNode>(`/categories/${id}`, body).then((r) => r.data),
     move: (id: number, direction: -1 | 1) => http.post(`/categories/${id}/move`, null, { params: { direction } }),
+    /** 끌어 놓기: parentId(null=최상위) 아래 index 번째 자리로 */
+    place: (id: number, parentId: number | null, index: number) => http.post(`/categories/${id}/place`, { parentId, index }),
     remove: (id: number) => http.delete(`/categories/${id}`),
   },
   files: {
@@ -297,6 +321,9 @@ export const api = {
     create: (name: string, expiresInDays?: number) =>
       http.post<{ token: string; info: TokenInfo }>('/tokens', { name, expiresInDays }).then((r) => r.data),
     revoke: (id: number) => http.delete(`/tokens/${id}`),
+  },
+  stats: {
+    get: (days: number) => http.get<StatsResponse>('/stats', { params: { days } }).then((r) => r.data),
   },
   guide: {
     list: () => http.get<GuideDoc[]>('/guide').then((r) => r.data),
@@ -364,4 +391,26 @@ export const changeTypeLabel: Record<ChangeType, string> = {
   RESTORE: '복원',
   DELETE: '삭제',
   UNDELETE: '삭제 취소',
+}
+
+// ---------- 운영(관리자 상태 화면, com.workblog.ops) ----------
+export interface OpsLogEntry { time: string; level: string; logger: string; message: string; exception: string | null }
+export interface CleanupResult {
+  startedAt: string; finishedAt: string; manual: boolean
+  purgedPosts: number; deletedOrphans: number; deletedFiles: number; failedFiles: number; error: string | null
+}
+export interface OpsAlert { code: string; message: string }
+export interface OpsStatus {
+  app: { version: string; startedAt: string; uptimeSeconds: number; javaVersion: string; now: string }
+  memory: { usedBytes: number; maxBytes: number }
+  disk: { path: string; totalBytes: number; freeBytes: number }
+  db: { up: boolean; version: string | null; error: string | null }
+  counts: { users: number; activeUsers: number; posts: number; published: number; drafts: number; trash: number; comments: number; attachments: number; attachmentBytes: number }
+  cleanup: { enabled: boolean; trashRetentionDays: number; orphanAttachmentHours: number; last: CleanupResult | null }
+  recentErrors: OpsLogEntry[]
+  alerts: OpsAlert[]
+}
+export const opsApi = {
+  status: () => http.get<OpsStatus>('/admin/ops/status').then((r) => r.data),
+  cleanup: () => http.post<CleanupResult>('/admin/ops/cleanup').then((r) => r.data),
 }

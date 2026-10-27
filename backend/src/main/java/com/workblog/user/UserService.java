@@ -15,13 +15,15 @@ public class UserService {
     private final PasswordEncoder encoder;
     private final com.workblog.post.PostRepository posts;
     private final com.workblog.attachment.AttachmentService attachments;
+    private final PasswordPolicy passwordPolicy;
 
     public UserService(UserRepository users, PasswordEncoder encoder, com.workblog.post.PostRepository posts,
-                       com.workblog.attachment.AttachmentService attachments) {
+                       com.workblog.attachment.AttachmentService attachments, PasswordPolicy passwordPolicy) {
         this.users = users;
         this.encoder = encoder;
         this.posts = posts;
         this.attachments = attachments;
+        this.passwordPolicy = passwordPolicy;
     }
 
     @Transactional(readOnly = true)
@@ -43,6 +45,7 @@ public class UserService {
         if (users.existsByUsername(req.username())) {
             throw ApiException.conflict("이미 사용 중인 아이디입니다: " + req.username());
         }
+        passwordPolicy.check(req.password());
         User u = new User(req.username(), encoder.encode(req.password()), req.displayName(),
                 req.email(), req.department(), req.role());
         return UserResponse.from(users.save(u));
@@ -54,6 +57,7 @@ public class UserService {
         if (users.existsByUsernameIgnoreCase(username)) {
             throw ApiException.conflict("이미 사용 중인 아이디입니다: " + username);
         }
+        passwordPolicy.check(req.password());
         User u = new User(username, encoder.encode(req.password()), req.displayName().trim(),
                 blankToNull(req.email()), blankToNull(req.department()), User.Role.USER);
         u.setActive(active);
@@ -82,6 +86,7 @@ public class UserService {
             u.setActive(req.active());
         }
         if (req.newPassword() != null && !req.newPassword().isBlank()) {
+            passwordPolicy.check(req.newPassword());
             u.setPassword(encoder.encode(req.newPassword()));
         }
         return UserResponse.from(u);
@@ -116,6 +121,7 @@ public class UserService {
         if (!encoder.matches(req.currentPassword(), u.getPassword())) {
             throw ApiException.badRequest("현재 비밀번호가 올바르지 않습니다.");
         }
+        passwordPolicy.check(req.newPassword());
         u.setPassword(encoder.encode(req.newPassword()));
     }
 }

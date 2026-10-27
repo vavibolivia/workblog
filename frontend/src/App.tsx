@@ -15,8 +15,13 @@ const AdminUsersPage = lazy(() => import('./pages/AdminUsersPage'))
 const ProfilePage = lazy(() => import('./pages/ProfilePage'))
 const TrashPage = lazy(() => import('./pages/TrashPage'))
 const AdminCategoriesPage = lazy(() => import('./pages/AdminCategoriesPage'))
+const AdminStatusPage = lazy(() => import('./pages/AdminStatusPage'))
+const AdminAuditPage = lazy(() => import('./pages/AdminAuditPage'))
 const SignupPage = lazy(() => import('./pages/SignupPage'))
 const HelpPage = lazy(() => import('./pages/HelpPage'))
+const StatsPage = lazy(() => import('./pages/StatsPage'))
+const AdminTemplatesPage = lazy(() => import('./pages/AdminTemplatesPage'))
+const AdminReviewPage = lazy(() => import('./pages/AdminReviewPage'))
 
 const Loading = () => <div className="screen-center" style={{ minHeight: '50vh' }}><div className="spinner" aria-label="불러오는 중" /></div>
 
@@ -48,8 +53,13 @@ export default function App() {
         <Route path="trash" element={<TrashPage />} />
         <Route path="help" element={<HelpPage />} />
         <Route path="help/:doc" element={<HelpPage />} />
+        <Route path="stats" element={<StatsPage />} />
         <Route path="admin/users" element={<RequireAuth admin><AdminUsersPage /></RequireAuth>} />
         <Route path="admin/categories" element={<RequireAuth admin><AdminCategoriesPage /></RequireAuth>} />
+        <Route path="admin/status" element={<RequireAuth admin><AdminStatusPage /></RequireAuth>} />
+        <Route path="admin/audit" element={<RequireAuth admin><AdminAuditPage /></RequireAuth>} />
+        <Route path="admin/templates" element={<RequireAuth admin><AdminTemplatesPage /></RequireAuth>} />
+        <Route path="admin/review" element={<RequireAuth admin><AdminReviewPage /></RequireAuth>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

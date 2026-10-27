@@ -85,3 +85,25 @@
 .drawio__fail { flex: 1; display: grid; place-items: center; text-align: center; padding: 24px; }
 
 .rte__btn svg { vertical-align: -3px; margin-right: 2px; }
+/* 원본 width/height 속성이 남은 사진(HTML 가져오기)도 비율 유지: 가로만 줄고 세로가 늘어나던 문제 */
+.rich img { max-width: 100%; height: auto; }
+
+/* X2 표 메뉴: 셀 배경색(8색+없음)·셀 정렬 */
+.rte__menu:has(.rte__cellcolors) { min-width: 250px; max-height: 70vh; overflow-y: auto; }
+.rte__menu-label { padding: 4px 10px 2px; font-size: 12px; color: var(--muted); }
+.rte__cellcolors { display: grid; grid-template-columns: repeat(9, 22px); gap: 4px; padding: 4px 10px 6px; }
+.rte__menu .rte__cellcolors button { width: 22px; height: 22px; padding: 0; border: 1px solid rgba(0,0,0,.14); border-radius: 5px; text-align: center; font-size: 12px; line-height: 1; }
+.rte__menu .rte__cellcolors button:hover { outline: 2px solid var(--sky); outline-offset: 1px; }
+.rte__menu .rte__color--none { background: var(--paper); color: var(--muted); }
+.rte__cellalign { display: flex; gap: 4px; padding: 2px 10px 6px; }
+.rte__menu .rte__cellalign button { flex: 1; padding: 5px 6px; border: 1px solid var(--line-strong); border-radius: 5px; text-align: center; font-size: 12.5px; }
+.rte__menu .rte__cellalign button[aria-pressed="true"] { background: var(--sky-50); color: var(--navy); border-color: var(--sky-100); }
+
+/* X3 모바일: 툴바 그룹을 줄바꿈하고 구분선은 없앤다. 펼침 메뉴는 화면 폭 안에서 */
+@media (max-width: 640px) {
+  .rte__toolbar { padding: 6px 8px; }
+  .rte__group { flex-wrap: wrap; }
+  .rte__group + .rte__group { padding-left: 0; border-left: 0; }
+  .rte__group--end { margin-left: 0; }
+  .rte__menu, .rte__palette { max-width: calc(100vw - 32px); }
+}

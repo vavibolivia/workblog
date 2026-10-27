@@ -18,7 +18,7 @@ public class OpenApiConfig {
                 .info(new Info().title("WorkBlog API").version("1.0")
                         .description("사내 지식 공유 블로그 API. 인증: 웹 로그인 JWT 또는 개인 API 토큰(wbt_...)을 "
                                 + "`Authorization: Bearer <token>` 헤더로 보낸다. 사용 안내는 /api/guide/api, "
-                                + "Claude Code 연동은 /api/guide/claude-code.")
+                                + "명령줄·자동화 도구 연동은 /api/guide/cli.")
                         .contact(new Contact().name("WorkBlog")))
                 .components(new Components().addSecuritySchemes("bearer",
                         new SecurityScheme().type(SecurityScheme.Type.HTTP).scheme("bearer")

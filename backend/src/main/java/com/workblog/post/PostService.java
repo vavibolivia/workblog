@@ -32,15 +32,18 @@ public class PostService {
     private final AttachmentService attachments;
     private final ReactionService reactions;
     private final CommentRepository comments;
+    private final com.workblog.notification.NotificationService notifications;
 
     public PostService(PostRepository posts, PostRevisionRepository revisions, CategoryService categories,
-                       AttachmentService attachments, ReactionService reactions, CommentRepository comments) {
+                       AttachmentService attachments, ReactionService reactions, CommentRepository comments,
+                       com.workblog.notification.NotificationService notifications) {
         this.posts = posts;
         this.revisions = revisions;
         this.categories = categories;
         this.attachments = attachments;
         this.reactions = reactions;
         this.comments = comments;
+        this.notifications = notifications;
     }
 
     // ---------- queries ----------
@@ -73,7 +76,12 @@ public class PostService {
     public PostDetail getDetail(Long id, User viewer, boolean countView) {
         Post p = posts.findById(id).orElseThrow(() -> ApiException.notFound("글"));
         if (!canView(p, viewer)) throw ApiException.notFound("글");
-        if (countView) p.incrementViews();
+        if (countView) {
+            // 엔티티를 고치면 @LastModifiedDate 로 updated_at 이 '조회 시각'이 된다 → SQL 로만 올리고 응답 값만 맞춘다
+            posts.incrementViewCount(id);
+            PostDetail d = toDetail(p, viewer);
+            return d.withViewCount(d.viewCount() + 1);
+        }
         return toDetail(p, viewer);
     }
 
@@ -108,11 +116,13 @@ public class PostService {
         p = posts.save(p);
         attachments.linkToPost(p.getId(), req.attachmentIds(), author);
         revisions.save(PostRevision.snapshot(p, PostRevision.ChangeType.CREATE, req.changeNote(), author));
+        notifications.onPostSaved(p, author);
         return toDetail(p, author);
     }
 
     public PostDetail update(Long id, PostRequest req, User editor) {
         Post p = loadEditable(id, editor);
+        checkBaseVersion(p, req.baseVersion());
         Category cat = category(req.categoryId(), req.categoryPath());
         Post.ContentFormat fmt = req.contentFormat() == null ? Post.ContentFormat.HTML : req.contentFormat();
         p.applyEdit(req.title().trim(), body(req.content(), fmt), fmt, blankToNull(req.summary()), cat, req.tags(),
@@ -120,7 +130,22 @@ public class PostService {
         applyPinned(p, req.pinned(), editor);
         attachments.linkToPost(p.getId(), req.attachmentIds(), editor);
         revisions.save(PostRevision.snapshot(p, PostRevision.ChangeType.UPDATE, req.changeNote(), editor));
+        notifications.onPostSaved(p, editor);
         return toDetail(p, editor);
+    }
+
+    /**
+     * 동시 편집 충돌 검사. baseVersion 을 보냈는데 지금 버전과 다르면 409.
+     * 보내지 않으면(기존 CLI·API) 검사하지 않고 덮어쓴다.
+     */
+    private void checkBaseVersion(Post p, Integer baseVersion) {
+        if (baseVersion == null || baseVersion == p.getVersion()) return;
+        String who = revisions.findByPostIdOrderByVersionDesc(p.getId()).stream().findFirst()
+                .map(r -> r.getEditedBy().getDisplayName() + ", "
+                        + java.time.format.DateTimeFormatter.ofPattern("MM.dd HH:mm").withZone(java.time.ZoneId.of("Asia/Seoul")).format(r.getCreatedAt()))
+                .orElse("");
+        throw ApiException.conflict("다른 사람이 v" + p.getVersion() + " 으로 고쳤습니다" + (who.isEmpty() ? "" : "(" + who + ")")
+                + ". 불러온 버전은 v" + baseVersion + " 입니다. 최신 내용을 확인한 뒤 다시 저장하거나, 내 내용으로 덮어쓰세요.");
     }
 
     /** 부분 수정: 보내지 않은 항목은 지금 값을 유지한다. 새 리비전이 하나 생긴다. */
@@ -138,7 +163,7 @@ public class PostService {
                 req.tags() != null ? req.tags() : p.getTagList(),
                 req.status() != null ? req.status() : p.getStatus(),
                 req.visibility() != null ? req.visibility() : p.getVisibility(),
-                req.pinned(), req.changeNote(), req.categoryId() == null ? req.categoryPath() : null);
+                req.pinned(), req.changeNote(), req.categoryId() == null ? req.categoryPath() : null, req.baseVersion());
         return update(id, full, editor);
     }
 
@@ -212,10 +237,14 @@ public class PostService {
         if (pinned != null && editor.isAdmin()) p.setPinned(pinned);
     }
 
-    /** 발행 + 전체 공개 글은 누구나, 임시 저장·비공개 글은 작성자와 관리자만. */
+    /**
+     * 발행 + 전체 공개 글은 누구나, 임시 저장·비공개 글은 작성자와 관리자만.
+     * 열람 제한 카테고리(하위 포함)의 글은 그 부서 사용자 · 작성자 · 관리자만(CategoryAccess).
+     */
     public static boolean canView(Post p, User viewer) {
         if (p.isDeleted()) return viewer.isAdmin() || p.getAuthor().getId().equals(viewer.getId());
-        return p.isOpen() || canEdit(p, viewer);
+        if (canEdit(p, viewer)) return true;
+        return p.isOpen() && com.workblog.category.CategoryAccess.allows(p.getCategory(), viewer);
     }
 
     public static boolean canEdit(Post p, User viewer) {

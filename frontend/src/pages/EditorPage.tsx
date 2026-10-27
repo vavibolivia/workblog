@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api, errorMessage, flattenCategories, formatFileSize, type AttachmentResponse, type CategoryNode, type PostRequest, type PostStatus, type Visibility } from '../lib/api'
 import { htmlToText, markdownToHtml } from '../lib/html'
 import { useAuth } from '../lib/auth'
@@ -7,6 +7,11 @@ import { useToast } from '../lib/toast'
 import TagInput from '../components/TagInput'
 import type { UploadedFile } from '../editor/RichEditor'
 import { editorApi } from '../lib/editorApi'
+import { useEditorShortcuts } from '../lib/shortcuts'
+import TemplatePicker from '../components/TemplatePicker'
+import Modal from '../components/Modal'
+import axios from 'axios'
+import type { TemplateResponse } from '../lib/knowledgeApi'
 
 const RichEditor = lazy(() => import('../editor/RichEditor'))
 const DRAFT_KEY = 'workblog.draft.new'
@@ -23,7 +28,9 @@ export default function EditorPage() {
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('<p></p>')
   const [summary, setSummary] = useState('')
-  const [categoryId, setCategoryId] = useState<number | null>(null)
+  const [searchParams] = useSearchParams()
+  // 사이드바 카테고리 메뉴의 '이 카테고리에 글쓰기' → /write?categoryId=
+  const [categoryId, setCategoryId] = useState<number | null>(() => { const v = Number(searchParams.get('categoryId')); return Number.isFinite(v) && v > 0 ? v : null })
   const [tags, setTags] = useState<string[]>([])
   const [status, setStatus] = useState<PostStatus>('PUBLISHED')
   const [visibility, setVisibility] = useState<Visibility>('PUBLIC')
@@ -36,6 +43,10 @@ export default function EditorPage() {
   const [err, setErr] = useState<string | null>(null)
   const [restoredDraft, setRestoredDraft] = useState(false)
   const [converted, setConverted] = useState(false)
+  const [pickTemplate, setPickTemplate] = useState(false)
+  // 동시 편집 충돌 방지: 불러온 버전을 baseVersion 으로 보내고, 409 면 선택 창을 연다.
+  const [baseVersion, setBaseVersion] = useState<number | null>(null)
+  const [conflict, setConflict] = useState<{ message: string; status: PostStatus } | null>(null)
   const dirty = useRef(false)
 
   useEffect(() => { api.categories.tree().then(setTree).catch(() => null) }, [])
@@ -58,6 +69,7 @@ export default function EditorPage() {
       if (!p.editable) { setErr('이 글을 수정할 권한이 없습니다.'); return }
       setTitle(p.title); setSummary(p.summary ?? ''); setCategoryId(p.category.id); setTags(p.tags); setStatus(p.status); setVisibility(p.visibility); setPinned(p.pinned); setAttachments(p.attachments)
       if (p.contentFormat === 'MARKDOWN') { setContent(markdownToHtml(p.content)); setConverted(true) } else setContent(p.content)
+      setBaseVersion(p.version)
       setLoaded(true)
     }).catch((e) => setErr(errorMessage(e)))
   }, [editing, id])
@@ -93,7 +105,8 @@ export default function EditorPage() {
     setAttachments((list) => list.some((x) => x.id === f.id) ? list : [...list, { id: f.id, name: f.name, url: f.url, kind: f.kind, size: f.size, contentType: '', createdAt: new Date().toISOString() }])
   }
 
-  const save = async (asStatus?: PostStatus) => {
+  /** overwrite=true 면 baseVersion 없이 보내 다른 사람의 수정을 덮어쓴다(충돌 창에서 고른 경우). */
+  const save = async (asStatus?: PostStatus, overwrite = false) => {
     const st = asStatus ?? status
     if (!title.trim()) { toast('제목을 입력하세요.', 'error'); return }
     if (!htmlToText(content).trim() && !/<img|<table/.test(content)) { toast('본문을 입력하세요.', 'error'); return }
@@ -101,15 +114,24 @@ export default function EditorPage() {
     // 본문에 쓰인 사진 + 첨부 목록을 모두 글에 연결
     const usedIds = Array.from(content.matchAll(/\/api\/files\/([0-9a-f-]{36})/g)).map((m) => m[1])
     const attachmentIds = Array.from(new Set([...usedIds, ...attachments.map((a) => a.id)]))
-    const body: PostRequest = { title: title.trim(), content, contentFormat: 'HTML', attachmentIds, summary: summary.trim() || undefined, categoryId, tags, status: st, visibility, pinned: isAdmin ? pinned : undefined, changeNote: changeNote.trim() || undefined }
+    const body: PostRequest = { title: title.trim(), content, contentFormat: 'HTML', attachmentIds, summary: summary.trim() || undefined, categoryId, tags, status: st, visibility, pinned: isAdmin ? pinned : undefined, changeNote: changeNote.trim() || undefined,
+      baseVersion: editing && !overwrite && baseVersion != null ? baseVersion : undefined }
     try {
       const saved = editing ? await api.posts.update(Number(id), body) : await api.posts.create(body)
       dirty.current = false
       try { localStorage.removeItem(DRAFT_KEY) } catch { /* ignore */ }
       toast(st === 'DRAFT' ? '임시 저장했습니다.' : editing ? '수정 내용을 발행했습니다.' : '글을 발행했습니다.', 'success')
       navigate(`/posts/${saved.id}`)
-    } catch (e) { toast(errorMessage(e, '저장하지 못했습니다.'), 'error') } finally { setBusy(false) }
+    } catch (e) {
+      if (editing && !overwrite && axios.isAxiosError(e) && e.response?.status === 409) setConflict({ message: errorMessage(e), status: st })
+      else toast(errorMessage(e, '저장하지 못했습니다.'), 'error')
+    } finally { setBusy(false) }
   }
+
+  // X5: Ctrl+S 임시 저장, Ctrl+Enter 발행 (본문 안은 RichEditor 가 같은 함수를 부른다)
+  const saveDraftKey = () => { if (!busy && loaded) void save('DRAFT') }
+  const publishKey = () => { if (!busy && loaded) void save('PUBLISHED') }
+  useEditorShortcuts(saveDraftKey, publishKey)
 
   if (err) return <div className="shell shell--wide"><div className="alert alert--error">{err}</div></div>
   if (!loaded) return <div className="shell shell--wide"><div className="empty"><div className="spinner" style={{ margin: '0 auto' }} /></div></div>
@@ -124,6 +146,7 @@ export default function EditorPage() {
             <span style={{ fontWeight: 700 }}>{editing ? '글 수정' : '새 글'}</span>
             {restoredDraft && <span className="chip chip--neutral">작성 중이던 내용을 불러왔습니다</span>}
             {converted && <span className="chip chip--draft">예전 마크다운 글을 서식 편집으로 변환했습니다. 저장하면 새 형식으로 바뀝니다.</span>}
+            {!editing && !htmlToText(content).trim() && !/<img|<table/.test(content) && <button type="button" className="btn btn--sm" onClick={() => setPickTemplate(true)}>템플릿으로 시작</button>}
           </div>
           <span className="small muted">{wordInfo}</span>
         </div>
@@ -134,7 +157,7 @@ export default function EditorPage() {
           <div className="field">
             <label htmlFor="category">카테고리 <span className="muted" style={{ fontWeight: 400 }}>(최대 5단계 트리)</span></label>
             <select id="category" className="select" value={categoryId ?? ''} onChange={(e) => mark(setCategoryId)(e.target.value === '' ? null : Number(e.target.value))}>
-              <option value="">일반 (기본)</option>
+              <option value="">기본 카테고리</option>
               {categoryOptions.map((c) => <option key={c.id} value={c.id}>{'　'.repeat(c.depth - 1)}{c.depth > 1 ? '› ' : ''}{c.name}</option>)}
             </select>
           </div>
@@ -167,7 +190,8 @@ export default function EditorPage() {
         <Suspense fallback={<div className="empty"><div className="spinner" style={{ margin: '0 auto' }} /></div>}>
           <RichEditor value={content} onChange={mark(setContent)} onUpload={upload} onAttached={attached}
                       onImportDocument={(f) => editorApi.convert(f, true)}
-                      onImportedTitle={(t) => { if (!title.trim()) mark(setTitle)(t) }} />
+                      onImportedTitle={(t) => { if (!title.trim()) mark(setTitle)(t) }}
+                      onSaveShortcut={saveDraftKey} onPublishShortcut={publishKey} />
         </Suspense>
 
         <div className="editor__attach">
@@ -198,6 +222,25 @@ export default function EditorPage() {
           </div>
         </div>
       </section>
+      {pickTemplate && <TemplatePicker onClose={() => setPickTemplate(false)} onPick={(t: TemplateResponse) => {
+        dirty.current = true
+        setContent(t.content)
+        if (t.category) setCategoryId(t.category.id)
+        if (t.tags.length > 0) setTags((cur) => Array.from(new Set([...cur, ...t.tags])).slice(0, 10))
+        setPickTemplate(false)
+        toast(`'${t.name}' 템플릿으로 본문을 채웠습니다.`, 'success')
+      }} />}
+      {conflict && (
+        <Modal title="다른 사람이 먼저 고쳤습니다" onClose={() => setConflict(null)}
+               footer={<>
+                 <button type="button" className="btn" onClick={() => setConflict(null)}>취소</button>
+                 <button type="button" className="btn" onClick={() => window.open(`/posts/${id}`, '_blank', 'noopener')}>최신 내용 보기(새 탭)</button>
+                 <button type="button" className="btn btn--danger" disabled={busy} onClick={() => { const st = conflict.status; setConflict(null); void save(st, true) }}>내 내용으로 덮어쓰기</button>
+               </>}>
+          <p>{conflict.message}</p>
+          <p className="small muted">새 탭에서 최신 내용을 확인한 뒤 필요한 부분을 이 화면에 옮겨 저장하세요. 덮어쓰면 다른 사람이 고친 내용은 지금 글에서 사라지지만 변경 이력에는 남습니다. 취소하면 이 화면의 내용은 그대로 남습니다.</p>
+        </Modal>
+      )}
     </div>
   )
 }

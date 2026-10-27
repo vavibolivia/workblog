@@ -5,6 +5,7 @@ import axios from 'axios'
 import { api, errorMessage, type AuthOptions, type SignupResponse } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { useToast } from '../lib/toast'
+import { PASSWORD_MIN_LENGTH, passwordHint, passwordProblem } from '../lib/password'
 
 const USERNAME_RE = /^[a-zA-Z0-9._-]{3,50}$/
 
@@ -41,7 +42,9 @@ export default function SignupPage() {
 
   const hint = usernameHint(username)
   const pwMismatch = password2.length > 0 && password !== password2
-  const canSubmit = hint.state === 'ok' && password.length >= 4 && !pwMismatch && password2.length > 0 && displayName.trim().length > 0 && !busy
+  const pwMin = options?.passwordMinLength ?? PASSWORD_MIN_LENGTH
+  const pwProblem = password ? passwordProblem(password, pwMin) : null
+  const canSubmit = hint.state === 'ok' && password.length > 0 && !pwProblem && !pwMismatch && password2.length > 0 && displayName.trim().length > 0 && !busy
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
@@ -104,12 +107,12 @@ export default function SignupPage() {
             </div>
             <div className="field">
               <label htmlFor="s-password">비밀번호</label>
-              <input id="s-password" type="password" className="input" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" required minLength={4} />
-              <span className="field__hint">4자 이상</span>
+              <input id="s-password" type="password" className="input" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" required minLength={pwMin} aria-invalid={pwProblem !== null} />
+              <span className={`field__hint${pwProblem ? ' field__hint--bad' : password ? ' field__hint--ok' : ''}`}>{pwProblem ?? (password ? '사용할 수 있습니다.' : passwordHint(pwMin))}</span>
             </div>
             <div className="field">
               <label htmlFor="s-password2">비밀번호 확인</label>
-              <input id="s-password2" type="password" className="input" value={password2} onChange={(e) => setPassword2(e.target.value)} autoComplete="new-password" required minLength={4} aria-invalid={pwMismatch} />
+              <input id="s-password2" type="password" className="input" value={password2} onChange={(e) => setPassword2(e.target.value)} autoComplete="new-password" required minLength={pwMin} aria-invalid={pwMismatch} />
               {pwMismatch && <span className="field__hint field__hint--bad">비밀번호가 서로 다릅니다.</span>}
             </div>
             <div className="field">

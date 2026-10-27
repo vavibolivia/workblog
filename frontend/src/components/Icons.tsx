@@ -22,6 +22,8 @@ export const IcRedo = ({ size = 16, ...p }: P) => <svg {...base(size)} {...p}><p
 export const IcEraser = ({ size = 16, ...p }: P) => <svg {...base(size)} {...p}><path d="m7 21 11.5-11.5a2 2 0 0 0 0-2.8l-3.2-3.2a2 2 0 0 0-2.8 0L3 13l6 6" /><path d="M5.5 14.5 12 21M11 21h9" /></svg>
 export const IcDownload = ({ size = 16, ...p }: P) => <svg {...base(size)} {...p}><path d="M12 4v11m0 0 4-4m-4 4-4-4" /><path d="M4 17v2a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2" /></svg>
 export const IcHeart = ({ size = 16, filled = false, ...p }: P & { filled?: boolean }) => <svg {...base(size)} fill={filled ? 'currentColor' : 'none'} {...p}><path d="M12 20.5s-7.5-4.6-7.5-10A4.2 4.2 0 0 1 12 8.2a4.2 4.2 0 0 1 7.5 2.3c0 5.4-7.5 10-7.5 10Z" /></svg>
+export const IcBell = ({ size = 16, ...p }: P) => <svg {...base(size)} {...p}><path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 1.5h-15z" /><path d="M10 20.5a2.2 2.2 0 0 0 4 0" /></svg>
+export const IcEye = ({ size = 16, ...p }: P) => <svg {...base(size)} {...p}><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" /><circle cx="12" cy="12" r="2.8" /></svg>
 
 /** 브랜드 마크: 펼친 노트(지식)와 펜촉을 합친 'W'. 네이비 바탕 + 하늘색 점. */
 export function BrandMark({ size = 32 }: { size?: number }) {

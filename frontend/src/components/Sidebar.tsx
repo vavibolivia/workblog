@@ -14,6 +14,8 @@ export default function Sidebar() {
   const [myCount, setMyCount] = useState<number | null>(null)
   const [draftCount, setDraftCount] = useState<number | null>(null)
 
+  const reloadTree = () => { api.categories.tree().then(setTree).catch(() => setTree([])) }
+
   useEffect(() => {
     api.categories.tree().then(setTree).catch(() => setTree([]))
     api.taxonomy.tags(24).then(setTags).catch(() => setTags([]))
@@ -58,7 +60,7 @@ export default function Sidebar() {
           <ul className="cat-tree">
             <li><div className={`cat-tree__row cat-tree__row--d1${isAll ? ' active' : ''}`}><span className="cat-tree__toggle" aria-hidden>·</span><Link to="/" className="cat-tree__link"><span>전체 보기</span><span className="cat-tree__count">{total}</span></Link></div></li>
           </ul>
-          <CategoryTree nodes={tree} activeId={activeId} activePathIds={pathIds} />
+          <CategoryTree nodes={tree} activeId={activeId} activePathIds={pathIds} onChanged={reloadTree} />
           {tree.length === 0 && <p className="small muted" style={{ padding: '6px 0' }}>카테고리가 없습니다.</p>}
           {activeId != null && findCategory(tree, activeId) === undefined && tree.length > 0 && <p className="small muted">선택한 카테고리를 찾을 수 없습니다.</p>}
         </div>

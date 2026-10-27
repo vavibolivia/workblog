@@ -3,16 +3,17 @@ import { NavLink, useParams } from 'react-router-dom'
 import { api, errorMessage, type GuideDoc } from '../lib/api'
 import Markdown from '../components/Markdown'
 
-const DEFAULT_DOC = 'claude-code'
+const DEFAULT_DOC = 'cli'
 const FALLBACK_DOCS: GuideDoc[] = [
   { id: 'api', title: 'API 사용 안내' },
-  { id: 'claude-code', title: 'Claude Code 연동 가이드' },
+  { id: 'cli', title: 'CLI 가이드' },
 ]
 
-/** 도움말: 왼쪽 문서 목록, 오른쪽에 서버가 주는 마크다운 문서. 기본 문서는 Claude Code 연동 가이드. */
+/** 도움말: 왼쪽 문서 목록, 오른쪽에 서버가 주는 마크다운 문서. 기본 문서는 CLI 가이드. */
 export default function HelpPage() {
   const { doc } = useParams()
-  const docId = doc ?? DEFAULT_DOC
+  // 예전 이름(claude-code) 링크는 CLI 가이드로
+  const docId = doc === 'claude-code' ? 'cli' : (doc ?? DEFAULT_DOC)
   const [docs, setDocs] = useState<GuideDoc[]>(FALLBACK_DOCS)
   const [body, setBody] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)

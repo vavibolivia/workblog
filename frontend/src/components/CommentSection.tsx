@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useMemo, useState, type KeyboardEvent, type ReactNode } from 'react'
-import { errorMessage, relativeTime } from '../lib/api'
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { useLocation } from 'react-router-dom'
+import { api, errorMessage, relativeTime, type UserResponse } from '../lib/api'
 import { COMMENT_MAX_LENGTH, commentsApi, type CommentResponse } from '../lib/commentsApi'
+import { mentionQueryAt } from '../lib/collabApi'
 import { useToast } from '../lib/toast'
 import { Avatar } from './Avatar'
 import Modal from './Modal'
@@ -21,6 +23,18 @@ export default function CommentSection({ postId }: { postId: number }) {
   }, [postId])
 
   useEffect(() => { setItems(null); setReplyTo(null); setEditing(null); load() }, [load])
+
+  // 알림에서 온 #comment-ID 로 스크롤하고 잠깐 강조한다.
+  const { hash } = useLocation()
+  useEffect(() => {
+    if (!items || !hash.startsWith('#comment-')) return
+    const el = document.getElementById(hash.slice(1))
+    if (!el) return
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    el.classList.add('comment--focus')
+    const t = window.setTimeout(() => el.classList.remove('comment--focus'), 2400)
+    return () => window.clearTimeout(t)
+  }, [items, hash])
 
   const count = useMemo(() => (items ?? []).filter((c) => !c.deleted).length, [items])
   const roots = useMemo(() => (items ?? []).filter((c) => c.parentId === null), [items])
@@ -67,7 +81,7 @@ export default function CommentSection({ postId }: { postId: number }) {
   }
 
   const renderItem = (c: CommentResponse, isReply: boolean) => (
-    <li key={c.id} className={`comment${isReply ? ' comment--reply' : ''}${c.deleted ? ' comment--deleted' : ''}`}>
+    <li key={c.id} id={`comment-${c.id}`} className={`comment${isReply ? ' comment--reply' : ''}${c.deleted ? ' comment--deleted' : ''}`}>
       <Avatar name={c.author.displayName} size={isReply ? 'xs' : undefined} />
       <div className="comment__main">
         <div className="comment__meta">
@@ -200,40 +214,104 @@ interface ComposerProps {
   onCancel?: () => void
 }
 
-/** 텍스트 입력 + 등록. Ctrl+Enter(맥은 Cmd+Enter)로도 등록한다. */
+/** @멘션 자동완성용 구성원 목록. 화면에서 한 번만 불러온다(GET /api/users). */
+let usersCache: Promise<UserResponse[]> | null = null
+function loadUsers(): Promise<UserResponse[]> {
+  if (!usersCache) usersCache = api.users.list().then((l) => l.filter((u) => u.active)).catch(() => { usersCache = null; return [] })
+  return usersCache
+}
+
+const MENTION_LIMIT = 6
+
+/** 텍스트 입력 + 등록. Ctrl+Enter(맥은 Cmd+Enter)로도 등록한다. @ 를 치면 구성원 자동완성(↑↓ 선택, Enter·Tab 넣기, Esc 닫기). */
 function CommentComposer({ initial = '', placeholder, submitLabel, busy, autoFocus, onSubmit, onCancel }: ComposerProps) {
   const [text, setText] = useState(initial)
   const trimmed = text.trim()
   const over = text.length > COMMENT_MAX_LENGTH
   const canSubmit = trimmed.length > 0 && !over && !busy
+  const areaRef = useRef<HTMLTextAreaElement>(null)
+  const [mention, setMention] = useState<{ start: number; query: string } | null>(null)
+  const [users, setUsers] = useState<UserResponse[]>([])
+  const [active, setActive] = useState(0)
+
+  const matches = useMemo(() => {
+    if (!mention) return []
+    const q = mention.query.toLowerCase()
+    const starts = users.filter((u) => u.username.toLowerCase().startsWith(q) || u.displayName.toLowerCase().startsWith(q))
+    const rest = q ? users.filter((u) => !starts.includes(u) && (u.username.toLowerCase().includes(q) || u.displayName.toLowerCase().includes(q))) : []
+    return [...starts, ...rest].slice(0, MENTION_LIMIT)
+  }, [mention, users])
+
+  const detect = (value: string, caret: number) => {
+    const m = mentionQueryAt(value, caret)
+    setMention(m)
+    setActive(0)
+    if (m) loadUsers().then(setUsers)
+  }
+
+  const pick = (u: UserResponse) => {
+    const el = areaRef.current
+    if (!mention || !el) return
+    const caret = el.selectionStart ?? text.length
+    const insert = `@${u.username} `
+    const next = text.slice(0, mention.start) + insert + text.slice(caret)
+    setText(next); setMention(null)
+    const pos = mention.start + insert.length
+    window.requestAnimationFrame(() => { el.focus(); el.setSelectionRange(pos, pos) })
+  }
 
   const send = async () => {
     if (!canSubmit) return
     const ok = await onSubmit(trimmed)
-    if (ok) setText('')
+    if (ok) { setText(''); setMention(null) }
   }
 
   const onKey = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (mention && matches.length > 0) {
+      if (e.key === 'ArrowDown') { e.preventDefault(); setActive((i) => (i + 1) % matches.length); return }
+      if (e.key === 'ArrowUp') { e.preventDefault(); setActive((i) => (i - 1 + matches.length) % matches.length); return }
+      if ((e.key === 'Enter' && !e.ctrlKey && !e.metaKey && !e.nativeEvent.isComposing) || e.key === 'Tab') { e.preventDefault(); pick(matches[active]); return }
+      if (e.key === 'Escape') { e.preventDefault(); setMention(null); return }
+    }
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); send() }
     if (e.key === 'Escape' && onCancel) onCancel()
   }
 
   return (
     <div className="composer">
-      <textarea
-        className="textarea composer__input"
-        rows={3}
-        placeholder={placeholder}
-        value={text}
-        autoFocus={autoFocus}
-        maxLength={COMMENT_MAX_LENGTH + 100}
-        onChange={(e) => setText(e.target.value)}
-        onKeyDown={onKey}
-        aria-label={placeholder}
-      />
+      <div className="mention-wrap">
+        <textarea
+          ref={areaRef}
+          className="textarea composer__input"
+          rows={3}
+          placeholder={placeholder}
+          value={text}
+          autoFocus={autoFocus}
+          maxLength={COMMENT_MAX_LENGTH + 100}
+          onChange={(e) => { setText(e.target.value); detect(e.target.value, e.target.selectionStart ?? e.target.value.length) }}
+          onKeyDown={onKey}
+          onClick={(e) => detect(e.currentTarget.value, e.currentTarget.selectionStart ?? 0)}
+          onBlur={() => window.setTimeout(() => setMention(null), 150)}
+          aria-label={placeholder}
+          aria-autocomplete="list"
+          aria-expanded={mention !== null && matches.length > 0}
+        />
+        {mention && matches.length > 0 && (
+          <ul className="mention-list" role="listbox" aria-label="언급할 사람">
+            {matches.map((u, i) => (
+              <li key={u.id} role="option" aria-selected={i === active}>
+                <button type="button" className={i === active ? 'is-active' : undefined} onMouseDown={(e) => { e.preventDefault(); pick(u) }} onMouseEnter={() => setActive(i)}>
+                  <strong>{u.displayName}</strong>
+                  <span className="muted">@{u.username}{u.department ? ` · ${u.department}` : ''}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
       <div className="composer__foot">
         <span className={`composer__count${over ? ' composer__count--over' : ''}`}>{text.length} / {COMMENT_MAX_LENGTH}</span>
-        <span className="composer__hint">Ctrl+Enter로 등록</span>
+        <span className="composer__hint">Ctrl+Enter로 등록 · @아이디로 알림</span>
         <span className="grow" />
         {onCancel && <button type="button" className="btn btn--sm" onClick={onCancel} disabled={busy}>취소</button>}
         <button type="button" className="btn btn--sm btn--primary" onClick={send} disabled={!canSubmit}>{submitLabel}</button>
