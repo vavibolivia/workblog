@@ -13,7 +13,7 @@
 #   sudo ./install.sh --uninstall              # 서비스·프로그램 제거 (설정·데이터는 남김)
 #
 # 옵션: --dir /opt/workblog  --port 8080  --admin-pass <비밀번호>  --public-url http://host:8080  --jar <파일>
-#       --pg-pass <비밀번호>   PostgreSQL 관리자(postgres) 비밀번호가 없을 때 만들 값 (기본 postgres)
+#       --pg-pass <비밀번호>   PostgreSQL 관리자(postgres) 비밀번호가 없을 때 만들 값 (기본 postgres — 사내 요청. 5432 를 외부에 열지 말 것)
 # Java 21·PostgreSQL 이 없으면 apt/dnf 로 설치하고, PostgreSQL 은 켜고(처음이면 초기화), 계정(workblog·postgres)이 없으면 만든다.
 # 이미 설치돼 있으면 설정·데이터를 그대로 두고 프로그램만 바꾼다(업그레이드).
 # 끝나면 접속 주소와 초기 관리자 계정(아이디 admin)을 출력한다.
@@ -160,10 +160,11 @@ ensure_pg_superuser_password() {
   local has
   has=$(pgsu psql -w -qtAc "SELECT rolpassword IS NOT NULL FROM pg_authid WHERE rolname = 'postgres'" 2>/dev/null || true)
   if [ "$has" = t ]; then PG_SUPER_INFO="postgres (기존 비밀번호 그대로)"; return 0; fi
+  # 비밀번호는 psql 변수(:'pw')로 넘겨 따옴표가 들어 있어도 안전하게
   if [ -z "$has" ]; then
-    pgsu psql -v ON_ERROR_STOP=1 -qc "CREATE ROLE postgres LOGIN SUPERUSER PASSWORD '${PG_PASS}'" >/dev/null
+    echo "CREATE ROLE postgres LOGIN SUPERUSER PASSWORD :'pw';" | pgsu psql -v ON_ERROR_STOP=1 -q -v pw="$PG_PASS" >/dev/null
   else
-    pgsu psql -v ON_ERROR_STOP=1 -qc "ALTER ROLE postgres PASSWORD '${PG_PASS}'" >/dev/null
+    echo "ALTER ROLE postgres PASSWORD :'pw';" | pgsu psql -v ON_ERROR_STOP=1 -q -v pw="$PG_PASS" >/dev/null
   fi
   PG_SUPER_INFO="postgres / ${PG_PASS}"
 }
