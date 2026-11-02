@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api, errorMessage, formatDate, type CategoryNode, type UserResponse } from '../lib/api'
-import { mmApi, type MmImportResult, type MmProject, type MmRow, type MmSheet } from '../lib/manMonthApi'
+import { mmApi, mondayOf, periodText, type MmImportResult, type MmProject, type MmRow, type MmSheet } from '../lib/manMonthApi'
 import { useToast } from '../lib/toast'
 import Modal from '../components/Modal'
 import ManMonthBoard from '../components/ManMonthBoard'
@@ -366,7 +366,11 @@ function SettingsDialog({ sheet, busy, onClose, run }: { sheet: MmSheet; busy: b
   const lost = start && weeks ? lostCells(sheet, start, weeks) : 0
   const save = () => {
     if (lost > 0 && !confirmLoss) { setConfirmLoss(true); return }
-    run(() => mmApi.update(sheet.id, { title: title.trim(), description: desc, startDate: start, weeks }), '설정을 저장했습니다.')
+    const mon = mondayOf(start)
+    const same = mon === sheet.startDate && weeks === sheet.weeks && title.trim() === sheet.title && desc === (sheet.description ?? '')
+    const msg = same ? `바뀐 것이 없습니다 — ${start} 은 지금과 같은 주(${mon} 월요일)입니다.`
+      : mon !== start ? `저장했습니다. 시작은 그 주 월요일 ${mon} 로 맞췄습니다.` : '설정을 저장했습니다.'
+    run(() => mmApi.update(sheet.id, { title: title.trim(), description: desc, startDate: start, weeks }), msg)
   }
   return (
     <Modal title="표 설정" onClose={onClose}
@@ -381,6 +385,7 @@ function SettingsDialog({ sheet, busy, onClose, run }: { sheet: MmSheet; busy: b
         <div className="field" style={{ flex: 1 }}><label htmlFor="mm-s">시작 주 (월요일로 맞춤)</label><input id="mm-s" type="date" className="input" value={start} onChange={(e) => { setStart(e.target.value); setConfirmLoss(false) }} /></div>
         <div className="field" style={{ width: 120 }}><label htmlFor="mm-w">주 수</label><input id="mm-w" type="number" min={1} max={104} className="input" value={weeks} onChange={(e) => { setWeeks(Math.max(1, Math.min(104, Number(e.target.value) || 1))); setConfirmLoss(false) }} /></div>
       </div>
+      <p className="small">기간: <strong>{periodText(start, weeks)}</strong>{start && mondayOf(start) !== start && <span className="muted"> — 고른 {start} 은 그 주 월요일로 맞춥니다</span>}</p>
       {lost > 0
         ? <div className="alert alert--warn">이 기간으로 바꾸면 기간 밖이 되는 <strong>{lost}칸</strong>의 값이 지워집니다.</div>
         : <p className="small muted">시작을 바꿔도 입력한 값은 날짜 기준으로 그대로 남습니다.</p>}

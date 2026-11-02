@@ -45,6 +45,25 @@ export const mmApi = {
 
 // ---------- 계산 (백엔드 ManMonthExcel 과 같은 규칙) ----------
 
+/** 고른 날의 월요일 (yyyy-mm-dd). 표는 늘 월요일부터 주 단위 */
+export function mondayOf(date: string): string {
+  if (!date) return ''
+  const [y, m, d] = date.split('-').map(Number)
+  const s = new Date(y, m - 1, d)
+  s.setDate(s.getDate() - ((s.getDay() + 6) % 7))
+  return ymd(s)
+}
+const ymd = (x: Date) => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`
+
+/** 기간 표시: 월요일 ~ 마지막 주 일요일 · n주 */
+export function periodText(start: string, weeks: number): string {
+  if (!start) return '—'
+  const s = mondayOf(start)
+  const [y, m, d] = s.split('-').map(Number)
+  const e = new Date(y, m - 1, d + weeks * 7 - 1)
+  return `${s} (월) ~ ${ymd(e)} (일) · ${weeks}주`
+}
+
 export interface MmWeek { index: number; monday: Date; label: string; monthKey: string }
 
 function parseDate(s: string): Date {

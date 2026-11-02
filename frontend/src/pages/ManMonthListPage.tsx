@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { errorMessage, relativeTime } from '../lib/api'
-import { mmApi, type MmSheetSummary } from '../lib/manMonthApi'
+import { mmApi, type MmSheetSummary, periodText } from '../lib/manMonthApi'
 import Modal from '../components/Modal'
 
 function thisMonday(): string {
@@ -11,17 +11,6 @@ function thisMonday(): string {
 }
 
 /** 공수 표 목록 · 새 표 (시작 주와 주 수를 정해 만든다) */
-/** 고른 날의 월요일 ~ 마지막 주 일요일 */
-function periodText(start: string, weeks: number): string {
-  if (!start) return '—'
-  const [y, m, d] = start.split('-').map(Number)
-  const s = new Date(y, m - 1, d)
-  s.setDate(s.getDate() - ((s.getDay() + 6) % 7))
-  const e = new Date(s.getFullYear(), s.getMonth(), s.getDate() + weeks * 7 - 1)
-  const f = (x: Date) => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`
-  return `${f(s)} (월) ~ ${f(e)} (일) · ${weeks}주`
-}
-
 export default function ManMonthListPage() {
   const navigate = useNavigate()
   const [list, setList] = useState<MmSheetSummary[] | null>(null)
