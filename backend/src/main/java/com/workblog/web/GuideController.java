@@ -37,7 +37,8 @@ public class GuideController {
     private static final List<GuideInfo> DOCS = List.of(
             new GuideInfo("cli", "CLI 가이드", "guide/CLI_GUIDE.md"),
             new GuideInfo("api", "API 사용 안내", "guide/API.md"),
-            new GuideInfo("writing", "글 작성 지침 (공문형·도식)", "guide/WRITING_GUIDE.md"));
+            new GuideInfo("writing", "글 작성 지침 (공문형·도식)", "guide/WRITING_GUIDE.md"),
+            new GuideInfo("move", "다른 서버로 옮기기 (데이터 포함)", "guide/MOVE_GUIDE.md"));
     private static final Map<String, String> FILES = Map.of("workblog.py", "guide/workblog.py");
     /** 예전 문서 id → 새 id (북마크·링크 호환) */
     private static final Map<String, String> LEGACY = Map.of("claude-code", "cli");

@@ -157,7 +157,8 @@ check("SORT comments: comment counts non-increasing", s == 200 and _cc == sorted
 s, r = call("GET", "/api/posts?sort=BOGUS", tok=U); check("SORT unknown value 400", s == 400, s)
 
 # ---- 문서 (R14) ----
-s, r = call("GET", "/api/guide"); check("GUIDE list public", s == 200 and {d["id"] for d in r} >= {"api", "cli", "writing"}, (s, r))
+s, r = call("GET", "/api/guide"); check("GUIDE list public", s == 200 and {d["id"] for d in r} >= {"api", "cli", "writing", "move"}, (s, r))
+s, b, h = _raw("/api/guide/move", U); check("GUIDE move doc served (dump/load + pg_restore)", s == 200 and b"load" in b and b"pg_restore" in b, (s, b[:80]))
 s, b, h = _raw("/api/guide/cli", U); check("GUIDE cli markdown mentions token + CLI", s == 200 and b"wbt_" in b and b"workblog.py" in b, (s, b[:80]))
 s, b, h = _raw("/api/guide/claude-code", U); check("GUIDE legacy claude-code id still served", s == 200 and b"workblog.py" in b, s)
 s, b, h = _raw("/api/guide/api", U); check("GUIDE api markdown lists PATCH/import/export", s == 200 and b"PATCH" in b and b"/api/posts/import" in b and b"/export" in b, (s, b[:80]))

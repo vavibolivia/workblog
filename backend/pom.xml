@@ -145,6 +145,7 @@
           <include>API.md</include>
           <include>CLI_GUIDE.md</include>
           <include>WRITING_GUIDE.md</include>
+          <include>MOVE_GUIDE.md</include>
         </includes>
       </resource>
       <resource>

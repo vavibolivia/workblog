@@ -119,6 +119,7 @@ sudo ./install.sh --uninstall        # 서비스·프로그램 제거 (설정·�
 - 받는 서버에서 고친 글은 덮어쓰지 않고 **충돌**로 보고합니다. 사용자는 아이디가 이미 있으면 받는 서버 값을 유지하고, 새 사용자는 원래 비밀번호로 로그인합니다.
 - CLI: `workblog.py --user admin --password … dump --full -o 전체.zip` · `load 전체.zip --apply` ([CLI 가이드](backend/docs/CLI_GUIDE.md) 6절).
 - 덤프에는 모든 글·첨부 원본·비밀번호 해시가 그대로 들어 있습니다. 사내 반출 절차에 따라 옮기고 보관하세요.
+- 새 서버 설치부터 데이터 옮기기·통째 복제(DB 복원)·확인까지 전체 절차: [다른 서버로 옮기기](backend/docs/MOVE_GUIDE.md) (화면: 도움말 › 다른 서버로 옮기기).
 
 ## 8. 문서
 
@@ -127,6 +128,7 @@ sudo ./install.sh --uninstall        # 서비스·프로그램 제거 (설정·�
 | [CLI 가이드](backend/docs/CLI_GUIDE.md) | API 토큰 · `workblog.py` · 자동화 도구 연결 | 도움말 › CLI 가이드 |
 | [API 사용 안내](backend/docs/API.md) | REST API 전체 | 도움말 · `/swagger-ui/index.html` |
 | [글 작성 지침](backend/docs/WRITING_GUIDE.md) | 공문형 문서·도식·화면 기준 | 도움말 › 글 작성 지침 |
+| [다른 서버로 옮기기](backend/docs/MOVE_GUIDE.md) | 데이터와 함께 다른 서버에 설치 (데이터 이전 · DB 복원) | 도움말 › 다른 서버로 옮기기 |
 
 ## 9. 개발
 
