@@ -5,6 +5,7 @@ import { useAuth } from '../lib/auth'
 import Sidebar from '../components/Sidebar'
 import PostCard, { type ListView } from '../components/PostCard'
 import Pagination from '../components/Pagination'
+import ManMonthFeatured from '../components/ManMonthFeatured'
 
 const LIST_VIEW_KEY = 'workblog.listView'
 const SORT_KEY = 'workblog.sort'
@@ -84,7 +85,10 @@ export default function HomePage() {
     const n = new URLSearchParams(params); n.set('sort', s); n.delete('page'); setParams(n)
   }
 
+  const front = !categoryId && !tag && !authorId && !status && page === 0
   return (
+    <>
+    {front && <div className="shell shell--wide mm-front"><ManMonthFeatured /></div>}
     <div className="shell shell--3">
       <Sidebar />
       <main>
@@ -154,5 +158,6 @@ export default function HomePage() {
         </div>
       </aside>
     </div>
+    </>
   )
 }

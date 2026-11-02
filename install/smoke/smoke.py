@@ -167,4 +167,5 @@ exec(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "knowledge.py
 exec(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "collab.py"), encoding="utf-8").read())  # 알림·충돌·감사·열람 제한·비밀번호·잠금
 exec(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "api.py"), encoding="utf-8").read())  # 가입·토큰·PATCH·가져오기·내보내기·문서·영구 삭제
 exec(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "datamove.py"), encoding="utf-8").read())  # data transfer (synthetic dump, self cleanup)
+exec(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "mm.py"), encoding="utf-8").read())  # 공수(Man-month) 표
 print(f"\nRESULT {ok} pass / {bad} fail")

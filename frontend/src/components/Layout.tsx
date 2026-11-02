@@ -72,6 +72,7 @@ export default function Layout() {
           <nav className="gnb__nav" aria-label="주 메뉴">
             <NavLink to="/" end className="gnb__link">홈</NavLink>
             <NavLink to="/history" className="gnb__link">이력</NavLink>
+            <NavLink to="/mm" className="gnb__link">공수</NavLink>
             <NavLink to="/stats" className="gnb__link">통계</NavLink>
             {user?.role === 'ADMIN' && <AdminMenu />}
             <NavLink to="/help" className="gnb__link">도움말</NavLink>
@@ -91,6 +92,7 @@ export default function Layout() {
                   </div>
                   <Link to="/write" role="menuitem" className="menu__mobile" onClick={() => setOpen(false)}>글쓰기</Link>
                   <Link to="/history" role="menuitem" className="menu__mobile" onClick={() => setOpen(false)}>변경 이력</Link>
+                  <Link to="/mm" role="menuitem" className="menu__mobile" onClick={() => setOpen(false)}>공수</Link>
                   <Link to="/stats" role="menuitem" className="menu__mobile" onClick={() => setOpen(false)}>통계</Link>
                   {user.role === 'ADMIN' && ADMIN_ITEMS.map((it) => (
                     <Link key={it.to} to={it.to} role="menuitem" className="menu__mobile" onClick={() => setOpen(false)}>관리 · {it.label}</Link>

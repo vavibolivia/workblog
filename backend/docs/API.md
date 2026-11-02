@@ -285,3 +285,31 @@ data/postviews.json   열람 감사 로그                                     f
 
 - 본문 HTML 은 저장할 때와 같은 정화(HtmlSanitizer)를 거친다.
 - 단계(사용자 → 카테고리 → 템플릿 → 글·첨부 → 이력 → 댓글 → 공감 → 알림 → 열람 기록 → API 토큰)별로 50~500건씩 커밋한다. 실패하면 보고서에 멈춘 단계·마지막 커밋 위치가 남고, 같은 덤프를 다시 넣으면 이미 넣은 것은 건너뛰고 이어서 반영한다.
+
+## 13. 공수 표 (Man-month)
+
+가로 = 주(월요일 시작), 세로 = 프로젝트별 인원, 칸 = 그 주 투입률(0~1.0). 화면: 상단 **공수**(`/mm`), 관리자가 '메인 게시' 로 지정한 표는 홈 맨 위(대문)에 표시.
+
+| 권한 | 할 수 있는 것 |
+|---|---|
+| 로그인한 모두 | 보기 · 엑셀 내려받기 · 새 표 만들기(만든 사람 = 주인) |
+| 편집자 (표마다 지정) | 칸 · 프로젝트 · 인원 수정, 엑셀 올리기 |
+| 주인 · 관리자 | 위 전부 + 표 설정(제목·시작 주·주 수) · 편집자 지정 · 삭제 |
+| 관리자 | 메인 게시 지정 |
+
+| 메서드 | 경로 | 설명 |
+|---|---|---|
+| GET | `/api/mm/sheets?featured=` | 표 목록 (`featured=true` 면 메인 게시만) |
+| POST | `/api/mm/sheets` | `{title, startDate, weeks(1~104), description?}` — startDate 는 그 주 월요일로 맞춤 |
+| GET · PATCH · DELETE | `/api/mm/sheets/{id}` | 상세(프로젝트·행·칸·편집자·변경 이력 30건) · 설정(시작 주를 바꾸면 값은 날짜 기준으로 유지, 기간 밖은 지움) · 삭제 |
+| PUT | `/api/mm/sheets/{id}/editors` | `{userIds:[…]}` 편집자 목록 전체 교체 |
+| POST · PUT · DELETE | `/api/mm/sheets/{id}/projects[/{projectId}]` | 프로젝트 `{name, sortOrder?}` |
+| POST · PUT · DELETE | `/api/mm/sheets/{id}/rows[/{rowId}]` | 인원 `{projectId, userId?, personName?, department?, role?}` — 계정을 주면 이름·소속을 채움 |
+| PUT | `/api/mm/sheets/{id}/cells` | `{changes:[{rowId, week, value}]}` — value 가 null·0 이면 비움, 0~1.0 (한 번에 최대 5000칸) |
+| GET | `/api/mm/sheets/{id}/excel?template=` | 엑셀(화면과 같은 모양: 왼쪽 프로젝트·이름·소속·역할, 위 월/주). `template=true` 면 값 없는 양식 |
+| POST | `/api/mm/sheets/{id}/excel` | multipart `file` — 주 머리 날짜로 주를, (프로젝트, 이름) 으로 행을 찾아 반영(없으면 만듦, 빈 칸은 비움). 파일에 없는 행은 그대로 |
+
+- 합계 MM = 달마다 (그 달 주 투입률 합 ÷ 그 달 월요일 수) 의 합 → 한 달 내내 1.0 = 1 MM.
+- 사람별 부하 = 같은 사람(계정, 없으면 이름)의 모든 프로젝트 합. 1.0 초과는 화면에 빨갛게.
+- 같은 칸을 여러 명이 동시에 고치면 나중 저장이 남음(화면은 20초마다 다른 사람 변경을 반영). 모든 변경은 변경 이력에 남음.
+- 데이터 이전(12절) 덤프에는 아직 공수 표가 들어가지 않음 — 다른 서버로는 엑셀 내려받기 → 올리기로 옮김.
