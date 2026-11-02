@@ -153,6 +153,25 @@ class DataMoveTest {
     }
 
     @Test
+    void restrictedCategoryIsNotMergedIntoLooserTargetCategory() throws Exception {
+        // 받는 서버에 같은 경로 '정비 > 엔진' 이 제한 없이 있으면, 원본에서 '정비' 부서만 보던 글이 모두에게 보이게 된다
+        JdbcTemplate j = b.jdbc();
+        long root = id(j, "INSERT INTO categories (name, depth, sort_order) VALUES ('정비', 1, 1)");
+        j.update("UPDATE categories SET path = ? WHERE id = ?", "/" + root + "/", root);
+        long leaf = id(j, "INSERT INTO categories (name, parent_id, depth, sort_order) VALUES ('엔진', " + root + ", 2, 1)");
+        j.update("UPDATE categories SET path = ? WHERE id = ?", "/" + root + "/" + leaf + "/", leaf);
+        ImportReport r = importInto(b, export(a, null), true);
+        assertThat(r.counts.get("categories").conflict).isEqualTo(1);
+        assertThat(count(j, "posts")).isZero();
+        assertThat(j.queryForObject("SELECT restricted_departments FROM categories WHERE id = ?", String.class, leaf)).isNullOrEmpty();
+        // 받는 서버도 같은 제한을 걸면 가져온다
+        j.update("UPDATE categories SET restricted_departments = '정비' WHERE id = ?", leaf);
+        ImportReport r2 = importInto(b, export(a, null), true);
+        assertThat(r2.counts.get("categories").conflict).isZero();
+        assertThat(j.queryForObject("SELECT category_id FROM posts", Long.class)).isEqualTo(leaf);
+    }
+
+    @Test
     void apiTokenOfPreexistingAccountIsNotImported() throws Exception {
         // 원본 admin 의 토큰을 대상의 (원래 있던) admin 에 붙이면 원본 토큰으로 대상 관리자로 들어올 수 있다
         a.jdbc().update("INSERT INTO api_tokens (user_id, name, token_hash, token_prefix) VALUES (?,?,?,?)", a.adminId(), "admin-cli", "b".repeat(64), "wbt_bbbb");

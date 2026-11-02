@@ -89,6 +89,8 @@ final class DumpImporter {
     private final Map<Long, Long> users = new HashMap<>();
     private final Set<Long> createdUsers = new java.util.HashSet<>();
     private final Map<Long, Long> cats = new HashMap<>();
+    /** 열람 제한 충돌로 가져오지 않은 원본 카테고리(하위 포함). */
+    private final Set<Long> blockedCats = new java.util.HashSet<>();
     private final Map<Long, Integer> catDepth = new HashMap<>();
     private final Map<Long, Long> comments = new HashMap<>();
     private final Map<Long, PostState> posts = new HashMap<>();
@@ -194,10 +196,21 @@ final class DumpImporter {
             Long tp = null;
             if (sp != null) {
                 tp = cats.get(sp);
-                if (tp == null) { rep.add("categories", Action.FAIL, sid, null, label, "상위 카테고리를 찾지 못했습니다", true); return; }
+                if (tp == null) {
+                    if (blockedCats.contains(sp)) { blockedCats.add(sid); rep.add("categories", Action.SKIP, sid, null, label, "상위 카테고리가 열람 제한 충돌로 빠짐", true); }
+                    else rep.add("categories", Action.FAIL, sid, null, label, "상위 카테고리를 찾지 못했습니다", true);
+                    return;
+                }
             }
             Long tid = mapped(m.get(key(sid)), "categories");
             if (tid == null) tid = findChild(tp, name);
+            if (tid != null && looserThanSource(tid, str(n, "restrictedDepartments"))) {
+                // 원본에서 일부 부서만 보던 글이 여기서 더 넓게 보이게 된다 → 이 카테고리(와 그 글·하위)는 가져오지 않는다
+                blockedCats.add(sid);
+                rep.add("categories", Action.CONFLICT, sid, tid, label,
+                        "원본은 열람 부서 제한(" + nz(str(n, "restrictedDepartments")) + ")이 있는데 이 서버의 같은 카테고리는 더 넓게 열려 있음 — 이 서버의 제한을 맞춘 뒤 다시 가져오세요", true);
+                return;
+            }
             if (tid != null) {
                 cats.put(sid, tid);
                 saveMap("CATEGORY", key(sid), new MapRow(tid, null, null, null, null, null));
@@ -229,6 +242,15 @@ final class DumpImporter {
                 ? jdbc.queryForList("SELECT id FROM categories WHERE parent_id IS NULL AND lower(name) = lower(?)", Long.class, name)
                 : jdbc.queryForList("SELECT id FROM categories WHERE parent_id = ? AND lower(name) = lower(?)", Long.class, parent, name);
         return first(ids);
+    }
+
+    /** 이 서버 카테고리가 원본의 열람 부서 제한보다 넓게 열려 있는가(제한 없음 포함). 원본에 제한이 없으면 false. */
+    private boolean looserThanSource(long catId, String srcRestricted) {
+        List<String> src = com.workblog.category.CategoryAccess.parse(srcRestricted);
+        if (src.isEmpty()) return false;
+        List<String> tgt = com.workblog.category.CategoryAccess.parse(
+                first(jdbc.queryForList("SELECT restricted_departments FROM categories WHERE id = ?", String.class, catId)));
+        return tgt.isEmpty() || !src.containsAll(tgt);
     }
 
     private int depthOf(long catId) {
@@ -323,7 +345,7 @@ final class DumpImporter {
         Long tcat = scat == null ? null : cats.get(scat);
         Long tauthor = users.get(lng(n, "authorId"));
         if (tcat == null || tauthor == null) {
-            rep.add("posts", Action.FAIL, sid, null, title, tcat == null ? "카테고리를 찾지 못했습니다" : "작성자를 찾지 못했습니다", true);
+            rep.add("posts", Action.FAIL, sid, null, title, tcat == null ? (blockedCats.contains(scat) ? "카테고리 열람 제한 충돌로 가져오지 않음(카테고리 항목 참고)" : "카테고리를 찾지 못했습니다") : "작성자를 찾지 못했습니다", true);
             return;
         }
         MapRow r = postMap.get(key(sid));
