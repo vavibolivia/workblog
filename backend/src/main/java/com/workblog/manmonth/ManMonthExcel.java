@@ -164,9 +164,12 @@ public class ManMonthExcel {
         }
     }
 
-    /** 엑셀 내용을 표에 반영. 파일에 있는 행만 바꾸고, 파일에 없는 행은 그대로 둔다. */
+    /**
+     * 엑셀 내용을 표에 반영. 파일에 있는 행만 바꾸고, 파일에 없는 행은 그대로 둔다.
+     * dryRun = 미리보기(같은 계산을 하고 되돌린다). keepBlank = 파일의 빈 칸은 기존 값을 그대로 둔다(기본).
+     */
     @Transactional
-    public ImportResult importInto(long sheetId, InputStream in, User actor) {
+    public ImportResult importInto(long sheetId, InputStream in, User actor, boolean dryRun, boolean keepBlank) {
         SheetDetail d = service.get(sheetId, actor);
         if (!d.canEdit()) throw ApiException.forbidden("이 표의 편집자가 아닙니다.");
         List<String> warnings = new ArrayList<>();
@@ -196,7 +199,11 @@ public class ManMonthExcel {
             Map<String, Long> projectIds = new HashMap<>();
             for (ProjectDto p : d.projects()) projectIds.put(p.name().trim().toLowerCase(Locale.ROOT), p.id());
             Map<String, Long> rowIds = new HashMap<>();
-            for (RowDto r : d.rows()) rowIds.putIfAbsent(r.projectId() + "|" + r.personName().trim().toLowerCase(Locale.ROOT), r.id());
+            Map<String, BigDecimal> existing = new HashMap<>();
+            for (RowDto r : d.rows()) {
+                rowIds.putIfAbsent(r.projectId() + "|" + r.personName().trim().toLowerCase(Locale.ROOT), r.id());
+                for (Map.Entry<Integer, BigDecimal> c : r.cells().entrySet()) existing.put(r.id() + "|" + c.getKey(), c.getValue());
+            }
             if (sh.getLastRowNum() - headRow > MAX_IMPORT_ROWS + 1)
                 throw ApiException.badRequest("행이 너무 많습니다(최대 " + MAX_IMPORT_ROWS + "행). 파일을 나눠 올리세요.");
             DataFormatter fmt = new DataFormatter();
@@ -229,8 +236,14 @@ public class ManMonthExcel {
                 for (Map.Entry<Integer, Integer> e : colWeek.entrySet()) {
                     try {
                         BigDecimal n = ManMonthService.normalize(valueOf(row.getCell(e.getKey()), fmt));
-                        if (n == null) cleared += jdbc.update("DELETE FROM mm_cells WHERE row_id = ? AND week = ?", rid, e.getValue());
-                        else { service.upsert(rid, e.getValue(), n); set++; }
+                        BigDecimal old = existing.get(rid + "|" + e.getValue());
+                        if (n == null) {
+                            if (keepBlank || old == null) continue;
+                            cleared += jdbc.update("DELETE FROM mm_cells WHERE row_id = ? AND week = ?", rid, e.getValue());
+                        } else if (old == null || old.compareTo(n) != 0) {
+                            service.upsert(rid, e.getValue(), n);
+                            set++;
+                        }
                     } catch (ApiException ex) {
                         warnings.add((r + 1) + "행 " + name + ": " + ex.getMessage());
                     }
@@ -239,9 +252,14 @@ public class ManMonthExcel {
         } catch (IOException | org.apache.poi.EncryptedDocumentException e) {
             throw ApiException.badRequest("엑셀 파일을 읽지 못했습니다(.xlsx).");
         }
-        service.touch(sheetId);
-        service.log(sheetId, actor, "엑셀 가져오기: 프로젝트 +" + projectsCreated + " · 인원 +" + rowsCreated + " · " + set + "칸 · 비움 " + cleared + "칸");
-        return new ImportResult(projectsCreated, rowsCreated, set, cleared, warnings.size() > 50 ? warnings.subList(0, 50) : warnings);
+        if (dryRun) {
+            // 같은 계산을 한 뒤 되돌린다 — 화면에서 '무엇이 바뀌는지' 먼저 보여 주기 위함
+            org.springframework.transaction.interceptor.TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
+        } else {
+            service.touch(sheetId);
+            service.log(sheetId, actor, "엑셀 가져오기: 프로젝트 +" + projectsCreated + " · 인원 +" + rowsCreated + " · 바뀜 " + set + "칸 · 비움 " + cleared + "칸");
+        }
+        return new ImportResult(!dryRun, projectsCreated, rowsCreated, set, cleared, warnings.size() > 50 ? warnings.subList(0, 50) : warnings);
     }
 
     /** 합계 MM = 달마다 (그 달 주 투입률 합 ÷ 그 달 월요일 수) 의 합. 1.0 으로 한 달 내내 = 1 MM. */
@@ -275,17 +293,25 @@ public class ManMonthExcel {
         return null;
     }
 
+    /** 화면 입력과 같은 규칙: "50%" 와 1 보다 크고 100 이하인 수(50)는 % 로 본다 */
     private static BigDecimal valueOf(Cell c, DataFormatter fmt) {
         if (c == null) return null;
-        if (c.getCellType() == CellType.NUMERIC) return BigDecimal.valueOf(c.getNumericCellValue());
-        if (c.getCellType() == CellType.FORMULA && c.getCachedFormulaResultType() == CellType.NUMERIC) return BigDecimal.valueOf(c.getNumericCellValue());
-        String s = fmt.formatCellValue(c).trim();
-        if (s.isEmpty()) return null;
-        try {
-            return new BigDecimal(s);
-        } catch (NumberFormatException e) {
-            throw ApiException.badRequest("숫자가 아닌 값: " + s);
+        BigDecimal v;
+        if (c.getCellType() == CellType.NUMERIC) v = BigDecimal.valueOf(c.getNumericCellValue());
+        else if (c.getCellType() == CellType.FORMULA && c.getCachedFormulaResultType() == CellType.NUMERIC) v = BigDecimal.valueOf(c.getNumericCellValue());
+        else {
+            String s = fmt.formatCellValue(c).trim().replace(',', '.');
+            if (s.isEmpty()) return null;
+            boolean pct = s.endsWith("%");
+            try {
+                v = new BigDecimal(pct ? s.substring(0, s.length() - 1).trim() : s);
+            } catch (NumberFormatException e) {
+                throw ApiException.badRequest("숫자가 아닌 값: " + s);
+            }
+            if (pct) return v.movePointLeft(2);
         }
+        if (v.compareTo(BigDecimal.ONE) > 0 && v.compareTo(BigDecimal.valueOf(100)) <= 0) return v.movePointLeft(2);
+        return v;
     }
 
     private static void cell(Row r, int c, String v, CellStyle st) {

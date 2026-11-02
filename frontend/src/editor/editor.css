@@ -45,9 +45,10 @@
 .rich a { color: var(--sky); text-decoration: underline; text-underline-offset: 2px; }
 .rich mark { background: #fff2a8; }
 .rich s { text-decoration: line-through; }
-.rich table, .rich .rich-table { border-collapse: collapse; margin: 0 0 1.2em; width: 100%; table-layout: fixed; font-size: 14.5px; overflow: hidden; }
-.rich th, .rich td { border: 1px solid var(--line-strong); padding: 6px 10px; vertical-align: top; min-width: 3em; position: relative; }
-.rich th { background: var(--canvas); font-weight: 700; text-align: left; }
+/* 본문 속 공수 표(.mm-embed)는 자기 표 스타일을 쓴다 */
+.rich table:not(.mm-grid), .rich .rich-table { border-collapse: collapse; margin: 0 0 1.2em; width: 100%; table-layout: fixed; font-size: 14.5px; overflow: hidden; }
+.rich th:not(.mm-embed *), .rich td:not(.mm-embed *) { border: 1px solid var(--line-strong); padding: 6px 10px; vertical-align: top; min-width: 3em; position: relative; }
+.rich th:not(.mm-embed *) { background: var(--canvas); font-weight: 700; text-align: left; }
 .rich td > p, .rich th > p { margin: 0; }
 .rich .selectedCell::after { content: ''; position: absolute; inset: 0; background: rgba(47,155,227,.15); pointer-events: none; }
 .rich .column-resize-handle { position: absolute; right: -2px; top: 0; bottom: 0; width: 4px; background: var(--sky); pointer-events: none; }

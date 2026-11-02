@@ -35,9 +35,9 @@ public final class ManMonthDtos {
     public record CreateSheetRequest(@NotBlank @Size(max = 200) String title, @Size(max = 1000) String description,
                                      @NotNull LocalDate startDate, @Min(1) @Max(104) int weeks) {}
 
-    /** 준 항목만 바뀐다. startDate 를 바꾸면 기존 값은 날짜 기준으로 유지된다(범위 밖은 지워짐). featured 는 관리자만. */
+    /** 준 항목만 바뀐다. startDate 를 바꾸면 기존 값은 날짜 기준으로 유지된다(범위 밖은 지워짐). */
     public record UpdateSheetRequest(@Size(max = 200) String title, @Size(max = 1000) String description, LocalDate startDate,
-                                     @Min(1) @Max(104) Integer weeks, Boolean featured) {}
+                                     @Min(1) @Max(104) Integer weeks) {}
 
     public record EditorsRequest(@NotNull List<Long> userIds) {}
 
@@ -52,5 +52,6 @@ public final class ManMonthDtos {
 
     public record CellsRequest(@NotNull @Size(max = 5000) List<CellChange> changes) {}
 
-    public record ImportResult(int projectsCreated, int rowsCreated, int cellsSet, int cellsCleared, List<String> warnings) {}
+    /** applied=false 면 미리보기(아무것도 바뀌지 않음). cellsSet = 값이 바뀌는 칸, cellsCleared = 비워지는 칸. */
+    public record ImportResult(boolean applied, int projectsCreated, int rowsCreated, int cellsSet, int cellsCleared, List<String> warnings) {}
 }

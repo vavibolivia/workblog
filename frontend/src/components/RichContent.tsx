@@ -1,13 +1,41 @@
-import { useMemo } from 'react'
+import { useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import DOMPurify from 'dompurify'
 import Markdown from './Markdown'
+import MmEmbed from './MmEmbed'
 import '../editor/editor.css'
 
-/** 글 본문 렌더러: HTML(리치 에디터)은 한 번 더 정화해서, MARKDOWN(예전 글)은 마크다운으로. */
-export default function RichContent({ content, format }: { content: string; format: 'HTML' | 'MARKDOWN' }) {
+/** 본문에서 `/mm/번호` 링크 하나만 있는 문단 → 그 자리에 살아 있는 공수 표 */
+const MM_LINK = /^\/mm\/(\d+)\/?$/
+
+/**
+ * 글 본문 렌더러: HTML(리치 에디터)은 한 번 더 정화해서, MARKDOWN(예전 글)은 마크다운으로.
+ * readOnlyEmbeds = 본문 속 공수 표를 보기 전용으로(대문·이력).
+ */
+export default function RichContent({ content, format, readOnlyEmbeds }: { content: string; format: 'HTML' | 'MARKDOWN'; readOnlyEmbeds?: boolean }) {
   const html = useMemo(() => format === 'HTML' ? sanitize(content) : '', [content, format])
+  const ref = useRef<HTMLDivElement>(null)
+  const [slots, setSlots] = useState<{ el: HTMLElement; id: number }[]>([])
+  useLayoutEffect(() => {
+    const found: { el: HTMLElement; id: number }[] = []
+    ref.current?.querySelectorAll('p > a[href]').forEach((a) => {
+      const m = MM_LINK.exec(a.getAttribute('href') ?? '')
+      const p = a.parentElement
+      if (!m || !p || (p.textContent ?? '').trim() !== (a.textContent ?? '').trim()) return
+      const box = document.createElement('div')
+      p.replaceWith(box)
+      found.push({ el: box, id: Number(m[1]) })
+    })
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 본문 DOM 을 읽은 뒤에만 알 수 있는 자리
+    setSlots(found)
+  }, [html])
   if (format === 'MARKDOWN') return <Markdown>{content}</Markdown>
-  return <div className="rich" dangerouslySetInnerHTML={{ __html: html }} />
+  return (
+    <>
+      <div className="rich" ref={ref} dangerouslySetInnerHTML={{ __html: html }} />
+      {slots.map((s, i) => createPortal(<MmEmbed id={s.id} readOnly={readOnlyEmbeds} />, s.el, `mm${i}`))}
+    </>
+  )
 }
 
 export function sanitize(html: string): string {

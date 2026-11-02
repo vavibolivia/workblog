@@ -33,10 +33,10 @@ public class ManMonthController {
         this.excel = excel;
     }
 
-    @Operation(summary = "표 목록", description = "featured=true 면 메인 게시 표만")
+    @Operation(summary = "표 목록", description = "featured = 대문에 올라 있음")
     @GetMapping
-    public List<SheetSummary> list(@RequestParam(defaultValue = "false") boolean featured, @CurrentUser User user) {
-        return service.list(user, featured);
+    public List<SheetSummary> list(@CurrentUser User user) {
+        return service.list(user);
     }
 
     @Operation(summary = "표 만들기", description = "startDate 는 그 주 월요일로 맞춘다. 만든 사람이 주인(편집·설정 가능)")
@@ -51,7 +51,7 @@ public class ManMonthController {
         return service.get(id, user);
     }
 
-    @Operation(summary = "표 설정", description = "주인·관리자. startDate 를 바꾸면 값은 날짜 기준으로 유지. featured(메인 게시)는 관리자만")
+    @Operation(summary = "표 설정", description = "주인·관리자. startDate 를 바꾸면 값은 날짜 기준으로 유지")
     @PatchMapping("/{id}")
     public SheetDetail update(@PathVariable long id, @Valid @RequestBody UpdateSheetRequest req, @CurrentUser User user) {
         return service.update(id, req, user);
@@ -117,12 +117,13 @@ public class ManMonthController {
                 .body(excel.export(d, !template));
     }
 
-    @Operation(summary = "엑셀 올리기", description = "편집자. 파일에 있는 행만 바꾼다(프로젝트·인원이 없으면 만든다, 빈 칸은 비움)")
+    @Operation(summary = "엑셀 올리기", description = "편집자. dryRun=true 면 미리보기만. 파일에 있는 행만 바꾼다(프로젝트·인원이 없으면 만든다). keepBlank=true(기본) 면 빈 칸은 기존 값 유지")
     @PostMapping(value = "/{id}/excel", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ImportResult importExcel(@PathVariable long id, @RequestParam("file") MultipartFile file, @CurrentUser User user) {
+    public ImportResult importExcel(@PathVariable long id, @RequestParam("file") MultipartFile file, @RequestParam(defaultValue = "false") boolean dryRun,
+                                    @RequestParam(defaultValue = "true") boolean keepBlank, @CurrentUser User user) {
         if (file.isEmpty()) throw ApiException.badRequest("파일이 비어 있습니다.");
         try {
-            return excel.importInto(id, file.getInputStream(), user);
+            return excel.importInto(id, file.getInputStream(), user, dryRun, keepBlank);
         } catch (IOException e) {
             throw ApiException.badRequest("파일을 읽지 못했습니다.");
         }

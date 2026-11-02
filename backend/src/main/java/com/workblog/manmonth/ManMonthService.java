@@ -23,7 +23,7 @@ import java.util.*;
 
 /**
  * 공수(Man-month) 표. 가로 = 주(월요일 시작), 세로 = 프로젝트별 인원, 칸 = 그 주 투입률(0~1.0).
- * 조회는 로그인한 모두, 수정은 관리자 · 표 주인 · 편집자, 표 설정·편집자 지정·삭제는 관리자 · 주인, 메인 게시는 관리자.
+ * 조회는 로그인한 모두, 수정은 관리자 · 표 주인 · 편집자, 표 설정·편집자 지정·삭제는 관리자 · 주인. 대문 게시는 com.workblog.front.
  */
 @Service
 @Transactional
@@ -42,8 +42,8 @@ public class ManMonthService {
     // ---------- 조회 ----------
 
     @Transactional(readOnly = true)
-    public List<SheetSummary> list(User viewer, boolean featuredOnly) {
-        List<Sheet> sheets = jdbc.query(SHEET_SQL + (featuredOnly ? " WHERE s.featured = TRUE" : "") + " ORDER BY s.featured DESC, s.updated_at DESC",
+    public List<SheetSummary> list(User viewer) {
+        List<Sheet> sheets = jdbc.query(SHEET_SQL + " ORDER BY s.updated_at DESC",
                 (rs, i) -> sheet(rs));
         List<SheetSummary> out = new ArrayList<>();
         for (Sheet s : sheets) {
@@ -127,11 +127,6 @@ public class ManMonthService {
         if (req.startDate() != null || req.weeks() != null) {
             jdbc.update("DELETE FROM mm_cells WHERE week >= ? AND row_id IN (SELECT id FROM mm_rows WHERE sheet_id = ?)", weeks, id);
         }
-        if (req.featured() != null && req.featured() != s.featured()) {
-            if (!actor.isAdmin()) throw ApiException.forbidden("메인 게시는 관리자만 정할 수 있습니다.");
-            jdbc.update("UPDATE mm_sheets SET featured = ? WHERE id = ?", req.featured(), id);
-            what.add(req.featured() ? "메인 게시" : "메인 게시 해제");
-        }
         if (!what.isEmpty()) {
             touch(id);
             log(id, actor, "표 설정: " + String.join(" · ", what));
@@ -141,6 +136,7 @@ public class ManMonthService {
 
     public void delete(long id, User actor) {
         requireManage(load(id), actor);
+        jdbc.update("DELETE FROM front_items WHERE kind = 'MM_SHEET' AND ref_id = ?", id);
         jdbc.update("DELETE FROM mm_sheets WHERE id = ?", id);
     }
 
@@ -362,7 +358,8 @@ public class ManMonthService {
         return s == null || s.isBlank() ? null : s.trim();
     }
 
-    private static final String SHEET_SQL = "SELECT s.id, s.title, s.description, s.start_date, s.weeks, s.featured, s.owner_id, u.display_name, s.updated_at " +
+    private static final String SHEET_SQL = "SELECT s.id, s.title, s.description, s.start_date, s.weeks, " +
+            "EXISTS (SELECT 1 FROM front_items f WHERE f.kind = 'MM_SHEET' AND f.ref_id = s.id) AS featured, s.owner_id, u.display_name, s.updated_at " +
             "FROM mm_sheets s LEFT JOIN users u ON u.id = s.owner_id";
 
     private static Sheet sheet(java.sql.ResultSet rs) throws java.sql.SQLException {

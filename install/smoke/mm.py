@@ -43,8 +43,19 @@ s, r = call("PUT", f"/api/mm/sheets/{MM}/editors", {"userIds": [me_o["id"]]}, MO
 s, r = call("PUT", f"/api/mm/sheets/{MM}/editors", {"userIds": [me_o["id"]]}, A); check("MM owner sets editors", s == 200 and [e["id"] for e in r["editors"]] == [me_o["id"]], (s, r and r.get("editors")))
 s, r = call("PUT", f"/api/mm/sheets/{MM}/cells", {"changes": [{"rowId": R1, "week": 3, "value": 0.5}]}, MO); check("MM editor can edit", s == 200, (s, r))
 s, r = call("PATCH", f"/api/mm/sheets/{MM}", {"weeks": 10}, MO); check("MM editor cannot change settings 403", s == 403, s)
-s, r = call("PATCH", f"/api/mm/sheets/{MM}", {"featured": True}, A); check("MM admin features sheet", s == 200 and r["featured"] is True, (s, r and r.get("featured")))
-s, r = call("GET", "/api/mm/sheets?featured=true", tok=MO); check("MM featured list visible to all", s == 200 and any(x["id"] == MM for x in r), (s, r))
+# 대문(글만): 지금 목록을 기억해 두고, 이 표를 담은 임시 글을 맨 뒤에 올렸다가 원래대로 되돌린다(실제 대문을 건드리지 않음)
+s, _front0 = call("GET", "/api/front", tok=A); check("FRONT list 200", s == 200 and isinstance(_front0, list), s)
+_front_keep = [{"kind": i["kind"], "refId": i["refId"]} for i in _front0]
+s, _fp = call("POST", "/api/posts", {"title": "smoke 공수 글 " + _mm_sfx, "content": f'<p><a href="/mm/{MM}">공수 표</a></p>', "contentFormat": "HTML", "tags": [], "status": "PUBLISHED"}, A)
+FP = _fp["id"] if s in (200, 201) else None
+check("FRONT temp post with sheet link", FP is not None, s)
+s, r = call("PUT", "/api/front", {"items": _front_keep + [{"kind": "POST", "refId": FP}]}, MO); check("FRONT non-admin replace 403", s == 403, s)
+s, r = call("PUT", "/api/front", {"items": _front_keep + [{"kind": "MM_SHEET", "refId": MM}]}, A); check("FRONT sheet itself rejected (posts only) 400", s == 400, s)
+s, r = call("PUT", "/api/front", {"items": _front_keep + [{"kind": "POST", "refId": FP}]}, A); check("FRONT admin adds post last", s == 200 and r[-1]["kind"] == "POST" and r[-1]["refId"] == FP, (s, r))
+s, r = call("GET", "/api/front", tok=MO); check("FRONT visible to all", s == 200 and any(i["refId"] == FP and i["kind"] == "POST" for i in r), (s, r))
+s, r = call("PUT", "/api/front", {"items": _front_keep + [{"kind": "POST", "refId": 999999999}]}, A); check("FRONT unknown item 400", s == 400, s)
+s, r = call("PUT", "/api/front", {"items": _front_keep}, A); check("FRONT restored", s == 200 and [{"kind": i["kind"], "refId": i["refId"]} for i in r] == _front_keep, (s, r))
+if FP: call("DELETE", f"/api/posts/{FP}", tok=A); s, _ = call("DELETE", f"/api/posts/{FP}?purge=true", tok=A); check("FRONT temp post purged", s == 204, s)
 # 시작을 1주 늦추면 값은 날짜 기준으로 한 칸 당겨짐(첫 주 값은 기간 밖 → 지워짐)
 s, r = call("PATCH", f"/api/mm/sheets/{MM}", {"startDate": "2026-11-09"}, A)
 row1 = next(x for x in r["rows"] if x["id"] == R1) if s == 200 else {}
@@ -57,9 +68,27 @@ bd = "----mm" + _uuid.uuid4().hex
 body = (f"--{bd}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"mm.xlsx\"\r\nContent-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet\r\n\r\n").encode() + xbytes + f"\r\n--{bd}--\r\n".encode()
 s, rb = _mm_raw("POST", f"/api/mm/sheets/{MM}/excel", body, A, f"multipart/form-data; boundary={bd}")
 imp = json.loads(rb.decode()) if s == 200 else {}
-check("MM excel re-import is stable", s == 200 and imp.get("projectsCreated") == 0 and imp.get("rowsCreated") == 0, (s, rb[:200]))
+check("MM excel re-import is stable", s == 200 and imp.get("applied") is True and imp.get("projectsCreated") == 0 and imp.get("rowsCreated") == 0 and imp.get("cellsSet") == 0 and imp.get("cellsCleared") == 0, (s, rb[:200]))
 s, after = call("GET", f"/api/mm/sheets/{MM}", tok=A)
 check("MM values unchanged after round trip", s == 200 and {x["id"]: x["cells"] for x in after["rows"]} == {x["id"]: x["cells"] for x in r["rows"]}, (after and after.get("rows"), r.get("rows")))
+# 빈 양식 올리기: 미리보기(dryRun)는 아무것도 바꾸지 않고, 기본(keepBlank)은 빈 칸을 지우지 않는다
+tbody = (f"--{bd}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"t.xlsx\"\r\nContent-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet\r\n\r\n").encode() + tbytes + f"\r\n--{bd}--\r\n".encode()
+s, rb = _mm_raw("POST", f"/api/mm/sheets/{MM}/excel?dryRun=true&keepBlank=false", tbody, A, f"multipart/form-data; boundary={bd}")
+imp = json.loads(rb.decode()) if s == 200 else {}
+check("MM excel dry run reports clears", s == 200 and imp.get("applied") is False and imp.get("cellsCleared", 0) > 0, (s, rb[:200]))
+s, after2 = call("GET", f"/api/mm/sheets/{MM}", tok=A)
+check("MM excel dry run changes nothing", s == 200 and {x["id"]: x["cells"] for x in after2["rows"]} == {x["id"]: x["cells"] for x in r["rows"]} and len(after2["changes"]) == len(after["changes"]), s)
+s, rb = _mm_raw("POST", f"/api/mm/sheets/{MM}/excel", tbody, A, f"multipart/form-data; boundary={bd}")
+imp = json.loads(rb.decode()) if s == 200 else {}
+s2, after3 = call("GET", f"/api/mm/sheets/{MM}", tok=A)
+check("MM excel blank cells kept by default", s == 200 and imp.get("cellsCleared") == 0 and {x["id"]: x["cells"] for x in after3["rows"]} == {x["id"]: x["cells"] for x in r["rows"]}, (s, rb[:200]))
+call("PUT", f"/api/mm/sheets/{MM}/editors", {"userIds": []}, A)   # 편집자에서 빼고 확인한 뒤 되돌림
+s, rb = _mm_raw("POST", f"/api/mm/sheets/{MM}/excel?dryRun=true", tbody, MO, f"multipart/form-data; boundary={bd}")
+check("MM excel dry run needs editor", s == 403, s)
+call("PUT", f"/api/mm/sheets/{MM}/editors", {"userIds": [me_o["id"]]}, A)
+# 화면 주소를 바로 열거나 새로 고침해도 앱이 떠야 함(SPA 경로)
+for _path in ("/mm", f"/mm/{MM}"):
+    s, b = _mm_raw("GET", _path); check(f"MM page {_path} serves app", s == 200 and b"<div id=\"root\"" in b, (s, b[:80]))
 # 정리
 s, r = call("DELETE", f"/api/mm/sheets/{MM}", tok=MO); check("MM editor cannot delete 403", s == 403, s)
 s, r = call("DELETE", f"/api/mm/sheets/{MM}", tok=A); check("MM delete 204", s == 204, s)

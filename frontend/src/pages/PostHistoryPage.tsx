@@ -105,7 +105,7 @@ export default function PostHistoryPage() {
                 {detail.changeNote ? ` · ${detail.changeNote}` : ''} · 카테고리 {detail.category}{detail.tags.length ? ` · ${detail.tags.map((t) => '#' + t).join(' ')}` : ''}
               </p>
             )}
-            {detail && (mode === 'content' || isCurrent) && <RichContent content={detail.content} format={detail.contentFormat} />}
+            {detail && (mode === 'content' || isCurrent) && <RichContent content={detail.content} format={detail.contentFormat} readOnlyEmbeds />}
             {detail && mode === 'diff' && !isCurrent && (
               diff.every((l) => l.kind === 'ctx' || l.kind === 'gap')
                 ? <div className="alert alert--info">제목과 본문은 현재 버전과 같습니다. (카테고리·태그·상태만 바뀐 수정일 수 있습니다)</div>

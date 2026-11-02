@@ -4,6 +4,7 @@ import { api, errorMessage, formatDate, formatFileSize, type PostDetail } from '
 import { useToast } from '../lib/toast'
 import Sidebar from '../components/Sidebar'
 import RichContent from '../components/RichContent'
+import FrontToggle from '../components/FrontToggle'
 import Modal from '../components/Modal'
 import { Avatar } from '../components/Avatar'
 import CategoryPath from '../components/CategoryPath'
@@ -97,6 +98,7 @@ export default function PostDetailPage() {
                   )}
                   <Link to={`/posts/${post.id}/history`} className="btn btn--sm">변경 이력{post.version > 1 ? ` ${post.version}` : ''}</Link>
                   <ExportMenu postId={post.id} title={post.title} />
+                  {!post.deletedAt && <FrontToggle kind="POST" refId={post.id} />}
                   {post.editable && <ViewersButton postId={post.id} />}
                   {post.editable && !post.deletedAt && <>
                     <Link to={`/posts/${post.id}/edit`} className="btn btn--sm btn--primary">수정</Link>

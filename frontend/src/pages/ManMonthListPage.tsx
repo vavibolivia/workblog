@@ -11,6 +11,17 @@ function thisMonday(): string {
 }
 
 /** 공수 표 목록 · 새 표 (시작 주와 주 수를 정해 만든다) */
+/** 고른 날의 월요일 ~ 마지막 주 일요일 */
+function periodText(start: string, weeks: number): string {
+  if (!start) return '—'
+  const [y, m, d] = start.split('-').map(Number)
+  const s = new Date(y, m - 1, d)
+  s.setDate(s.getDate() - ((s.getDay() + 6) % 7))
+  const e = new Date(s.getFullYear(), s.getMonth(), s.getDate() + weeks * 7 - 1)
+  const f = (x: Date) => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`
+  return `${f(s)} (월) ~ ${f(e)} (일) · ${weeks}주`
+}
+
 export default function ManMonthListPage() {
   const navigate = useNavigate()
   const [list, setList] = useState<MmSheetSummary[] | null>(null)
@@ -48,7 +59,7 @@ export default function ManMonthListPage() {
             <tbody>
               {list?.map((s) => (
                 <tr key={s.id}>
-                  <td><Link to={`/mm/${s.id}`}>{s.title}</Link> {s.featured && <span className="chip">메인 게시</span>}{s.description && <div className="small muted">{s.description}</div>}</td>
+                  <td><Link to={`/mm/${s.id}`}>{s.title}</Link> {s.featured && <span className="chip">대문</span>}{s.description && <div className="small muted">{s.description}</div>}</td>
                   <td className="small">{s.startDate} 부터 {s.weeks}주</td>
                   <td className="small">{s.ownerName ?? '—'}</td>
                   <td className="small muted">{relativeTime(s.updatedAt)}</td>
@@ -68,7 +79,8 @@ export default function ManMonthListPage() {
             <div className="field" style={{ flex: 1 }}><label htmlFor="mmn-s">시작 주 (고른 날의 월요일로 맞춤)</label><input id="mmn-s" type="date" className="input" value={start} onChange={(e) => setStart(e.target.value)} /></div>
             <div className="field" style={{ width: 120 }}><label htmlFor="mmn-w">주 수 (최대 104)</label><input id="mmn-w" type="number" min={1} max={104} className="input" value={weeks} onChange={(e) => setWeeks(Math.max(1, Math.min(104, Number(e.target.value) || 1)))} /></div>
           </div>
-          <p className="small muted">만든 사람이 표 주인이 되어 편집자를 지정합니다. 프로젝트 → 인원 순서로 추가하거나, 만든 뒤 [빈 양식] 엑셀을 채워 [엑셀 올리기] 로 한 번에 넣을 수 있습니다.</p>
+          <p className="small">기간: <strong>{periodText(start, weeks)}</strong></p>
+          <p className="small muted">만든 사람이 표 주인이 되어 편집자를 지정합니다. 프로젝트 → 인원 순서로 추가하거나, 만든 뒤 [엑셀 ▾ → 양식 내려받기] 를 채워 [엑셀 ▾ → 올리기] 로 한 번에 넣을 수 있습니다.</p>
         </Modal>
       )}
     </div>

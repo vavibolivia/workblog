@@ -12,15 +12,15 @@ export interface MmSheet {
   editors: MmUserRef[]; projects: MmProject[]; rows: MmRow[]; changes: MmChange[]
 }
 export interface MmCellChange { rowId: number; week: number; value: number | null }
-export interface MmImportResult { projectsCreated: number; rowsCreated: number; cellsSet: number; cellsCleared: number; warnings: string[] }
+export interface MmImportResult { applied: boolean; projectsCreated: number; rowsCreated: number; cellsSet: number; cellsCleared: number; warnings: string[] }
 export interface MmRowRequest { projectId?: number; userId?: number | null; personName?: string; department?: string; role?: string }
 
 const base = '/mm/sheets'
 export const mmApi = {
-  list: (featured = false) => http.get<MmSheetSummary[]>(base, { params: { featured } }).then((r) => r.data),
+  list: () => http.get<MmSheetSummary[]>(base).then((r) => r.data),
   get: (id: number) => http.get<MmSheet>(`${base}/${id}`).then((r) => r.data),
   create: (body: { title: string; description?: string; startDate: string; weeks: number }) => http.post<MmSheet>(base, body).then((r) => r.data),
-  update: (id: number, body: { title?: string; description?: string; startDate?: string; weeks?: number; featured?: boolean }) =>
+  update: (id: number, body: { title?: string; description?: string; startDate?: string; weeks?: number }) =>
     http.patch<MmSheet>(`${base}/${id}`, body).then((r) => r.data),
   remove: (id: number) => http.delete(`${base}/${id}`),
   setEditors: (id: number, userIds: number[]) => http.put<MmSheet>(`${base}/${id}/editors`, { userIds }).then((r) => r.data),
@@ -35,10 +35,11 @@ export const mmApi = {
     const r = await http.get<Blob>(`${base}/${id}/excel`, { params: { template }, responseType: 'blob' })
     saveBlob(r.data, parseContentDispositionFilename(r.headers['content-disposition']) ?? (template ? '공수양식.xlsx' : '공수.xlsx'))
   },
-  uploadExcel: (id: number, file: File) => {
+  /** dryRun = 미리보기(바뀌는 것만 계산), keepBlank = 파일의 빈 칸은 기존 값 유지 */
+  uploadExcel: (id: number, file: File, opts: { dryRun: boolean; keepBlank: boolean }) => {
     const fd = new FormData()
     fd.append('file', file)
-    return http.post<MmImportResult>(`${base}/${id}/excel`, fd).then((r) => r.data)
+    return http.post<MmImportResult>(`${base}/${id}/excel`, fd, { params: opts }).then((r) => r.data)
   },
 }
 
@@ -99,14 +100,14 @@ export function fmtVal(v: number | undefined): string {
   return String(Math.round(v * 100) / 100)
 }
 
-/** 붙여넣기·입력 문자열 → 값. 빈 칸 = null, 50% → 0.5 */
+/** 붙여넣기·입력 문자열 → 값. 빈 칸 = null, 50% → 0.5, 1 보다 크고 100 이하인 수(50)도 % 로 본다 */
 export function parseVal(s: string): number | null | 'bad' {
   const t = s.trim().replace(',', '.')
   if (!t) return null
   const pct = t.endsWith('%')
   const n = Number(pct ? t.slice(0, -1) : t)
   if (!Number.isFinite(n)) return 'bad'
-  const v = pct ? n / 100 : n
+  const v = pct || (n > 1 && n <= 100) ? n / 100 : n
   if (v < 0 || v > 1) return 'bad'
   return v === 0 ? null : Math.round(v * 100) / 100
 }
