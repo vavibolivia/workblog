@@ -70,6 +70,14 @@ pgsu() { (cd / && runuser -u postgres -- "$@"); }
 # -w: 비밀번호를 묻지 않는다(묻는 설정이면 실패로 보고 아래에서 고친다)
 pg_ready() { pgsu psql -w -qtAc 'select 1' >/dev/null 2>&1; }
 pg_up() { command -v pg_isready >/dev/null && pg_isready -q 2>/dev/null; }
+# psql 변수 지정 줄(\set 이름 '값')을 만든다. 비밀번호를 명령줄(ps 에 보임)이 아니라 표준 입력으로 넘기기 위함.
+# psql 작은따옴표 안에서는 ' → '' , 백슬래시 → 백슬래시 두 개로 적는다.
+psql_set() {
+  local q="'" v="$2"
+  v="${v//\\/\\\\}"
+  v="${v//$q/$q$q}"
+  printf '%sset %s %s%s%s\n' '\' "$1" "$q" "$v" "$q"
+}
 
 # 서버는 떠 있는데 postgres 계정이 이 서버 안에서도 비밀번호를 요구하면(pg_hba 의 local 이 md5/scram) 설치를 못 한다.
 # → pg_hba.conf 맨 위에 'local all postgres peer' 한 줄을 넣고(백업 남김) 다시 읽게 한다. (Ubuntu·Rocky 기본과 같은 규칙)
@@ -163,9 +171,9 @@ ensure_pg_superuser_password() {
   if [ "$has" = t ]; then PG_SUPER_INFO="postgres (기존 비밀번호 그대로)"; return 0; fi
   # 비밀번호는 psql 변수(:'pw')로 넘겨 따옴표가 들어 있어도 안전하게
   if [ -z "$has" ]; then
-    echo "CREATE ROLE postgres LOGIN SUPERUSER PASSWORD :'pw';" | pgsu psql -v ON_ERROR_STOP=1 -q -v pw="$PG_PASS" >/dev/null
+    { psql_set pw "$PG_PASS"; echo "CREATE ROLE postgres LOGIN SUPERUSER PASSWORD :'pw';"; } | pgsu psql -v ON_ERROR_STOP=1 -q >/dev/null
   else
-    echo "ALTER ROLE postgres PASSWORD :'pw';" | pgsu psql -v ON_ERROR_STOP=1 -q -v pw="$PG_PASS" >/dev/null
+    { psql_set pw "$PG_PASS"; echo "ALTER ROLE postgres PASSWORD :'pw';"; } | pgsu psql -v ON_ERROR_STOP=1 -q >/dev/null
   fi
   PG_SUPER_INFO="postgres / ${PG_PASS}"
 }
@@ -220,7 +228,7 @@ else
     # DB 계정: --db-user/--db-pass 를 주면 그 값(없으면 만들고, 있으면 비밀번호를 맞춤), 안 주면 workblog + 난수
     DB_USER="${DB_USER:-workblog}"; DB_PASS="${DB_PASS:-$(rand 24)}"
     # 이름·비밀번호는 psql 변수로 넘긴다(특수문자 안전)
-    pgsu psql -v ON_ERROR_STOP=1 -q -v u="$DB_USER" -v p="$DB_PASS" <<'SQL'
+    { psql_set u "$DB_USER"; psql_set p "$DB_PASS"; cat <<'SQL'
 SELECT NOT EXISTS (SELECT FROM pg_roles WHERE rolname = :'u') AS need_role \gset
 \if :need_role
   CREATE ROLE :"u" LOGIN PASSWORD :'p';
@@ -228,6 +236,7 @@ SELECT NOT EXISTS (SELECT FROM pg_roles WHERE rolname = :'u') AS need_role \gset
   ALTER ROLE :"u" LOGIN PASSWORD :'p';
 \endif
 SQL
+    } | pgsu psql -v ON_ERROR_STOP=1 -q
     pgsu psql -tAc "SELECT 1 FROM pg_database WHERE datname='workblog'" | grep 1 >/dev/null \
       || pgsu createdb -O "$DB_USER" workblog
     pgsu psql -q -v u="$DB_USER" -c 'ALTER DATABASE workblog OWNER TO :"u"' >/dev/null 2>&1       || echo 'ALTER DATABASE workblog OWNER TO :"u";' | pgsu psql -q -v ON_ERROR_STOP=1 -v u="$DB_USER" >/dev/null
