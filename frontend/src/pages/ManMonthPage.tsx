@@ -92,7 +92,7 @@ export default function ManMonthPage() {
     <div className="shell shell--wide">
       <div className="page-head row row--between row--wrap">
         <div>
-          <p className="small muted"><Link to="/mm">공수 표</Link> ›</p>
+          <p className="small muted"><Link to="/mm">업무산정</Link> ›</p>
           {titleEdit !== null ? (
             <form className="row mm-title-edit" style={{ gap: 6 }} onSubmit={(e) => { e.preventDefault(); if (titleEdit.trim() && titleEdit.trim() !== sheet.title) run(() => mmApi.update(sheet.id, { title: titleEdit.trim() }), '제목을 바꿨습니다.').then((ok) => { if (ok) setTitleEdit(null) }); else setTitleEdit(null) }}>
               <input className="input" value={titleEdit} onChange={(e) => setTitleEdit(e.target.value)} maxLength={200} autoFocus aria-label="표 제목"
@@ -361,7 +361,7 @@ function lostCells(sheet: MmSheet, start: string, weeks: number): number {
   n.setDate(n.getDate() - ((n.getDay() + 6) % 7))   // 그 주 월요일
   const shift = Math.round((s0.getTime() - n.getTime()) / (7 * 864e5))
   let lost = 0
-  for (const r of sheet.rows) for (const w of Object.keys(r.cells)) { const nw = Number(w) + shift; if (nw < 0 || nw >= weeks) lost++ }
+  for (const r of sheet.rows) for (const w of [...Object.keys(r.cells), ...Object.keys(r.notes ?? {})]) { const nw = Number(w) + shift; if (nw < 0 || nw >= weeks) lost++ }
   return lost
 }
 
@@ -397,7 +397,7 @@ function SettingsDialog({ sheet, busy, onClose, run }: { sheet: MmSheet; busy: b
       </div>
       <p className="small">기간: <strong>{periodText(start, weeks)}</strong>{start && mondayOf(start) !== start && <span className="muted"> — 고른 {start} 은 그 주 월요일로 맞춥니다</span>}</p>
       {lost > 0
-        ? <div className="alert alert--warn">이 기간으로 바꾸면 기간 밖이 되는 <strong>{lost}칸</strong>의 값이 지워집니다.</div>
+        ? <div className="alert alert--warn">이 기간으로 바꾸면 기간 밖이 되는 <strong>{lost}칸</strong>의 값·메모가 지워집니다.</div>
         : <p className="small muted">시작을 바꿔도 입력한 값은 날짜 기준으로 그대로 남습니다.</p>}
     </Modal>
   )

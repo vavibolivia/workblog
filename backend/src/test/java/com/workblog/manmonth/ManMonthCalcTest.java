@@ -38,8 +38,11 @@ class ManMonthCalcTest {
         assertThat(ManMonthService.normalize(BigDecimal.ZERO)).isNull();
         assertThat(ManMonthService.normalize(new BigDecimal("0.333"))).isEqualByComparingTo("0.33");
         assertThat(ManMonthService.normalize(new BigDecimal("1"))).isEqualByComparingTo("1.00");
-        assertThatThrownBy(() -> ManMonthService.normalize(new BigDecimal("1.01"))).isInstanceOf(ApiException.class);
-        assertThatThrownBy(() -> ManMonthService.normalize(new BigDecimal("-0.1"))).isInstanceOf(ApiException.class);
+        // 아무 숫자(소수 둘째 자리) — 1 넘는 값·음수도 됨, 0.004 처럼 반올림해 0 이면 비움, 너무 크면 거절
+        assertThat(ManMonthService.normalize(new BigDecimal("40.256"))).isEqualByComparingTo("40.26");
+        assertThat(ManMonthService.normalize(new BigDecimal("-0.1"))).isEqualByComparingTo("-0.10");
+        assertThat(ManMonthService.normalize(new BigDecimal("0.004"))).isNull();
+        assertThatThrownBy(() -> ManMonthService.normalize(new BigDecimal("1E10"))).isInstanceOf(ApiException.class);
     }
 
     @Test

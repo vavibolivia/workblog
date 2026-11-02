@@ -108,3 +108,10 @@
   .rte__group--end { margin-left: 0; }
   .rte__menu, .rte__palette { max-width: calc(100vw - 32px); }
 }
+
+/* 글쓰기 중 업무산정·이벤트 링크 줄: 저장하면 살아 있는 표가 되는 자리 */
+.ProseMirror p > a[href^="/mm/"]:only-child { display: inline-flex; align-items: center; gap: 8px; padding: 10px 14px; border: 1px dashed var(--line-strong); border-radius: var(--radius-s); background: var(--canvas); color: var(--navy); font-weight: 700; text-decoration: none; }
+.ProseMirror p > a[href^="/mm/"]:only-child::before { content: '📊'; }
+.ProseMirror p > a[href^="/mm/"]:only-child::after { content: '— 글을 저장하면 이 자리에 표가 보입니다'; font-weight: 400; font-size: 12.5px; color: var(--muted); }
+.wp-menu { min-width: 260px; }
+.wp-menu button { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }

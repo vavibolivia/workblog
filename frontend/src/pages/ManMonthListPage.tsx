@@ -35,10 +35,14 @@ export default function ManMonthListPage() {
     <div className="shell shell--wide">
       <div className="page-head row row--between row--wrap">
         <div>
-          <h2>공수 표 (Man-month)</h2>
-          <p>가로는 주(월요일 시작), 세로는 프로젝트별 인원. 칸에는 그 주 투입률(0~1.0)을 적습니다. 보기는 모두, 수정은 표마다 지정한 편집자.</p>
+          <h2>업무산정 <span className="muted" style={{ fontWeight: 500, fontSize: 16 }}>공수 표 · 이벤트</span></h2>
+          <p>가로는 주(월요일 시작), 세로는 프로젝트별 인원. 칸에는 그 주 값(보통 투입률 0~1.0, 아무 숫자)과 할 일 메모를 적습니다. 보기는 모두, 수정은 표마다 지정한 편집자.
+            글쓰기 도구의 <strong>[업무산정]</strong> 으로 글에 바로 넣을 수 있습니다.</p>
         </div>
-        <button type="button" className="btn btn--primary" onClick={() => setCreating(true)}>새 공수 표</button>
+        <div className="row" style={{ gap: 6 }}>
+          <Link to="/mm/events" className="btn">이벤트 관리</Link>
+          <button type="button" className="btn btn--primary" onClick={() => setCreating(true)}>새 공수 표</button>
+        </div>
       </div>
       {err && <div className="alert alert--error">{err}</div>}
       <div className="card">

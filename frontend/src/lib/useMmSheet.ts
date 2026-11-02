@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { errorMessage } from './api'
-import { mmApi, type MmCellChange, type MmSheet } from './manMonthApi'
+import { MM_EVENTS_CHANGED, mmApi, type MmCellChange, type MmNoteChange, type MmSheet } from './manMonthApi'
 import { useToast } from './toast'
 
 const POLL_MS = 20_000
@@ -120,6 +120,24 @@ export function useMmSheet(id: number) {
     void flush()
   }, [flush])
 
+  /** 할 일 메모(되돌리기 기록에는 넣지 않음). 성공하면 true */
+  const saveNotes = useCallback(async (changes: MmNoteChange[]) => {
+    try {
+      const s = await mmApi.setNotes(id, changes)
+      setSheet(s)
+      const n = changes.filter((c) => c.text.trim()).length
+      toast(n ? `메모를 ${changes.length}칸에 저장했습니다.` : `메모를 ${changes.length}칸에서 지웠습니다.`, 'success')
+      return true
+    } catch (e) { toast(errorMessage(e, '메모를 저장하지 못했습니다.'), 'error'); return false }
+  }, [id, setSheet, toast])
+
+  // 이벤트(공용)가 바뀌면 다시 읽어 '이벤트' 줄을 맞춘다
+  useEffect(() => {
+    const on = () => { if (queue.current.size === 0) void reload() }
+    window.addEventListener(MM_EVENTS_CHANGED, on)
+    return () => window.removeEventListener(MM_EVENTS_CHANGED, on)
+  }, [reload])
+
   // 저장 전·실패한 칸이 있으면 창 닫기·새로 고침 전에 묻는다
   useEffect(() => {
     const onBefore = (e: BeforeUnloadEvent) => {
@@ -132,7 +150,7 @@ export function useMmSheet(id: number) {
   useEffect(() => () => { window.clearTimeout(timer.current); if (queue.current.size) void flush() }, [flush])
 
   return {
-    sheet, setSheet, err, overlay, change, saving, reload, savedAt, failed, retry,
+    sheet, setSheet, err, overlay, change, saving, reload, savedAt, failed, retry, saveNotes,
     undo, redo, canUndo: history.undo > 0, canRedo: history.redo > 0,
   }
 }

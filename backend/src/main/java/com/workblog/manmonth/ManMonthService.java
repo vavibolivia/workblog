@@ -22,13 +22,13 @@ import java.time.temporal.TemporalAdjusters;
 import java.util.*;
 
 /**
- * 공수(Man-month) 표. 가로 = 주(월요일 시작), 세로 = 프로젝트별 인원, 칸 = 그 주 투입률(0~1.0).
+ * 공수(Man-month) 표. 가로 = 주(월요일 시작), 세로 = 프로젝트별 인원, 칸 = 그 주 값(보통 투입률 0~1.0, 아무 숫자) + 메모.
  * 조회는 로그인한 모두, 수정은 관리자 · 표 주인 · 편집자, 표 설정·편집자 지정·삭제는 관리자 · 주인. 대문 게시는 com.workblog.front.
  */
 @Service
 @Transactional
 public class ManMonthService {
-    static final BigDecimal MAX = new BigDecimal("1.00");
+    static final BigDecimal LIMIT = new BigDecimal("10000000000");
 
     private final JdbcTemplate jdbc;
 
@@ -63,18 +63,23 @@ public class ManMonthService {
         jdbc.query("SELECT c.row_id, c.week, c.value FROM mm_cells c JOIN mm_rows r ON r.id = c.row_id WHERE r.sheet_id = ? AND c.week < ?", rs -> {
             cells.computeIfAbsent(rs.getLong(1), k -> new TreeMap<>()).put(rs.getInt(2), rs.getBigDecimal(3).stripTrailingZeros());
         }, id, s.weeks());
+        Map<Long, Map<Integer, String>> notes = new HashMap<>();
+        jdbc.query("SELECT n.row_id, n.week, n.text FROM mm_notes n JOIN mm_rows r ON r.id = n.row_id WHERE r.sheet_id = ? AND n.week < ?", rs -> {
+            notes.computeIfAbsent(rs.getLong(1), k -> new TreeMap<>()).put(rs.getInt(2), rs.getString(3));
+        }, id, s.weeks());
         List<RowDto> rows = jdbc.query("SELECT id, project_id, user_id, person_name, department, role, sort_order FROM mm_rows WHERE sheet_id = ? ORDER BY sort_order, id",
                 (rs, i) -> {
                     long rid = rs.getLong(1);
                     Long uid = rs.getLong(3);
                     if (rs.wasNull()) uid = null;
                     return new RowDto(rid, rs.getLong(2), uid, rs.getString(4), rs.getString(5), rs.getString(6), rs.getInt(7),
-                            cells.getOrDefault(rid, Map.of()));
+                            cells.getOrDefault(rid, Map.of()), notes.getOrDefault(rid, Map.of()));
                 }, id);
         List<ChangeDto> changes = jdbc.query("SELECT actor_name, summary, created_at FROM mm_changes WHERE sheet_id = ? ORDER BY created_at DESC, id DESC LIMIT 30",
                 (rs, i) -> new ChangeDto(rs.getString(1), rs.getString(2), rs.getTimestamp(3).toInstant()), id);
+        List<EventDto> events = MmEventService.between(jdbc, s.startDate(), s.startDate().plusWeeks(s.weeks()).minusDays(1));
         return new SheetDetail(s.id(), s.title(), s.description(), s.startDate(), s.weeks(), s.featured(), s.ownerId(), s.ownerName(), s.updatedAt(),
-                canEdit(s, viewer), canManage(s, viewer), editors, projects, rows, changes);
+                canEdit(s, viewer), canManage(s, viewer), editors, projects, rows, changes, events);
     }
 
     // ---------- 표 ----------
@@ -113,9 +118,11 @@ public class ManMonthService {
             start = monday(req.startDate());
             // 값은 날짜 기준으로 유지: 새 시작이 n주 늦으면 기존 주 번호에서 n 을 뺀다(PK 충돌을 피하려 두 번에 나눠 이동)
             int shift = (int) ChronoUnit.WEEKS.between(s.startDate(), start);
-            jdbc.update("UPDATE mm_cells SET week = week + 100000 - ? WHERE row_id IN (SELECT id FROM mm_rows WHERE sheet_id = ?)", shift, id);
-            jdbc.update("DELETE FROM mm_cells WHERE week < 100000 AND row_id IN (SELECT id FROM mm_rows WHERE sheet_id = ?)", id);
-            jdbc.update("UPDATE mm_cells SET week = week - 100000 WHERE row_id IN (SELECT id FROM mm_rows WHERE sheet_id = ?)", id);
+            for (String t : List.of("mm_cells", "mm_notes")) {   // 메모도 값과 같이 날짜 기준으로
+                jdbc.update("UPDATE " + t + " SET week = week + 100000 - ? WHERE row_id IN (SELECT id FROM mm_rows WHERE sheet_id = ?)", shift, id);
+                jdbc.update("DELETE FROM " + t + " WHERE week < 100000 AND row_id IN (SELECT id FROM mm_rows WHERE sheet_id = ?)", id);
+                jdbc.update("UPDATE " + t + " SET week = week - 100000 WHERE row_id IN (SELECT id FROM mm_rows WHERE sheet_id = ?)", id);
+            }
             jdbc.update("UPDATE mm_sheets SET start_date = ? WHERE id = ?", Date.valueOf(start), id);
             what.add("시작 " + start);
         }
@@ -126,6 +133,7 @@ public class ManMonthService {
         }
         if (req.startDate() != null || req.weeks() != null) {
             jdbc.update("DELETE FROM mm_cells WHERE week >= ? AND row_id IN (SELECT id FROM mm_rows WHERE sheet_id = ?)", weeks, id);
+            jdbc.update("DELETE FROM mm_notes WHERE week >= ? AND row_id IN (SELECT id FROM mm_rows WHERE sheet_id = ?)", weeks, id);
         }
         if (!what.isEmpty()) {
             touch(id);
@@ -245,6 +253,29 @@ public class ManMonthService {
         return get(id, actor);
     }
 
+    /** 주별 메모(할 일). 여러 칸에 한 번에(같은 메모를 묶어서). 빈 글이면 지운다. */
+    public SheetDetail setNotes(long id, NotesRequest req, User actor) {
+        Sheet s = load(id);
+        requireEdit(s, actor);
+        Set<Long> rowIds = new HashSet<>(jdbc.queryForList("SELECT id FROM mm_rows WHERE sheet_id = ?", Long.class, id));
+        int set = 0, cleared = 0;
+        for (NoteChange c : req.changes()) {
+            if (!rowIds.contains(c.rowId())) throw ApiException.badRequest("이 표의 행이 아닙니다: " + c.rowId());
+            if (c.week() < 0 || c.week() >= s.weeks()) throw ApiException.badRequest("주 범위 밖입니다: " + c.week());
+            String t = c.text() == null ? "" : c.text().strip();
+            if (t.isEmpty()) {
+                cleared += jdbc.update("DELETE FROM mm_notes WHERE row_id = ? AND week = ?", c.rowId(), c.week());
+            } else {
+                if (jdbc.update("UPDATE mm_notes SET text = ?, updated_by = ?, updated_at = now() WHERE row_id = ? AND week = ?", t, actor.getDisplayName(), c.rowId(), c.week()) == 0)
+                    jdbc.update("INSERT INTO mm_notes (row_id, week, text, updated_by) VALUES (?,?,?,?)", c.rowId(), c.week(), t, actor.getDisplayName());
+                set++;
+            }
+        }
+        touch(id);
+        log(id, actor, "메모: " + set + "칸" + (cleared > 0 ? " · 지움 " + cleared + "칸" : ""));
+        return get(id, actor);
+    }
+
     /** 엑셀 가져오기용: 변경 이력·전체 다시 읽기 없이 프로젝트를 넣고 id 를 돌려준다. */
     long insertProject(long sheetId, String name) {
         KeyHolder kh = new GeneratedKeyHolder();
@@ -283,11 +314,13 @@ public class ManMonthService {
         }
     }
 
-    /** 0~1.0, 소수 둘째 자리. 0 이나 null 은 '비움'. */
+    /** 아무 숫자(보통 투입률 0~1.0), 소수 둘째 자리. 0 이나 null 은 '비움'. */
     static BigDecimal normalize(BigDecimal v) {
-        if (v == null || v.signum() == 0) return null;
-        if (v.signum() < 0 || v.compareTo(MAX) > 0) throw ApiException.badRequest("투입률은 0 ~ 1.0 입니다: " + v.toPlainString());
-        return v.setScale(2, RoundingMode.HALF_UP);
+        if (v == null) return null;
+        BigDecimal r = v.setScale(2, RoundingMode.HALF_UP);
+        if (r.signum() == 0) return null;
+        if (r.abs().compareTo(LIMIT) >= 0) throw ApiException.badRequest("숫자가 너무 큽니다(최대 9,999,999,999.99): " + v.toPlainString());
+        return r;
     }
 
     // ---------- 권한 · 공통 ----------

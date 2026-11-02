@@ -4,14 +4,28 @@ import { http, parseContentDispositionFilename, saveBlob } from './api'
 export interface MmUserRef { id: number; username: string; displayName: string; department: string | null }
 export interface MmSheetSummary { id: number; title: string; description: string | null; startDate: string; weeks: number; featured: boolean; ownerName: string | null; updatedAt: string; canEdit: boolean }
 export interface MmProject { id: number; name: string; sortOrder: number }
-export interface MmRow { id: number; projectId: number; userId: number | null; personName: string; department: string | null; role: string | null; sortOrder: number; cells: Record<string, number> }
+export interface MmRow { id: number; projectId: number; userId: number | null; personName: string; department: string | null; role: string | null; sortOrder: number; cells: Record<string, number>; notes: Record<string, string> }
 export interface MmChange { actorName: string | null; summary: string; createdAt: string }
 export interface MmSheet {
   id: number; title: string; description: string | null; startDate: string; weeks: number; featured: boolean
   ownerId: number | null; ownerName: string | null; updatedAt: string; canEdit: boolean; canManage: boolean
-  editors: MmUserRef[]; projects: MmProject[]; rows: MmRow[]; changes: MmChange[]
+  editors: MmUserRef[]; projects: MmProject[]; rows: MmRow[]; changes: MmChange[]; events: MmEvent[]
 }
 export interface MmCellChange { rowId: number; week: number; value: number | null }
+export interface MmNoteChange { rowId: number; week: number; text: string }
+export type MmEventKind = 'MILESTONE' | 'MEETING' | 'RELEASE' | 'REVIEW' | 'HOLIDAY' | 'LEAVE' | 'ETC'
+export interface MmEvent { id: number; startDate: string; endDate: string | null; kind: MmEventKind; title: string; related: string | null; note: string | null; createdBy: string | null; updatedAt: string }
+export interface MmEventRequest { startDate: string; endDate?: string | null; kind: MmEventKind; title: string; related?: string; note?: string }
+/** 이벤트 종류: 이름 · 색(글자 색과 옅은 바탕을 함께 씀) */
+export const EVENT_KINDS: Record<MmEventKind, { label: string; color: string }> = {
+  RELEASE: { label: '릴리스·배포', color: '#d9480f' },
+  MILESTONE: { label: '마일스톤', color: '#7048e8' },
+  REVIEW: { label: '검토·감리', color: '#1971c2' },
+  MEETING: { label: '회의·보고', color: '#0c8599' },
+  HOLIDAY: { label: '공휴일', color: '#c92a2a' },
+  LEAVE: { label: '휴가·교육', color: '#5c940d' },
+  ETC: { label: '기타', color: '#495057' },
+}
 export interface MmImportResult { applied: boolean; projectsCreated: number; rowsCreated: number; cellsSet: number; cellsCleared: number; warnings: string[] }
 export interface MmRowRequest { projectId?: number; userId?: number | null; personName?: string; department?: string; role?: string }
 
@@ -31,6 +45,7 @@ export const mmApi = {
   updateRow: (id: number, rowId: number, body: MmRowRequest) => http.put<MmSheet>(`${base}/${id}/rows/${rowId}`, body).then((r) => r.data),
   removeRow: (id: number, rowId: number) => http.delete<MmSheet>(`${base}/${id}/rows/${rowId}`).then((r) => r.data),
   setCells: (id: number, changes: MmCellChange[]) => http.put<MmSheet>(`${base}/${id}/cells`, { changes }).then((r) => r.data),
+  setNotes: (id: number, changes: MmNoteChange[]) => http.put<MmSheet>(`${base}/${id}/notes`, { changes }).then((r) => r.data),
   downloadExcel: async (id: number, template: boolean) => {
     const r = await http.get<Blob>(`${base}/${id}/excel`, { params: { template }, responseType: 'blob' })
     saveBlob(r.data, parseContentDispositionFilename(r.headers['content-disposition']) ?? (template ? '공수양식.xlsx' : '공수.xlsx'))
@@ -119,14 +134,46 @@ export function fmtVal(v: number | undefined): string {
   return String(Math.round(v * 100) / 100)
 }
 
-/** 붙여넣기·입력 문자열 → 값. 빈 칸 = null, 50% → 0.5, 1 보다 크고 100 이하인 수(50)도 % 로 본다 */
+/** 붙여넣기·입력 문자열 → 값. 아무 숫자(소수 둘째 자리), 빈 칸·0 = 비움, 50% → 0.5. 천 단위 쉼표(1,234)도 됨 */
 export function parseVal(s: string): number | null | 'bad' {
-  const t = s.trim().replace(',', '.')
+  let t = s.trim().replace(/\s/g, '')
   if (!t) return null
+  if (/^-?\d{1,3}(,\d{3})+(\.\d+)?%?$/.test(t)) t = t.replace(/,/g, '')
+  else t = t.replace(',', '.')
   const pct = t.endsWith('%')
   const n = Number(pct ? t.slice(0, -1) : t)
   if (!Number.isFinite(n)) return 'bad'
-  const v = pct || (n > 1 && n <= 100) ? n / 100 : n
-  if (v < 0 || v > 1) return 'bad'
-  return v === 0 ? null : Math.round(v * 100) / 100
+  const v = Math.round((pct ? n / 100 : n) * 100) / 100
+  if (Math.abs(v) >= 1e10) return 'bad'
+  return v === 0 ? null : v
 }
+
+// ---------- 이벤트(공용 목록) ----------
+export const mmEventApi = {
+  list: (from?: string, to?: string) => http.get<{ events: MmEvent[]; canEdit: boolean }>('/mm/events', { params: { from, to } }).then((r) => r.data),
+  create: (body: MmEventRequest) => http.post<MmEvent>('/mm/events', body).then((r) => r.data),
+  update: (id: number, body: MmEventRequest) => http.put<MmEvent>(`/mm/events/${id}`, body).then((r) => r.data),
+  remove: (id: number) => http.delete(`/mm/events/${id}`),
+}
+export const MM_EVENTS_CHANGED = 'workblog:mm-events-changed'
+export const notifyEventsChanged = () => window.dispatchEvent(new Event(MM_EVENTS_CHANGED))
+
+/** 날짜(yyyy-mm-dd) 사이 날 수 */
+export function daysBetween(a: string, b: string): number {
+  const p = (x: string) => { const [y, m, d] = x.split('-').map(Number); return Date.UTC(y, m - 1, d) }
+  return Math.round((p(b) - p(a)) / 864e5)
+}
+/** 이벤트가 걸치는 주 번호들(표 기간 안만) */
+export function eventWeeks(e: MmEvent, startDate: string, weeks: number): number[] {
+  const a = Math.floor(daysBetween(startDate, e.startDate) / 7)
+  const b = Math.floor(daysBetween(startDate, e.endDate ?? e.startDate) / 7)
+  const out: number[] = []
+  for (let w = Math.max(0, a); w <= Math.min(weeks - 1, b); w++) out.push(w)
+  return out
+}
+/** 짧은 날짜: 11/20(금) */
+export function shortDate(d: string): string {
+  const [y, m, dd] = d.split('-').map(Number)
+  return `${m}/${dd}(${'일월화수목금토'[new Date(y, m - 1, dd).getDay()]})`
+}
+export const eventPeriod = (e: MmEvent) => (e.endDate ? `${shortDate(e.startDate)} ~ ${shortDate(e.endDate)}` : shortDate(e.startDate))

@@ -25,6 +25,7 @@ const AdminReviewPage = lazy(() => import('./pages/AdminReviewPage'))
 const AdminDataPage = lazy(() => import('./pages/AdminDataPage'))
 const ManMonthListPage = lazy(() => import('./pages/ManMonthListPage'))
 const ManMonthPage = lazy(() => import('./pages/ManMonthPage'))
+const MmEventsPage = lazy(() => import('./pages/MmEventsPage'))
 
 const Loading = () => <div className="screen-center" style={{ minHeight: '50vh' }}><div className="spinner" aria-label="불러오는 중" /></div>
 
@@ -64,6 +65,7 @@ export default function App() {
         <Route path="help/:doc" element={<HelpPage />} />
         <Route path="stats" element={<StatsPage />} />
         <Route path="mm" element={<ManMonthListPage />} />
+        <Route path="mm/events" element={<MmEventsPage />} />
         <Route path="mm/:id" element={<ManMonthPage />} />
         <Route path="admin/users" element={<RequireAuth admin><AdminUsersPage /></RequireAuth>} />
         <Route path="admin/categories" element={<RequireAuth admin><AdminCategoriesPage /></RequireAuth>} />

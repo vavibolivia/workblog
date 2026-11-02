@@ -19,7 +19,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
-@Tag(name = "공수", description = "Man-month 표: 가로 주(월요일 시작) · 세로 프로젝트별 인원 · 칸 = 주 투입률(0~1.0). 조회는 모두, 수정은 편집자")
+@Tag(name = "공수", description = "Man-month 표: 가로 주(월요일 시작) · 세로 프로젝트별 인원 · 칸 = 주 값(보통 투입률, 아무 숫자) + 주별 메모. 조회는 모두, 수정은 편집자")
 @RestController
 @RequestMapping("/api/mm/sheets")
 public class ManMonthController {
@@ -100,7 +100,13 @@ public class ManMonthController {
         return service.deleteRow(id, rowId, user);
     }
 
-    @Operation(summary = "칸 수정(여러 칸)", description = "value 가 null 이나 0 이면 비움. 0~1.0")
+    @PutMapping("/{id}/notes")
+    @Operation(summary = "주별 메모(할 일)", description = "편집자. {changes:[{rowId, week, text}]} — text 가 비면 지움. 여러 칸에 같은 메모를 한 번에")
+    public SheetDetail notes(@PathVariable long id, @Valid @RequestBody NotesRequest req, @CurrentUser User user) {
+        return service.setNotes(id, req, user);
+    }
+
+    @Operation(summary = "칸 수정(여러 칸)", description = "value 가 null 이나 0 이면 비움. 아무 숫자(소수 둘째 자리)")
     @PutMapping("/{id}/cells")
     public SheetDetail cells(@PathVariable long id, @Valid @RequestBody CellsRequest req, @CurrentUser User user) {
         return service.setCells(id, req, user);

@@ -22,15 +22,29 @@ public final class ManMonthDtos {
 
     public record ProjectDto(Long id, String name, int sortOrder) {}
 
-    /** cells: 주 번호(0부터) → 투입률. 값이 없는 주는 빠진다. */
+    /** cells: 주 번호(0부터) → 값(보통 투입률, 아무 숫자). notes: 주 번호 → 메모(할 일). 없는 주는 빠진다. */
     public record RowDto(Long id, Long projectId, Long userId, String personName, String department, String role, int sortOrder,
-                         Map<Integer, BigDecimal> cells) {}
+                         Map<Integer, BigDecimal> cells, Map<Integer, String> notes) {}
 
     public record ChangeDto(String actorName, String summary, Instant createdAt) {}
 
     public record SheetDetail(Long id, String title, String description, LocalDate startDate, int weeks, boolean featured,
                               Long ownerId, String ownerName, Instant updatedAt, boolean canEdit, boolean canManage,
-                              List<UserRef> editors, List<ProjectDto> projects, List<RowDto> rows, List<ChangeDto> changes) {}
+                              List<UserRef> editors, List<ProjectDto> projects, List<RowDto> rows, List<ChangeDto> changes,
+                              List<EventDto> events) {}
+
+    /** 이벤트 종류(화면 색). */
+    public enum EventKind { MILESTONE, MEETING, RELEASE, REVIEW, HOLIDAY, LEAVE, ETC }
+
+    /** 시기별 이벤트(공용). endDate 가 없으면 하루짜리. related(예: AirDeck)가 이름에 든 프로젝트 줄에도 표시. */
+    public record EventDto(Long id, LocalDate startDate, LocalDate endDate, EventKind kind, String title, String related, String note,
+                           String createdBy, Instant updatedAt) {}
+
+    public record EventRequest(@NotNull LocalDate startDate, LocalDate endDate, EventKind kind, @NotBlank @Size(max = 200) String title,
+                               @Size(max = 100) String related, @Size(max = 2000) String note) {}
+
+    /** 이벤트 목록 + 이 사람이 고칠 수 있는지(관리자, 또는 공수 표 하나라도 주인·편집자). */
+    public record EventList(List<EventDto> events, boolean canEdit) {}
 
     public record CreateSheetRequest(@NotBlank @Size(max = 200) String title, @Size(max = 1000) String description,
                                      @NotNull LocalDate startDate, @Min(1) @Max(104) int weeks) {}
@@ -51,6 +65,11 @@ public final class ManMonthDtos {
     public record CellChange(@NotNull Long rowId, @NotNull Integer week, BigDecimal value) {}
 
     public record CellsRequest(@NotNull @Size(max = 5000) List<CellChange> changes) {}
+
+    /** text 가 비었으면 그 칸 메모를 지운다. */
+    public record NoteChange(@NotNull Long rowId, @NotNull Integer week, @Size(max = 2000) String text) {}
+
+    public record NotesRequest(@NotNull @Size(max = 5000) List<NoteChange> changes) {}
 
     /** applied=false 면 미리보기(아무것도 바뀌지 않음). cellsSet = 값이 바뀌는 칸, cellsCleared = 비워지는 칸. */
     public record ImportResult(boolean applied, int projectsCreated, int rowsCreated, int cellsSet, int cellsCleared, List<String> warnings) {}

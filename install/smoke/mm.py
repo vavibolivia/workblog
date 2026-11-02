@@ -34,15 +34,30 @@ s, sh = call("POST", f"/api/mm/sheets/{MM}/rows", {"projectId": P1, "personName"
 R1, R2 = sh["rows"][0]["id"], sh["rows"][1]["id"]
 s, sh = call("PUT", f"/api/mm/sheets/{MM}/cells", {"changes": [{"rowId": R1, "week": 0, "value": 1.0}, {"rowId": R1, "week": 1, "value": 0.5}, {"rowId": R2, "week": 1, "value": 0.25}]}, A)
 check("MM set cells", s == 200 and sh["rows"][0]["cells"].get("1") == 0.5 and sh["rows"][1]["cells"].get("1") == 0.25, (s, sh.get("rows")))
-s, r = call("PUT", f"/api/mm/sheets/{MM}/cells", {"changes": [{"rowId": R1, "week": 2, "value": 1.5}]}, A); check("MM value > 1.0 rejected 400", s == 400, (s, r))
+# 아무 숫자(1 넘는 값·소수 둘째 자리) — 넣었다가 바로 비움
+s, r = call("PUT", f"/api/mm/sheets/{MM}/cells", {"changes": [{"rowId": R2, "week": 5, "value": 40.256}]}, A); check("MM any number accepted (40.26)", s == 200 and r["rows"][1]["cells"].get("5") == 40.26, (s, r and r["rows"][1]["cells"]))
+s, r = call("PUT", f"/api/mm/sheets/{MM}/cells", {"changes": [{"rowId": R2, "week": 5, "value": None}]}, A); check("MM clear number", s == 200 and "5" not in r["rows"][1]["cells"], s)
+s, r = call("PUT", f"/api/mm/sheets/{MM}/cells", {"changes": [{"rowId": R2, "week": 5, "value": 1e12}]}, A); check("MM too large rejected 400", s == 400, s)
+# 할 일 메모: 여러 칸 한 번에, 빈 글은 지움
+s, r = call("PUT", f"/api/mm/sheets/{MM}/notes", {"changes": [{"rowId": R1, "week": 3, "text": "통합 시험"}, {"rowId": R2, "week": 3, "text": "통합 시험"}]}, A)
+check("MM notes set on 2 cells", s == 200 and r["rows"][0]["notes"].get("3") == "통합 시험" and r["rows"][1]["notes"].get("3") == "통합 시험", (s, r and [x.get("notes") for x in r["rows"]]))
+s, r = call("PUT", f"/api/mm/sheets/{MM}/notes", {"changes": [{"rowId": R2, "week": 3, "text": "  "}]}, A); check("MM note blank clears", s == 200 and "3" not in r["rows"][1]["notes"], s)
+# 이벤트(공용): 표가 하나도 없는 사람은 못 고침
 s, r = call("PUT", f"/api/mm/sheets/{MM}/cells", {"changes": [{"rowId": R1, "week": 8, "value": 0.5}]}, A); check("MM week out of range 400", s == 400, (s, r))
 # 권한: 보기는 모두, 수정은 편집자
 s, r = call("GET", f"/api/mm/sheets/{MM}", tok=MO); check("MM other user can view, not edit", s == 200 and r["canEdit"] is False, (s, r and r.get("canEdit")))
 s, r = call("PUT", f"/api/mm/sheets/{MM}/cells", {"changes": [{"rowId": R1, "week": 3, "value": 0.5}]}, MO); check("MM non-editor edit 403", s == 403, s)
 s, r = call("PUT", f"/api/mm/sheets/{MM}/editors", {"userIds": [me_o["id"]]}, MO); check("MM non-owner set editors 403", s == 403, s)
+s, r = call("POST", "/api/mm/events", {"startDate": "2026-11-18", "kind": "RELEASE", "title": "스모크 릴리스"}, MO); check("EV non-editor create 403", s == 403, s)
 s, r = call("PUT", f"/api/mm/sheets/{MM}/editors", {"userIds": [me_o["id"]]}, A); check("MM owner sets editors", s == 200 and [e["id"] for e in r["editors"]] == [me_o["id"]], (s, r and r.get("editors")))
 s, r = call("PUT", f"/api/mm/sheets/{MM}/cells", {"changes": [{"rowId": R1, "week": 3, "value": 0.5}]}, MO); check("MM editor can edit", s == 200, (s, r))
 s, r = call("PATCH", f"/api/mm/sheets/{MM}", {"weeks": 10}, MO); check("MM editor cannot change settings 403", s == 403, s)
+s, EV = call("POST", "/api/mm/events", {"startDate": "2026-11-18", "endDate": "2026-11-19", "kind": "RELEASE", "title": "스모크 릴리스", "related": "프로젝트 가"}, MO)
+check("EV sheet editor creates event 201", s == 201 and EV["kind"] == "RELEASE" and EV["endDate"] == "2026-11-19", (s, EV))
+s, r = call("GET", f"/api/mm/sheets/{MM}", tok=A); check("EV shown in sheet period", s == 200 and any(e["id"] == EV["id"] for e in r["events"]), s)
+s, r = call("GET", "/api/mm/events?from=2027-06-01&to=2027-06-30", tok=MO); check("EV range filter excludes", s == 200 and all(e["id"] != EV["id"] for e in r["events"]) and r["canEdit"] is True, s)
+s, r = call("PUT", f"/api/mm/events/{EV['id']}", {"startDate": "2026-11-20", "endDate": "2026-11-18", "title": "x"}, A); check("EV end before start 400", s == 400, s)
+s, r = call("PUT", f"/api/mm/events/{EV['id']}", {"startDate": "2026-11-20", "kind": "MILESTONE", "title": "스모크 마일스톤"}, A); check("EV update", s == 200 and r["kind"] == "MILESTONE" and r["endDate"] is None, (s, r))
 # 대문(글만): 지금 목록을 기억해 두고, 이 표를 담은 임시 글을 맨 뒤에 올렸다가 원래대로 되돌린다(실제 대문을 건드리지 않음)
 s, _front0 = call("GET", "/api/front", tok=A); check("FRONT list 200", s == 200 and isinstance(_front0, list), s)
 _front_keep = [{"kind": i["kind"], "refId": i["refId"]} for i in _front0]
@@ -60,6 +75,7 @@ if FP: call("DELETE", f"/api/posts/{FP}", tok=A); s, _ = call("DELETE", f"/api/p
 s, r = call("PATCH", f"/api/mm/sheets/{MM}", {"startDate": "2026-11-09"}, A)
 row1 = next(x for x in r["rows"] if x["id"] == R1) if s == 200 else {}
 check("MM start shift keeps values by date", s == 200 and r["startDate"] == "2026-11-09" and row1.get("cells") == {"0": 0.5, "2": 0.5}, (s, row1))
+check("MM start shift moves notes too", row1.get("notes") == {"2": "통합 시험"}, row1.get("notes"))
 s, r = call("GET", f"/api/mm/sheets/{MM}", tok=A); check("MM change log recorded", s == 200 and len(r["changes"]) >= 5, (s, r and len(r["changes"])))
 # 엑셀: 내려받기 → 같은 파일 올리기(값 그대로) → 프로젝트·인원 늘지 않음
 s, xbytes = _mm_raw("GET", f"/api/mm/sheets/{MM}/excel", tok=A); check("MM excel export 200 xlsx", s == 200 and xbytes[:2] == b"PK", s)
@@ -91,6 +107,7 @@ for _path in ("/mm", f"/mm/{MM}"):
     s, b = _mm_raw("GET", _path); check(f"MM page {_path} serves app", s == 200 and b"<div id=\"root\"" in b, (s, b[:80]))
 # 정리
 s, r = call("DELETE", f"/api/mm/sheets/{MM}", tok=MO); check("MM editor cannot delete 403", s == 403, s)
+s, r = call("DELETE", f"/api/mm/events/{EV['id']}", tok=A); check("EV delete 204", s == 204, s)
 s, r = call("DELETE", f"/api/mm/sheets/{MM}", tok=A); check("MM delete 204", s == 204, s)
 s, r = call("GET", f"/api/mm/sheets/{MM}", tok=A); check("MM gone 404", s == 404, s)
 for _u in _mm_users:

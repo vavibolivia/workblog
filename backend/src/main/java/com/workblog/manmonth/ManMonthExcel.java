@@ -113,6 +113,9 @@ public class ManMonthExcel {
             int ri = FIRST_DATA;
             double[] weekSum = new double[d.weeks()];
             double mmSum = 0;
+            // 주별 메모 → 엑셀 메모(칸 오른쪽 위 빨간 삼각형, 마우스를 올리면 보임)
+            Drawing<?> drawing = withValues ? sh.createDrawingPatriarch() : null;
+            CreationHelper helper = wb.getCreationHelper();
             for (RowDto r : rows) {
                 Row row = sh.createRow(ri++);
                 cell(row, 0, projects.getOrDefault(r.projectId(), ""), text);
@@ -126,6 +129,15 @@ public class ManMonthExcel {
                     if (v != null) {
                         c.setCellValue(v.doubleValue());
                         weekSum[w] += v.doubleValue();
+                    }
+                    String note = withValues && r.notes() != null ? r.notes().get(w) : null;
+                    if (note != null) {
+                        ClientAnchor an = helper.createClientAnchor();
+                        an.setCol1(LEFT + w); an.setCol2(LEFT + w + 4); an.setRow1(row.getRowNum()); an.setRow2(row.getRowNum() + 4);
+                        Comment cm = drawing.createCellComment(an);
+                        cm.setString(helper.createRichTextString(note));
+                        cm.setAuthor("WorkBlog");
+                        c.setCellComment(cm);
                     }
                 }
                 Cell t = row.createCell(totalCol);
@@ -293,7 +305,7 @@ public class ManMonthExcel {
         return null;
     }
 
-    /** 화면 입력과 같은 규칙: "50%" 와 1 보다 크고 100 이하인 수(50)는 % 로 본다 */
+    /** 화면 입력과 같은 규칙: 아무 숫자. "50%" 처럼 % 를 붙이면 0.5 */
     private static BigDecimal valueOf(Cell c, DataFormatter fmt) {
         if (c == null) return null;
         BigDecimal v;
@@ -310,7 +322,6 @@ public class ManMonthExcel {
             }
             if (pct) return v.movePointLeft(2);
         }
-        if (v.compareTo(BigDecimal.ONE) > 0 && v.compareTo(BigDecimal.valueOf(100)) <= 0) return v.movePointLeft(2);
         return v;
     }
 
