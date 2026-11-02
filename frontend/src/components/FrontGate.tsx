@@ -45,10 +45,11 @@ export default function FrontGate() {
   if (!items.length) {
     if (!admin) return null
     return (
-      <section className="front front--empty">
-        <h3 className="front__label">대문</h3>
-        <span style={{ marginRight: 'auto' }}>대문이 비어 있습니다. 글이나 공수 표를 골라 홈 맨 위에 띄울 수 있습니다.</span>
-        <button type="button" className="btn btn--primary btn--sm" onClick={() => setPicking(true)}>대문 고르기</button>
+      <section className="front-sec" aria-label="대문">
+        <div className="feed-head">
+          <div><h2>대문</h2><p>비어 있습니다. 글을 골라 홈 첫 화면에 띄울 수 있습니다.</p></div>
+          <button type="button" className="btn btn--primary btn--sm" onClick={() => setPicking(true)}>대문 고르기</button>
+        </div>
         {picking && <FrontPicker items={items} onClose={() => setPicking(false)} onSaved={(l) => { setItems(l); setPicking(false); setActive(l[0] ? keyOf(l[0]) : null) }} />}
       </section>
     )
@@ -56,9 +57,17 @@ export default function FrontGate() {
   const cur = items.find((i) => keyOf(i) === active) ?? items[0]
   const pick = (k: string) => { setActive(k); if (folded) fold(false); try { localStorage.setItem(TAB_KEY, k) } catch { /* 무시 */ } }
   return (
-    <section className={`front${folded ? ' front--folded' : ''}`} aria-label="대문">
+    <section className="front-sec" aria-label="대문">
+    <div className="feed-head">
+      <div><h2>대문</h2><p>관리자가 고른 글 · {items.length}건</p></div>
+      <div className="row front__actions" style={{ gap: 6 }}>
+        {!folded && <Link to={hrefOf(cur)} className="btn btn--sm">{cur.kind === 'POST' ? '글 열기' : '전체 화면 · 관리'}</Link>}
+        {admin && <button type="button" className="btn btn--sm" onClick={() => setPicking(true)}>대문 고르기</button>}
+        <button type="button" className="btn btn--sm btn--ghost" onClick={() => fold(!folded)} aria-expanded={!folded} title={folded ? '대문 내용 펼치기' : '대문 내용 접기 — 이 브라우저에서 기억'}>{folded ? '펼치기 ▾' : '접기 ▴'}</button>
+      </div>
+    </div>
+    <div className={`front${folded ? ' front--folded' : ''}`}>
       <div className="front__head">
-        <h3 className="front__label">대문 <small>관리자가 고른 글</small></h3>
         <div className="front__tabs" role="tablist" aria-label="대문 항목">
           {items.map((i) => (
             <button key={keyOf(i)} type="button" role="tab" aria-selected={keyOf(i) === keyOf(cur)} className={keyOf(i) === keyOf(cur) ? 'is-on' : undefined} onClick={() => pick(keyOf(i))} title={i.title}>
@@ -66,17 +75,13 @@ export default function FrontGate() {
             </button>
           ))}
         </div>
-        <div className="row front__actions" style={{ gap: 6 }}>
-          {!folded && <Link to={hrefOf(cur)} className="btn btn--sm">{cur.kind === 'POST' ? '글 열기' : '전체 화면 · 관리'}</Link>}
-          {admin && <button type="button" className="btn btn--sm" onClick={() => setPicking(true)}>대문 고르기</button>}
-          <button type="button" className="btn btn--sm btn--ghost" onClick={() => fold(!folded)} aria-expanded={!folded} title={folded ? '대문 내용 펼치기' : '대문 내용 접기 — 이 브라우저에서 기억'}>{folded ? '펼치기 ▾' : '접기 ▴'}</button>
-        </div>
       </div>
       {!folded && (
         <div role="tabpanel">
           {cur.kind === 'POST' ? <FrontPost key={keyOf(cur)} id={cur.refId} /> : <FrontSheet key={keyOf(cur)} id={cur.refId} />}
         </div>
       )}
+    </div>
       {picking && <FrontPicker items={items} onClose={() => setPicking(false)} onSaved={(l) => { setItems(l); setPicking(false) }} />}
     </section>
   )
