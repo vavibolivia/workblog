@@ -43,11 +43,6 @@ public class CommentService {
                 .toList();
     }
 
-    @Transactional(readOnly = true)
-    public long count(Long postId) {
-        return comments.countVisible(postId);
-    }
-
     // ---------- commands ----------
 
     public CommentResponse create(Long postId, CommentRequest req, User author) {

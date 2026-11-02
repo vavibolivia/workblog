@@ -29,7 +29,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 /**
- * 파일 → 글 본문(HTML) 변환. 지원: HTML(.html/.htm), Word(.docx), Excel(.xlsx/.xlsm/.xls), CSV, Markdown(.md), 텍스트(.txt).
+ * 파일 → 글 본문(HTML) 변환. 지원: HTML(.html/.htm), Word(.docx), Excel(.xlsx/.xlsm/.xls), CSV, Markdown(.md), 텍스트(.txt), PDF(.pdf).
+ * PDF 는 쪽마다 그림으로 넣어 원본 모양을 그대로 보이고, 원본 PDF 를 항상 첨부한다(첨부 내용 검색으로 글자도 찾힘).
  * 문서 안의 사진(워드 내장 이미지, HTML 의 data: 이미지)은 첨부로 저장하고 본문의 주소를 바꾼다.
  * 결과는 항상 {@link HtmlSanitizer#clean} 을 거친다.
  */
@@ -37,7 +38,13 @@ import java.util.*;
 public class ImportService {
     private static final Logger log = LoggerFactory.getLogger(ImportService.class);
 
-    public enum SourceType { HTML, WORD, EXCEL, CSV, MARKDOWN, TEXT }
+    public enum SourceType { HTML, WORD, EXCEL, CSV, MARKDOWN, TEXT, PDF }
+
+    /** PDF 를 그림으로 넣는 최대 쪽 수 · 해상도 */
+    static final int PDF_MAX_PAGES = 100;
+    static final float PDF_DPI = 120f;
+    /** 한 쪽 그림의 최대 화소 수(약 A4 300dpi). 넘으면 DPI 를 낮춘다. */
+    static final double PDF_MAX_PIXELS = 9_000_000;
 
     /** 변환 결과. attachments = 변환 중 저장한 사진(+원본 파일) 의 publicId. */
     public record Converted(String title, String html, SourceType sourceType, List<Attachment> attachments, List<String> warnings) {}
@@ -48,7 +55,7 @@ public class ImportService {
             Map.entry("xlsx", SourceType.EXCEL), Map.entry("xlsm", SourceType.EXCEL), Map.entry("xls", SourceType.EXCEL),
             Map.entry("csv", SourceType.CSV),
             Map.entry("md", SourceType.MARKDOWN), Map.entry("markdown", SourceType.MARKDOWN),
-            Map.entry("txt", SourceType.TEXT));
+            Map.entry("txt", SourceType.TEXT), Map.entry("pdf", SourceType.PDF));
 
     private final AttachmentService attachments;
 
@@ -134,6 +141,32 @@ public class ImportService {
                     }
                     html = sb.toString();
                 }
+                case PDF -> {
+                    try (org.apache.pdfbox.pdmodel.PDDocument pdf = org.apache.pdfbox.Loader.loadPDF(data)) {
+                        if (pdf.isEncrypted() && !pdf.getCurrentAccessPermission().canExtractContent())
+                            throw ApiException.badRequest("암호가 걸린 PDF 는 가져올 수 없습니다. 암호를 풀어 저장한 뒤 올려 주세요.");
+                        String t = pdf.getDocumentInformation() == null ? null : blankToNull(pdf.getDocumentInformation().getTitle());
+                        if (t != null && t.length() <= 300) title = t;
+                        int pages = pdf.getNumberOfPages();
+                        int n = Math.min(pages, PDF_MAX_PAGES);
+                        var renderer = new org.apache.pdfbox.rendering.PDFRenderer(pdf);
+                        StringBuilder sb = new StringBuilder();
+                        for (int i = 0; i < n; i++) {
+                            // 쪽 크기가 비정상적으로 큰 PDF 로 메모리가 터지지 않게 한 쪽을 최대 PDF_MAX_PIXELS 로 줄여 그린다
+                            var box = pdf.getPage(i).getCropBox();
+                            double px = (double) box.getWidth() * box.getHeight() * (PDF_DPI / 72.0) * (PDF_DPI / 72.0);
+                            float dpi = px > PDF_MAX_PIXELS ? (float) (PDF_DPI * Math.sqrt(PDF_MAX_PIXELS / px)) : PDF_DPI;
+                            var img = renderer.renderImageWithDPI(i, dpi, org.apache.pdfbox.rendering.ImageType.RGB);
+                            Attachment a = attachments.storeBytes(jpeg(img), baseTitle + "-p" + (i + 1) + ".jpg", "image/jpeg", uploader);
+                            saved.add(a);
+                            sb.append("<figure class=\"img-figure\" data-align=\"center\"><img src=\"").append(a.url())
+                              .append("\" alt=\"").append(i + 1).append("쪽\"><figcaption>").append(i + 1).append(" / ").append(pages).append("쪽</figcaption></figure>");
+                        }
+                        if (pages > n) warnings.add("PDF " + pages + "쪽 중 앞 " + n + "쪽만 그림으로 넣었습니다. 전체는 첨부한 원본 PDF 를 보세요.");
+                        warnings.add("PDF 는 쪽마다 그림으로 넣었습니다. 원본 PDF 는 첨부되며 그 안의 글자는 검색됩니다.");
+                        html = sb.toString();
+                    }
+                }
                 default -> throw new IllegalStateException();
             }
         } catch (IOException e) {
@@ -156,7 +189,7 @@ public class ImportService {
         if (HtmlSanitizer.toPlainText(cleaned).isBlank() && !cleaned.contains("<img") && !cleaned.contains("<table")) {
             throw ApiException.badRequest("파일에서 본문을 찾지 못했습니다.");
         }
-        if (attachOriginal) {
+        if (attachOriginal || type == SourceType.PDF) {
             saved.add(attachments.storeOriginal(data, name, contentType, uploader));
         }
         return new Converted(title == null ? baseTitle : title, cleaned, type, saved, warnings);
@@ -258,6 +291,20 @@ public class ImportService {
         } catch (CharacterCodingException e) {
             return new String(data, Charset.forName("MS949"));
         }
+    }
+
+    /** 그림 → JPEG(품질 0.85) */
+    private static byte[] jpeg(java.awt.image.BufferedImage img) throws IOException {
+        var out = new java.io.ByteArrayOutputStream();
+        var writer = javax.imageio.ImageIO.getImageWritersByFormatName("jpg").next();
+        var param = writer.getDefaultWriteParam();
+        param.setCompressionMode(javax.imageio.ImageWriteParam.MODE_EXPLICIT);
+        param.setCompressionQuality(0.85f);
+        try (var ios = javax.imageio.ImageIO.createImageOutputStream(out)) {
+            writer.setOutput(ios);
+            writer.write(null, new javax.imageio.IIOImage(img, null, null), param);
+        } finally { writer.dispose(); }
+        return out.toByteArray();
     }
 
     private static String imageExt(String ct) {

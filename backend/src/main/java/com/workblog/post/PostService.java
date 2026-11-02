@@ -49,12 +49,6 @@ public class PostService {
     // ---------- queries ----------
 
     @Transactional(readOnly = true)
-    public PageResponse<PostSummary> search(String q, Long categoryId, String tag, Long authorId, Post.Status status,
-                                            int page, int size, User viewer) {
-        return search(q, categoryId, tag, authorId, status, null, page, size, viewer);
-    }
-
-    @Transactional(readOnly = true)
     public PageResponse<PostSummary> search(String q, Long categoryId, String tag, Long authorId, Post.Status status, Post.Sort sort,
                                             int page, int size, User viewer) {
         String query = q == null ? "" : q.trim();
@@ -212,7 +206,7 @@ public class PostService {
         PostRevision r = revisions.findByPostIdAndVersion(postId, version)
                 .orElseThrow(() -> ApiException.notFound("리비전"));
         Category cat = categories.resolveForPost(categories.existsId(r.getCategoryId()) ? r.getCategoryId() : null);
-        p.applyEdit(r.getTitle(), r.getContent(), r.getContentFormat(), r.getSummary(), cat, Post.splitTags(r.getTags()),
+        p.applyEdit(r.getTitle(), body(r.getContent(), r.getContentFormat()), r.getContentFormat(), r.getSummary(), cat, Post.splitTags(r.getTags()),
                 r.getStatus(), r.getVisibility());
         revisions.save(PostRevision.snapshot(p, PostRevision.ChangeType.RESTORE, "v" + version + " 내용으로 복원", editor));
         return toDetail(p, editor);

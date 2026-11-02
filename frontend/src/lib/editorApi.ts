@@ -10,7 +10,7 @@ export interface ConvertResponse {
   warnings: string[]
 }
 
-export const IMPORT_ACCEPT = '.html,.htm,.docx,.xlsx,.xlsm,.xls,.csv,.md,.markdown,.txt'
+export const IMPORT_ACCEPT = '.html,.htm,.docx,.pdf,.xlsx,.xlsm,.xls,.csv,.md,.markdown,.txt'
 
 export const editorApi = {
   /** HTML·Word·Excel·CSV·Markdown·텍스트 파일을 본문 HTML 로 바꾼다. 문서 안의 사진은 첨부로 저장된다. */
@@ -19,7 +19,6 @@ export const editorApi = {
     return http.post<ConvertResponse>('/import/convert', fd, { params: { attachOriginal }, headers: { 'Content-Type': 'multipart/form-data' }, timeout: 300_000 }).then((r) => r.data)
   },
   /** 공개 설정(다이어그램 편집기 주소 등). 토큰 없이도 열린다. */
-  options: () => http.get<{ signupEnabled: boolean; signupRequiresApproval: boolean; drawioUrl: string }>('/auth/options').then((r) => r.data),
 }
 
 /** 이미지 주소 → data URI (draw.io 에 기존 다이어그램(PNG 안의 XML)을 다시 열 때) */

@@ -4,6 +4,7 @@ import { api, findCategory, type CategoryNode, type TagCount } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { Avatar } from './Avatar'
 import CategoryTree from './CategoryTree'
+import { publishCategoryTree } from '../lib/categoryLeaves'
 
 /** 네이버 블로그의 왼쪽 프로필 + 카테고리 영역. 전사 지식 공간이므로 프로필은 "로그인한 나", 카테고리는 전사 트리. */
 export default function Sidebar() {
@@ -14,6 +15,8 @@ export default function Sidebar() {
   const [myCount, setMyCount] = useState<number | null>(null)
   const [draftCount, setDraftCount] = useState<number | null>(null)
 
+  // 첫 렌더의 빈 트리는 알리지 않는다(다시 마운트될 때 카테고리 표식이 깜빡임)
+  useEffect(() => { if (tree.length) publishCategoryTree(tree) }, [tree])
   const reloadTree = () => { api.categories.tree().then(setTree).catch(() => setTree([])) }
 
   useEffect(() => {

@@ -91,7 +91,29 @@ Claude Code 같은 코딩 도구가 작업하는 프로젝트의 지침 파일(`
 - 결과 보고에 글 주소 `{{BASE_URL}}/posts/<id>` 표기.
 ````
 
-## 6. 규칙과 주의
+## 6. 데이터 이전 (관리자 — 다른 망으로 옮기기)
+
+관리자 **아이디/비밀번호**로만 동작합니다(API 토큰은 서버가 거부). 화면은 **관리자 › 데이터 이전**.
+
+```bash
+export WORKBLOG_USER=admin WORKBLOG_PASSWORD='…'
+python workblog.py dump --full -o 전체.zip                       # 1) 원래 서버: 전체 덤프
+python workblog.py --url http://<새 서버> load 전체.zip           # 2) 새 서버: 미리 보기(아무것도 바꾸지 않음)
+python workblog.py --url http://<새 서버> load 전체.zip --apply   # 3) 적용
+python workblog.py dump -o 변경분.zip                             # 4) 이후: 직전 내보내기 이후 변경분
+python workblog.py dump --since 2026-10-27T09:00:00+09:00         #    기준 시각 직접 지정
+```
+
+| 명령 | 하는 일 |
+|---|---|
+| `dump [--full] [--since 시각] [-o 파일] [--no-baseline]` | 덤프 받기. 기본은 직전 내보내기(기준) 이후 변경분. `--no-baseline` 이면 이번 것을 다음 기준으로 기록하지 않음 |
+| `load <zip> [--apply]` | 올리고 미리 보기(추가·갱신·건너뜀·충돌·실패 건수, 충돌·실패 목록). `--apply` 면 이어서 적용 |
+
+- 가져오기는 병합: 받는 서버의 데이터를 지우지 않고, 같은 덤프를 다시 넣어도 결과가 같다(멱등).
+- 받는 서버에서 고친 글은 **충돌**로 보고하고 덮어쓰지 않는다. 자기 서버가 만든 덤프는 거부.
+- 덤프에는 글·첨부 원본·비밀번호 해시가 그대로 있다 — 사내 반출 절차에 따라 보관.
+
+## 7. 규칙과 주의
 
 1. 토큰은 개인용 — 공유 금지, PC 를 바꾸면 재발급 후 옛 토큰 폐기
 2. CLI·도구로 올린 글도 이력(누가·언제·무엇을)이 남음 — `--note`(changeNote) 필수

@@ -73,7 +73,7 @@ public class AuthController {
     @GetMapping("/options")
     public AuthOptions options() {
         WorkblogProperties.Signup s = signup();
-        String drawio = props.drawio() == null || props.drawio().url() == null || props.drawio().url().isBlank() ? "https://embed.diagrams.net" : props.drawio().url();
+        String drawio = props.drawio() == null || props.drawio().url() == null || props.drawio().url().isBlank() ? defaultDrawio() : props.drawio().url();
         return new AuthOptions(s.enabled(), s.approval(), drawio, passwordPolicy.minLength());
     }
 
@@ -104,5 +104,14 @@ public class AuthController {
 
     private WorkblogProperties.Signup signup() {
         return props.signup() == null ? new WorkblogProperties.Signup(true, false) : props.signup();
+    }
+
+    @org.springframework.beans.factory.annotation.Value("${EXTRA_STATIC_DIR:./static-extra}")
+    private String extraStaticDir;
+
+    /** DRAWIO_URL 을 비워 두면: 자체 호스팅 draw.io(static-extra/drawio)가 있으면 같은 서버의 /drawio, 없으면 공개 embed.diagrams.net. */
+    private String defaultDrawio() {
+        boolean selfHosted = extraStaticDir != null && java.nio.file.Files.isRegularFile(java.nio.file.Path.of(extraStaticDir, "drawio", "index.html"));
+        return selfHosted ? "/drawio" : "https://embed.diagrams.net";
     }
 }

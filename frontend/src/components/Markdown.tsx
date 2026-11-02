@@ -6,8 +6,8 @@ export default function Markdown({ children, className = '' }: { children: strin
     <div className={`md ${className}`.trim()}>
       <ReactMarkdown remarkPlugins={[remarkGfm]}
         components={{
-          // 내부 링크(`/`로 시작)는 같은 창, 그 밖의 모든 링크는 새 창(R11)
-          a: ({ node: _n, ...props }) => props.href?.startsWith('/')
+          // 내부 링크(`/`로 시작, `//` 외부 주소는 제외)는 같은 창, 그 밖의 모든 링크는 새 창(R11)
+          a: ({ node: _n, ...props }) => props.href && /^\/(?!\/)/.test(props.href)
             ? <a {...props} />
             : <a {...props} target="_blank" rel="noopener noreferrer" />,
         }}>

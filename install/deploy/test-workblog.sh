@@ -6,6 +6,6 @@ cd "/project/workblog"
 ADM=$(grep '^ADMIN_PASSWORD=' "${WORKBLOG_ENV:-$HOME/project/across/env/workblog.env}" | cut -d= -f2-)
 mkdir -p logs
 LOG="logs/smoke-$(date +%Y%m%d-%H%M%S).log"
-PYTHONIOENCODING=utf-8 python3 -I smoke.py http://127.0.0.1:8070 "$ADM" | tee "$LOG" | grep -E "FAIL|RESULT"
+PYTHONIOENCODING=utf-8 python3 -I smoke/smoke.py http://127.0.0.1:8070 "$ADM" | tee "$LOG" | grep -E "FAIL|RESULT"
 ls -1t logs/smoke-*.log | tail -n +11 | xargs -r rm -f
 grep -q " 0 fail" "$LOG"

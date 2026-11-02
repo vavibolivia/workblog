@@ -25,6 +25,13 @@ WorkBlog CLI — 다른 Claude Code·스크립트에서 글을 읽고 쓰고 고
   python workblog.py delete 31
   python workblog.py revisions 31 / python workblog.py restore 31 2
   python workblog.py comment 31 "확인했습니다."
+
+데이터 이전(관리자, 아이디/비밀번호 로그인만 — API 토큰 불가):
+  python workblog.py --user admin --password ... dump --full -o 전체.zip     # 전체 덤프
+  python workblog.py --user admin --password ... dump                         # 직전 내보내기 이후 변경분
+  python workblog.py --user admin --password ... dump --since 2026-10-27T09:00:00+09:00
+  python workblog.py --user admin --password ... load 덤프.zip                # 미리 보기만(바꾸지 않음)
+  python workblog.py --user admin --password ... load 덤프.zip --apply        # 적용
 """
 import argparse, json, mimetypes, os, sys, urllib.error, urllib.parse, urllib.request, uuid
 
@@ -137,8 +144,16 @@ def main():
     p = sub.add_parser("restore", help="이전 버전으로 복원"); p.add_argument("id", type=int); p.add_argument("version", type=int)
     p = sub.add_parser("comment", help="댓글 달기"); p.add_argument("id", type=int); p.add_argument("text"); p.add_argument("--parent", type=int)
     p = sub.add_parser("comments", help="댓글 목록"); p.add_argument("id", type=int)
+    p = sub.add_parser("dump", help="관리자: 데이터 이전 덤프 받기(기본: 직전 내보내기 이후 변경분)")
+    p.add_argument("--full", action="store_true", help="전체 덤프"); p.add_argument("--since", help="기준 시각(ISO, 예 2026-10-27T09:00:00+09:00)")
+    p.add_argument("-o", "--out", help="저장할 파일(기본: 서버가 정한 이름)"); p.add_argument("--no-baseline", action="store_true", help="다음 업데이트 덤프의 기준 시각으로 기록하지 않음")
+    p = sub.add_parser("load", help="관리자: 덤프 가져오기(기본은 미리 보기)"); p.add_argument("path"); p.add_argument("--apply", action="store_true", help="미리 보기 뒤 바로 적용")
 
     a = ap.parse_args()
+    if a.cmd in ("dump", "load"):
+        # 데이터 이전은 웹 로그인(JWT)만 받는다 → 토큰은 쓰지 않고 아이디/비밀번호로 로그인
+        if not (a.user and a.password): sys.exit("데이터 이전은 관리자 아이디/비밀번호가 필요합니다(--user/--password 또는 WORKBLOG_USER/WORKBLOG_PASSWORD).")
+        a.token = None
     c = Client(a.url, a.token, a.user, a.password)
 
     def post_body():
@@ -215,6 +230,55 @@ def main():
         for r in c.call("GET", f"/api/posts/{a.id}/revisions"): print(f"v{r['version']:<3} {r['changeType']:<9} {r['createdAt'][:16]} {r['editedBy']['displayName']}  {r['changeNote'] or ''}")
     elif a.cmd == "restore": r = c.call("POST", f"/api/posts/{a.id}/revisions/{a.version}/restore"); print(f"복원했습니다: 지금 v{r['version']}")
     elif a.cmd == "comment": r = c.call("POST", f"/api/posts/{a.id}/comments", {"content": a.text, "parentId": a.parent}); print(f"댓글 id={r['id']}")
+    elif a.cmd == "dump":
+        params = {"full": "true" if a.full else "false", "since": a.since, "markBaseline": "false" if a.no_baseline else "true"}
+        req = urllib.request.Request(c.base + "/api/admin/data/export?" + urllib.parse.urlencode({k: v for k, v in params.items() if v is not None}))
+        req.add_header("Authorization", "Bearer " + c.token)
+        try:
+            with urllib.request.urlopen(req, timeout=None) as r:
+                name = a.out or r.headers.get("X-Dump-Name") or "workblog-dump.zip"
+                n = 0
+                with open(name, "wb") as f:
+                    while True:
+                        b = r.read(1024 * 1024)
+                        if not b: break
+                        f.write(b); n += len(b)
+        except urllib.error.HTTPError as e:
+            t = e.read().decode("utf-8", "replace")
+            try: t = json.loads(t).get("message", t)
+            except Exception: pass
+            sys.exit(f"HTTP {e.code}: {t}")
+        print(f"저장: {name} ({n:,} bytes)")
+    elif a.cmd == "load":
+        size = os.path.getsize(a.path)
+        with open(a.path, "rb") as f:
+            req = urllib.request.Request(c.base + "/api/admin/data/import", method="POST", data=f)
+            req.add_header("Content-Type", "application/zip"); req.add_header("Content-Length", str(size)); req.add_header("Authorization", "Bearer " + c.token)
+            try:
+                with urllib.request.urlopen(req, timeout=None) as r: up = json.loads(r.read().decode("utf-8"))
+            except urllib.error.HTTPError as e:
+                t = e.read().decode("utf-8", "replace")
+                try: t = json.loads(t).get("message", t)
+                except Exception: pass
+                sys.exit(f"HTTP {e.code}: {t}")
+        def show(rep, head):
+            print(f"== {head}: {rep['dumpName']} ({rep['kind']}, 원본 {rep['sourceInstanceId']}) — {rep['status']}")
+            print(f"{'항목':<14}{'추가':>8}{'갱신':>8}{'건너뜀':>8}{'충돌':>8}{'실패':>8}")
+            for k, v in rep["counts"].items(): print(f"{k:<14}{v['created']:>8}{v['updated']:>8}{v['skipped']:>8}{v['conflict']:>8}{v['failed']:>8}")
+            for i in rep["items"]:
+                if i["action"] in ("CONFLICT", "FAIL"): print(f"  [{i['action']}] {i['entity']} #{i['sourceId']} {i['label'] or ''} — {i['reason'] or ''}")
+            if rep.get("error"): print(f"  오류({rep['failedStage']}): {rep['error']}  마지막 커밋: {rep.get('lastCommitted')}")
+        show(up["preview"], "미리 보기")
+        if not a.apply:
+            c.call("DELETE", f"/api/admin/data/import/{up['uploadId']}")
+            print("미리 보기만 했습니다. 반영하려면 --apply 를 붙여 다시 실행하세요.")
+        else:
+            req = urllib.request.Request(c.base + f"/api/admin/data/import/{up['uploadId']}/apply", method="POST")
+            req.add_header("Authorization", "Bearer " + c.token)
+            try:
+                with urllib.request.urlopen(req, timeout=None) as r: show(json.loads(r.read().decode("utf-8")), "적용")
+            except urllib.error.HTTPError as e:
+                sys.exit(f"HTTP {e.code}: {e.read().decode('utf-8', 'replace')}")
     elif a.cmd == "comments":
         for r in c.call("GET", f"/api/posts/{a.id}/comments"): print(f"{'  ↳ ' if r['parentId'] else ''}[{r['id']}] {r['author']['displayName']}: {r['content'] if not r['deleted'] else '(삭제됨)'}")
 

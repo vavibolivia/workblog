@@ -44,6 +44,8 @@ public class SecurityConfig {
                 // API 문서·Claude Code 가이드·CLI 는 토큰 없이 읽을 수 있다(비밀 정보 없음)
                 .requestMatchers("/api/guide", "/api/guide/**", "/v3/api-docs", "/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**").permitAll()
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/files/*").permitAll()
+                // 덤프 내려받기: 관리자가 만든 1회용 표로만 연다(표 검사는 DataMoveController)
+                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/admin/data/export/download").permitAll()
                 .requestMatchers("/api/**").authenticated()
                 .anyRequest().permitAll())
             .exceptionHandling(eh -> eh.authenticationEntryPoint((req, res, e) -> {

@@ -44,7 +44,7 @@ export default function ProfilePage() {
               <div className="field"><label htmlFor="p-name">이름</label><input id="p-name" className="input" value={displayName} onChange={(e) => setDisplayName(e.target.value)} required maxLength={100} /></div>
             </div>
             <div className="form-row">
-              <div className="field"><label htmlFor="p-dept">부서</label><input id="p-dept" className="input" value={department} onChange={(e) => setDepartment(e.target.value)} maxLength={100} /></div>
+              <div className="field"><label htmlFor="p-dept">부서</label><input id="p-dept" className="input" value={department} onChange={(e) => setDepartment(e.target.value)} maxLength={100} readOnly={user?.role !== 'ADMIN'} />{user?.role !== 'ADMIN' && <p className="small muted">부서는 열람 권한에 쓰여 관리자가 정합니다.</p>}</div>
               <div className="field"><label htmlFor="p-email">이메일</label><input id="p-email" type="email" className="input" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={200} /></div>
             </div>
             <div><button type="submit" className="btn btn--primary" disabled={busy}>저장</button></div>

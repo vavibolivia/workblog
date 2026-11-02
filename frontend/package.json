@@ -10,6 +10,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@fontsource/nanum-gothic": "^5.3.0",
+    "@fontsource/nanum-myeongjo": "^5.3.0",
     "@tiptap/extension-color": "^3.32.0",
     "@tiptap/extension-font-family": "^3.32.0",
     "@tiptap/extension-highlight": "^3.32.0",
@@ -31,6 +33,7 @@
     "axios": "^1.20.0",
     "dompurify": "^3.4.17",
     "marked": "^18.1.1",
+    "pretendard": "^1.3.9",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "react-markdown": "^10.1.0",

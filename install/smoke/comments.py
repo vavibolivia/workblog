@@ -1,6 +1,6 @@
-# 댓글·답글 스모크 테스트. scripts/smoke.py 의 call()/check() 와 토큰(A=관리자, U=작성자, O=다른 사용자), pid(발행 글), did(U 의 임시 저장 글)를 그대로 쓴다.
-#   smoke.py 안에서 실행:  exec(open("scripts/smoke_comments.py", encoding="utf-8").read())
-#   단독 실행:            python scripts/smoke_comments.py http://localhost:8080 <admin_pw>
+# 댓글·답글 스모크 테스트. smoke.py 의 call()/check() 와 토큰(A=관리자, U=작성자, O=다른 사용자), pid(발행 글), did(U 의 임시 저장 글)를 그대로 쓴다.
+#   smoke.py 안에서 실행:  exec(open("comments.py", encoding="utf-8").read())
+#   단독 실행:            python install/smoke/comments.py http://localhost:8080 <admin_pw>
 if "call" not in globals():
     import json, sys, time, urllib.request, urllib.parse
     B = sys.argv[1] if len(sys.argv) > 1 else "http://localhost:8080"

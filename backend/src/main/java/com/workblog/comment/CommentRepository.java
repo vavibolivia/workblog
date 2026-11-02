@@ -12,9 +12,6 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
     @Query("SELECT c FROM Comment c JOIN FETCH c.author LEFT JOIN FETCH c.parent WHERE c.post.id = :postId ORDER BY c.createdAt ASC, c.id ASC")
     List<Comment> findAllByPost(@Param("postId") Long postId);
 
-    @Query("SELECT count(c) FROM Comment c WHERE c.post.id = :postId AND c.deletedAt IS NULL")
-    long countVisible(@Param("postId") Long postId);
-
     /** 목록용: 글 id 별 (삭제되지 않은) 댓글 수 [postId, count] */
     @Query("SELECT c.post.id, count(c) FROM Comment c WHERE c.post.id IN :postIds AND c.deletedAt IS NULL GROUP BY c.post.id")
     List<Object[]> countVisibleByPostIds(@Param("postIds") java.util.Collection<Long> postIds);

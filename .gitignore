@@ -1,7 +1,7 @@
 # build outputs
 backend/target/
 backend/src/main/resources/static/
-frontend/dist/
+frontendinstall/dist/
 frontend/node_modules/
 # local env / secrets
 *.env
@@ -11,15 +11,14 @@ frontend/node_modules/
 
 # internal records / company data (never published)
 data/
-backend/data/
-docs/WORKLOG.md
-docs/LEADER_REVIEW.md
-docs/00-REQUIREMENTS.md
-scripts/import_server_info.py
+backend/docs/WORKLOG.md
+backend/docs/LEADER_REVIEW.md
+backend/docs/00-REQUIREMENTS.md
+backend/cli/import_server_info.py
 .claude/
 *.xlsx
 *.p12
 *.jks
 __pycache__/
 *.pyc
-/dist/
+install/dist/

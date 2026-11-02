@@ -36,11 +36,6 @@ public class UserService {
         return users.findById(id).orElseThrow(() -> ApiException.notFound("사용자"));
     }
 
-    @Transactional(readOnly = true)
-    public User getByUsername(String username) {
-        return users.findByUsername(username).orElseThrow(() -> ApiException.notFound("사용자"));
-    }
-
     public UserResponse create(CreateUserRequest req) {
         if (users.existsByUsername(req.username())) {
             throw ApiException.conflict("이미 사용 중인 아이디입니다: " + req.username());
@@ -51,7 +46,10 @@ public class UserService {
         return UserResponse.from(users.save(u));
     }
 
-    /** 회원 가입. 아이디는 대소문자 구분 없이 중복을 막는다. active=false 면 관리자 승인 대기. */
+    /**
+     * 회원 가입. 아이디는 대소문자 구분 없이 중복을 막는다. active=false 면 관리자 승인 대기.
+     * 부서는 카테고리 열람 제한의 근거라 스스로 정할 수 없다: 승인 대기일 때만 신청값으로 남기고(관리자가 보고 승인), 바로 가입이면 비운다.
+     */
     public User signup(SignupRequest req, boolean active) {
         String username = req.username().trim();
         if (users.existsByUsernameIgnoreCase(username)) {
@@ -59,7 +57,7 @@ public class UserService {
         }
         passwordPolicy.check(req.password());
         User u = new User(username, encoder.encode(req.password()), req.displayName().trim(),
-                blankToNull(req.email()), blankToNull(req.department()), User.Role.USER);
+                blankToNull(req.email()), active ? null : blankToNull(req.department()), User.Role.USER);
         u.setActive(active);
         return users.save(u);
     }
@@ -112,7 +110,8 @@ public class UserService {
         User u = getById(actor.getId());
         u.setDisplayName(req.displayName());
         u.setEmail(req.email());
-        u.setDepartment(req.department());
+        // 부서는 열람 제한의 근거라 관리자만 바꾼다(관리 > 사용자). 관리자는 자기 부서도 여기서 바꿀 수 있다.
+        if (u.getRole() == User.Role.ADMIN) u.setDepartment(req.department());
         return UserResponse.from(u);
     }
 

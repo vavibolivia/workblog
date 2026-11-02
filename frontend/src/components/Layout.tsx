@@ -1,5 +1,5 @@
 import { Suspense, useEffect, useRef, useState, type FormEvent } from 'react'
-import { Link, NavLink, Outlet, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import { Avatar } from './Avatar'
 import { BrandMark } from './Icons'
@@ -73,12 +73,7 @@ export default function Layout() {
             <NavLink to="/" end className="gnb__link">홈</NavLink>
             <NavLink to="/history" className="gnb__link">이력</NavLink>
             <NavLink to="/stats" className="gnb__link">통계</NavLink>
-            {user?.role === 'ADMIN' && <NavLink to="/admin/users" className="gnb__link">사용자</NavLink>}
-            {user?.role === 'ADMIN' && <NavLink to="/admin/categories" className="gnb__link">카테고리</NavLink>}
-            {user?.role === 'ADMIN' && <NavLink to="/admin/templates" className="gnb__link">템플릿</NavLink>}
-            {user?.role === 'ADMIN' && <NavLink to="/admin/review" className="gnb__link">재검토</NavLink>}
-            {user?.role === 'ADMIN' && <NavLink to="/admin/status" className="gnb__link">상태</NavLink>}
-            {user?.role === 'ADMIN' && <NavLink to="/admin/audit" className="gnb__link">감사</NavLink>}
+            {user?.role === 'ADMIN' && <AdminMenu />}
             <NavLink to="/help" className="gnb__link">도움말</NavLink>
             <Link to="/write" className="btn btn--primary btn--sm" style={{ marginLeft: 8 }}>글쓰기</Link>
 
@@ -97,12 +92,9 @@ export default function Layout() {
                   <Link to="/write" role="menuitem" className="menu__mobile" onClick={() => setOpen(false)}>글쓰기</Link>
                   <Link to="/history" role="menuitem" className="menu__mobile" onClick={() => setOpen(false)}>변경 이력</Link>
                   <Link to="/stats" role="menuitem" className="menu__mobile" onClick={() => setOpen(false)}>통계</Link>
-                  {user.role === 'ADMIN' && <Link to="/admin/users" role="menuitem" className="menu__mobile" onClick={() => setOpen(false)}>사용자 관리</Link>}
-                  {user.role === 'ADMIN' && <Link to="/admin/categories" role="menuitem" className="menu__mobile" onClick={() => setOpen(false)}>카테고리 관리</Link>}
-                  {user.role === 'ADMIN' && <Link to="/admin/templates" role="menuitem" className="menu__mobile" onClick={() => setOpen(false)}>템플릿 관리</Link>}
-                  {user.role === 'ADMIN' && <Link to="/admin/review" role="menuitem" className="menu__mobile" onClick={() => setOpen(false)}>재검토</Link>}
-                  {user.role === 'ADMIN' && <Link to="/admin/status" role="menuitem" className="menu__mobile" onClick={() => setOpen(false)}>시스템 상태</Link>}
-                  {user.role === 'ADMIN' && <Link to="/admin/audit" role="menuitem" className="menu__mobile" onClick={() => setOpen(false)}>감사 로그</Link>}
+                  {user.role === 'ADMIN' && ADMIN_ITEMS.map((it) => (
+                    <Link key={it.to} to={it.to} role="menuitem" className="menu__mobile" onClick={() => setOpen(false)}>관리 · {it.label}</Link>
+                  ))}
                   <Link to="/help" role="menuitem" className="menu__mobile" onClick={() => setOpen(false)}>도움말</Link>
                   <Link to={`/?authorId=${user.id}`} role="menuitem" onClick={() => setOpen(false)}>내가 쓴 글</Link>
                   <Link to={`/?authorId=${user.id}&status=DRAFT`} role="menuitem" onClick={() => setOpen(false)}>임시 저장 글</Link>
@@ -141,5 +133,46 @@ export default function Layout() {
         </Modal>
       )}
     </>
+  )
+}
+
+/** 관리자 메뉴(드롭다운). 상단에는 "관리" 하나만 두고 관리 화면은 모두 이 아래로. */
+const ADMIN_ITEMS: { to: string; label: string; desc: string }[] = [
+  { to: '/admin/users', label: '사용자', desc: '계정·역할·잠금' },
+  { to: '/admin/categories', label: '카테고리', desc: '트리·열람 제한' },
+  { to: '/admin/templates', label: '템플릿', desc: '글 양식' },
+  { to: '/admin/review', label: '재검토', desc: '오래된 글 점검' },
+  { to: '/admin/status', label: '시스템 상태', desc: '서버·DB·저장소' },
+  { to: '/admin/audit', label: '감사 로그', desc: '열람·변경 기록' },
+  { to: '/admin/data', label: '데이터 이전', desc: '덤프 받기·가져오기' },
+]
+
+function AdminMenu() {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  const { pathname } = useLocation()
+  useEffect(() => { setOpen(false) }, [pathname])
+  useEffect(() => {
+    if (!open) return
+    const onDoc = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false) }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
+    document.addEventListener('mousedown', onDoc)
+    document.addEventListener('keydown', onKey)
+    return () => { document.removeEventListener('mousedown', onDoc); document.removeEventListener('keydown', onKey) }
+  }, [open])
+  return (
+    <div className="gnb__admin" ref={ref}>
+      <button type="button" className={`gnb__link${pathname.startsWith('/admin') ? ' active' : ''}`} aria-haspopup="menu" aria-expanded={open}
+              onClick={() => setOpen((v) => !v)}>관리 <span aria-hidden style={{ fontSize: 11, marginLeft: 4 }}>▾</span></button>
+      {open && (
+        <div className="menu menu--admin" role="menu">
+          {ADMIN_ITEMS.map((it) => (
+            <NavLink key={it.to} to={it.to} role="menuitem" className={({ isActive }) => (isActive ? 'is-current' : undefined)}>
+              <span>{it.label}</span><span className="small muted">{it.desc}</span>
+            </NavLink>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }

@@ -133,13 +133,13 @@
   </dependencies>
 
   <build>
-    <!-- 문서(API·Claude Code 가이드)와 CLI 를 jar 에 함께 넣어 /api/guide/* 로 제공한다. 원본은 docs/, scripts/ -->
+    <!-- 문서(API·Claude Code 가이드)와 CLI 를 jar 에 함께 넣어 /api/guide/* 로 제공한다. 원본은 backend/docs/, backend/cli/ -->
     <resources>
       <resource>
         <directory>src/main/resources</directory>
       </resource>
       <resource>
-        <directory>../docs</directory>
+        <directory>docs</directory>
         <targetPath>guide</targetPath>
         <includes>
           <include>API.md</include>
@@ -148,7 +148,7 @@
         </includes>
       </resource>
       <resource>
-        <directory>../scripts</directory>
+        <directory>cli</directory>
         <targetPath>guide</targetPath>
         <includes>
           <include>workblog.py</include>

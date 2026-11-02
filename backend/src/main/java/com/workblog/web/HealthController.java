@@ -1,4 +1,4 @@
-package com.workblog.config;
+package com.workblog.web;
 
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;

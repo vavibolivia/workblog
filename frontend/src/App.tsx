@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
+import { Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom'
 import { useAuth } from './lib/auth'
 import Layout from './components/Layout'
 import { lazy, Suspense } from 'react'
@@ -22,6 +22,7 @@ const HelpPage = lazy(() => import('./pages/HelpPage'))
 const StatsPage = lazy(() => import('./pages/StatsPage'))
 const AdminTemplatesPage = lazy(() => import('./pages/AdminTemplatesPage'))
 const AdminReviewPage = lazy(() => import('./pages/AdminReviewPage'))
+const AdminDataPage = lazy(() => import('./pages/AdminDataPage'))
 
 const Loading = () => <div className="screen-center" style={{ minHeight: '50vh' }}><div className="spinner" aria-label="불러오는 중" /></div>
 
@@ -34,6 +35,12 @@ function RequireAuth({ children, admin = false }: { children: React.ReactElement
   return children
 }
 
+/** 글마다 새 편집 화면(같은 EditorPage 를 재사용하면 이전 글의 상태가 남는다). */
+function EditPost() {
+  const { id } = useParams()
+  return <EditorPage key={id} />
+}
+
 export default function App() {
   return (
     <Suspense fallback={<Loading />}>
@@ -44,9 +51,9 @@ export default function App() {
         <Route index element={<HomePage />} />
         <Route path="posts" element={<HomePage />} />
         <Route path="posts/:id" element={<PostDetailPage />} />
-        <Route path="posts/:id/edit" element={<EditorPage />} />
+        <Route path="posts/:id/edit" element={<EditPost />} />
         <Route path="posts/:id/history" element={<PostHistoryPage />} />
-        <Route path="write" element={<EditorPage />} />
+        <Route path="write" element={<EditorPage key="new" />} />
         <Route path="search" element={<SearchPage />} />
         <Route path="history" element={<HistoryPage />} />
         <Route path="me" element={<ProfilePage />} />
@@ -60,6 +67,7 @@ export default function App() {
         <Route path="admin/audit" element={<RequireAuth admin><AdminAuditPage /></RequireAuth>} />
         <Route path="admin/templates" element={<RequireAuth admin><AdminTemplatesPage /></RequireAuth>} />
         <Route path="admin/review" element={<RequireAuth admin><AdminReviewPage /></RequireAuth>} />
+        <Route path="admin/data" element={<RequireAuth admin><AdminDataPage /></RequireAuth>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

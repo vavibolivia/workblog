@@ -38,9 +38,11 @@ export default function HomePage() {
   const pageSize = view === 'album' ? 12 : 10
 
   useEffect(() => {
+    let alive = true
     setErr(null)
     api.posts.list({ categoryId, tag, authorId, status, sort, page, size: pageSize })
-      .then(setData).catch((e) => setErr(errorMessage(e)))
+      .then((d) => { if (alive) setData(d) }).catch((e) => { if (alive) setErr(errorMessage(e)) })
+    return () => { alive = false }
   }, [categoryId, tag, authorId, status, sort, page, pageSize])
 
   useEffect(() => { if (categoryId) api.categories.tree().then(setTree).catch(() => null) }, [categoryId])
@@ -95,7 +97,12 @@ export default function HomePage() {
                 {trail.map((c, i) => (
                   <span key={c.id} className="row" style={{ gap: 4 }}>
                     {i > 0 && <span className="sep" aria-hidden>›</span>}
-                    <Link to={`/?categoryId=${c.id}`} data-depth={c.depth} className={c.id === categoryId ? 'is-current' : undefined}>{c.depth}단계 · {c.name}</Link>
+                    <Link to={`/?categoryId=${c.id}`} data-depth={c.depth} className={c.id === categoryId ? 'is-current' : undefined}>
+                      {i === trail.length - 1 && (
+                        <span className={`cat-kind cat-kind--${c.children.length ? 'branch' : 'leaf'}`}
+                              title={c.children.length ? '하위 카테고리가 있는 카테고리' : '끝 카테고리 (하위 없음)'}>{c.children.length ? '▸' : ''}</span>
+                      )}
+                      {c.depth}단계 · {c.name}</Link>
                   </span>
                 ))}
               </nav>

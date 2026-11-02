@@ -1,6 +1,6 @@
 # 2026-10-27 추가 기능 스모크: 회원 가입(R13) · API 토큰·PATCH·카테고리 경로(R14/R15) · 파일 가져오기(R16) · 내보내기(R12) · 문서(R14) · 영구 삭제.
 # smoke.py 안에서 exec 된다(call/check/upload, 토큰 A/U/O, uname, rich_pid 재사용). 단독 실행은 지원하지 않는다.
-# 주의: smoke_comments.py 가 rid/cid 를 댓글 id 로 덮어쓰므로 글 id 는 rich_pid 를 쓴다.
+# 주의: comments.py 가 rid/cid 를 댓글 id 로 덮어쓰므로 글 id 는 rich_pid 를 쓴다.
 import io, time as _t, zipfile as _z
 
 _sfx = str(int(_t.time()))[-6:]
@@ -73,6 +73,8 @@ check("R13 signup 201 with token (instant approval)", s == 201 and r["approved"]
 s, r = call("POST", "/api/auth/signup", {"username": _su.upper(), "password": "pass1234", "displayName": "중복"}); check("R13 duplicate username (case-insensitive) 409", s == 409, s)
 s, r = call("POST", "/api/auth/signup", {"username": "bad name!", "password": "pass1234", "displayName": "x"}); check("R13 invalid username 400", s == 400, s)
 s, r = call("GET", "/api/auth/me", tok=S); check("R13 signed-up user can use token", s == 200 and r["username"] == _su, (s, r))
+check("R13 instant signup does not take self-declared department", r.get("department") is None, r)
+s, r = call("PUT", "/api/users/me", {"displayName": "가입자", "department": "운항통제"}, S); check("PROFILE user cannot set own department", s == 200 and r.get("department") is None, (s, r))
 
 # ---- API 토큰 (R14) ----
 s, r = call("POST", "/api/tokens", {"name": "스모크 토큰", "expiresInDays": 30}, U); check("TOKEN create 201 returns wbt_ once", s == 201 and r["token"].startswith("wbt_") and r["info"]["active"] is True, (s, r)); WBT = r["token"]; tid = r["info"]["id"]

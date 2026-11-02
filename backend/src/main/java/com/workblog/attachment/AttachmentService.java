@@ -28,6 +28,17 @@ public class AttachmentService {
     private static final Logger log = LoggerFactory.getLogger(AttachmentService.class);
 
     private static final Set<String> IMAGE_TYPES = Set.of("image/png", "image/jpeg", "image/gif", "image/webp", "image/svg+xml", "image/bmp");
+    /** 화면에 바로 열어도(inline) 스크립트가 돌 수 없는 형식. svg 는 빠진다. */
+    private static final Set<String> INLINE_TYPES = Set.of("image/png", "image/jpeg", "image/gif", "image/webp", "image/bmp");
+    private static final java.util.Map<String, String> IMAGE_EXT_TYPE = java.util.Map.of("png", "image/png", "jpg", "image/jpeg", "jpeg", "image/jpeg",
+            "gif", "image/gif", "webp", "image/webp", "bmp", "image/bmp");
+
+    /** 내려받을 때 그대로 inline 으로 내줘도 되는 형식인가(매개변수 무시). */
+    public static boolean inlineSafe(String contentType) {
+        if (contentType == null) return false;
+        int i = contentType.indexOf(';');
+        return INLINE_TYPES.contains((i < 0 ? contentType : contentType.substring(0, i)).trim().toLowerCase(java.util.Locale.ROOT));
+    }
     private static final Set<String> EXCEL_EXT = Set.of("xlsx", "xlsm", "xls", "csv");
     private static final Set<String> BLOCKED_EXT = Set.of("exe", "bat", "cmd", "com", "msi", "sh", "ps1", "js", "jar", "dll", "scr", "vbs", "html", "htm");
 
@@ -84,8 +95,10 @@ public class AttachmentService {
         String ext = extension(original);
         if (BLOCKED_EXT.contains(ext)) throw ApiException.badRequest("실행 파일이나 스크립트(." + ext + ")는 올릴 수 없습니다.");
         String contentType = type == null || type.isBlank() ? "application/octet-stream" : type;
-        Attachment.Kind kind = IMAGE_TYPES.contains(contentType) || Set.of("png", "jpg", "jpeg", "gif", "webp", "bmp").contains(ext) ? Attachment.Kind.IMAGE
+        Attachment.Kind kind = IMAGE_TYPES.contains(contentType) || IMAGE_EXT_TYPE.containsKey(ext) ? Attachment.Kind.IMAGE
                 : EXCEL_EXT.contains(ext) ? Attachment.Kind.EXCEL : Attachment.Kind.FILE;
+        // 사진 확장자는 형식을 확장자로 정한다(브라우저가 보낸 text/html 등을 믿으면 inline 으로 열려 스크립트가 돈다)
+        if (IMAGE_EXT_TYPE.containsKey(ext)) contentType = IMAGE_EXT_TYPE.get(ext);
         if ((kind == Attachment.Kind.IMAGE || contentType.contains("svg")) && ("svg".equals(ext) || contentType.contains("svg"))) {
             throw ApiException.badRequest("SVG 는 스크립트를 담을 수 있어 올릴 수 없습니다. PNG 나 JPG 로 올려 주세요.");
         }

@@ -99,6 +99,10 @@ png = bytes.fromhex("89504e470d0a1a0a0000000d49484452000000010000000108060000001
 s, r = upload("그림.png", png, "image/png", U); check("R8 upload image 201", s == 201 and r["kind"] == "IMAGE" and r["url"].startswith("/api/files/"), (s, r)); img = r
 s, r = upload("표.xlsx", b"PK\x03\x04fake", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", U); check("R8 upload excel kind EXCEL", s == 201 and r["kind"] == "EXCEL", (s, r)); xls = r
 s, r = upload("evil.exe", b"MZ", "application/octet-stream", U); check("R8 exe upload rejected 400", s == 400, s)
+# .png 이름에 text/html 형식으로 올려도 사진 형식으로만 inline 제공(첨부를 통한 저장형 XSS 방지)
+s, r = upload("x.png", b"<script>alert(1)</script>", "text/html", U); check("R8 png with text/html stored as image/png", s == 201 and r["contentType"] == "image/png", (s, r))
+if s == 201:
+    with urllib.request.urlopen(B + r["url"]) as rr: check("R8 png with text/html served as image/png", rr.headers.get("Content-Type", "").startswith("image/png"), rr.headers.get("Content-Type"))
 req = urllib.request.Request(B + img["url"]);
 try:
     with urllib.request.urlopen(req) as rr: check("R8 image served without token", rr.status == 200 and rr.headers.get("Content-Type","").startswith("image/png"), rr.status)
@@ -157,10 +161,10 @@ s, r = call("PUT", f"/api/users/{uid}", {"displayName": "홍길동", "active": F
 s, r = call("POST", "/api/auth/login", {"username": uname, "password": "pass1234"}); check("R1 deactivated user cannot login", s == 401, s)
 s, r = call("GET", "/api/posts", tok=U); check("R1 deactivated user's token rejected", s == 401, s)
 call("PUT", f"/api/users/{uid}", {"displayName": "홍길동", "active": True}, A)
-# ---- 댓글·답글 (scripts/smoke_comments.py, 같은 폴더) ----
-exec(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "smoke_comments.py"), encoding="utf-8").read())
-exec(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "smoke_knowledge.py"), encoding="utf-8").read())  # 템플릿·관련 글·재검토·첨부 검색
-exec(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "smoke_collab.py"), encoding="utf-8").read())  # 알림·충돌·감사·열람 제한·비밀번호·잠금
-# ---- 2026-10-27 기능(가입·토큰·PATCH·가져오기·내보내기·문서·영구삭제) + 정리 (scripts/smoke_v2.py) ----
-exec(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "smoke_v2.py"), encoding="utf-8").read())
+# ---- 기능별 스모크(같은 폴더). 앞에서 만든 call/check/토큰을 그대로 쓴다 ----
+exec(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "comments.py"), encoding="utf-8").read())
+exec(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "knowledge.py"), encoding="utf-8").read())  # 템플릿·관련 글·재검토·첨부 검색
+exec(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "collab.py"), encoding="utf-8").read())  # 알림·충돌·감사·열람 제한·비밀번호·잠금
+exec(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "api.py"), encoding="utf-8").read())  # 가입·토큰·PATCH·가져오기·내보내기·문서·영구 삭제
+exec(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "datamove.py"), encoding="utf-8").read())  # data transfer (synthetic dump, self cleanup)
 print(f"\nRESULT {ok} pass / {bad} fail")

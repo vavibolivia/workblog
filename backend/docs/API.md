@@ -30,7 +30,7 @@ curl -s -X POST {{BASE_URL}}/api/tokens -H "Authorization: Bearer <JWT>" -H 'Con
 | 메서드 | 경로 | 설명 |
 |---|---|---|
 | POST | `/api/auth/login` | 로그인 → `{ token, expiresIn, user }` |
-| POST | `/api/auth/signup` | 회원 가입 `{ username, password, displayName, email?, department? }` → 201(즉시 승인, token 포함) / 202(승인 대기) |
+| POST | `/api/auth/signup` | 회원 가입 `{ username, password, displayName, email?, department? }` → 201(즉시 승인, token 포함) / 202(승인 대기). 부서는 열람 제한의 근거라 승인 대기일 때만 신청값으로 남고(관리자가 확인), 즉시 승인이면 비워 둔다 |
 | GET | `/api/auth/options` | 가입 가능 여부, 다이어그램 편집기 주소(토큰 불필요) |
 | GET | `/api/auth/me` | 내 계정 |
 | GET / POST / DELETE | `/api/tokens`, `/api/tokens/{id}` | 내 API 토큰 목록 · 발급 `{ name, expiresInDays? }` · 폐기 |
@@ -152,7 +152,7 @@ curl -s -X PUT $WB/api/posts/31/import -H "Authorization: Bearer $TOKEN" -F 'fil
 | PUT / DELETE | `/api/posts/{id}/comments/{cid}` | 수정(본인·관리자) · 삭제 |
 | GET | `/api/users` | 구성원 목록 |
 | POST / PUT / DELETE | `/api/users`, `/api/users/{id}` | 관리자: 생성 · 수정(역할·활성·비밀번호) · 비활성화(`?purge=true` 면 글 없는 계정 영구 삭제) |
-| PUT | `/api/users/me`, `/api/users/me/password` | 내 정보 · 비밀번호 변경(JWT 만) |
+| PUT | `/api/users/me`, `/api/users/me/password` | 내 정보 · 비밀번호 변경(JWT 만). 부서는 관리자만 바꾼다(일반 사용자가 보낸 department 는 무시) |
 
 ## 8. 문서 · 상태
 
@@ -235,3 +235,53 @@ curl -s -X PATCH $WB/api/posts/31 -H "Authorization: Bearer $TOKEN" -H 'Content-
 
 - 새 비밀번호(가입 · 내 비밀번호 변경 · 관리자 생성/재설정)는 **8자 이상 + 영문과 숫자 모두** → 어기면 400 과 이유. 최소 길이는 설정 `workblog.security.password-min-length`(기본 8, env `PASSWORD_MIN_LENGTH`)이고 `GET /api/auth/options` 의 `passwordMinLength` 로 알 수 있다. 이미 있는 계정의 로그인에는 적용하지 않는다.
 - 같은 아이디로 로그인에 **5회 연속 실패하면 10분 잠금**. 잠긴 동안은 맞는 비밀번호도 **429** `"… 9분 30초 뒤에 다시 시도하세요."`. 성공하면 실패 횟수는 0. 메모리에만 두므로 서버를 다시 시작하면 풀린다.
+
+## 12. 데이터 이전 (관리자 — 다른 망으로 옮기기)
+
+**관리자 + 웹 로그인(JWT)만.** API 토큰으로 부르면 403. 화면: 관리자 › 데이터 이전(`/admin/data`). 모든 내보내기·미리 보기·적용은 기록(누가·언제·어떤 덤프·결과 보고서)이 남는다.
+
+| 메서드 | 경로 | 설명 |
+|---|---|---|
+| GET | `/api/admin/data/info` | 이 서버 인스턴스 ID · 직전 내보내기(기준) 시각 · 올리기 한도 · 최근 기록 30건 |
+| GET | `/api/admin/data/export?full=true` | 전체 덤프(zip 스트림). `full=false`(기본)면 `since`(ISO 시각, 없으면 직전 기준 시각) 이후 변경분. `markBaseline=false` 면 다음 기준으로 기록 안 함 |
+| POST | `/api/admin/data/export/ticket` | 본문 `{full, since, markBaseline}` → `{ticket}`. 브라우저가 `GET /api/admin/data/export/download?ticket=…` 로 바로 내려받는다(2분·1회용) |
+| POST | `/api/admin/data/import` | 본문 = zip 그대로(`Content-Type: application/zip`, 최대 `IMPORT_MAX_MB`, 기본 2048MB). 검사 후 **미리 보기**(아무것도 바꾸지 않음) → `{uploadId, manifest, preview}` |
+| POST | `/api/admin/data/import/{uploadId}/apply` | 미리 본 덤프를 적용 → 보고서. 한 번에 하나만(진행 중이면 409). 올린 덤프는 2시간 보관 |
+| DELETE | `/api/admin/data/import/{uploadId}` | 올린 덤프 취소 |
+| GET | `/api/admin/data/transfers/{id}` | 기록 1건과 보고서 |
+| DELETE | `/api/admin/data/sources/{instanceId}` | 시험용 원본의 매핑·가져오기 기록 삭제(만들어진 데이터는 그대로) |
+
+CLI: `workblog.py dump [--full] [--since …] [-o 파일]` · `workblog.py load <zip> [--apply]` (관리자 아이디/비밀번호, [CLI 가이드](/help/cli) 6절). 글 하나 내보내기 `export <id>` 와는 다른 명령이다.
+
+**덤프 형식** `workblog-dump-<인스턴스 앞 8자>-<yyyyMMdd-HHmm>-full|update.zip`
+
+```
+manifest.json         {format:"workblog-dump", formatVersion:1, appVersion, sourceInstanceId, dumpName, kind:FULL|UPDATE,
+                       exportedAt, since, counts:{users:…, posts:…}, files:[{path, sha256, size}, …]}
+data/users.json       사용자(아이디·이름·부서·역할·상태·bcrypt 해시)     data/categories.json  카테고리(경로·순서·열람 제한 부서)
+data/templates.json   템플릿                                             data/posts.json       글(본문·요약·태그·상태·공개 범위·공지·작성자·시각·버전, 휴지통은 deletedAt)
+data/revisions.json   글 이력                                            data/comments.json    댓글
+data/likes.json       공감                                               data/attachments.json 첨부 메타(+ sha256)
+data/apitokens.json   API 토큰(SHA-256 해시)                             data/notifications.json 알림
+data/postviews.json   열람 감사 로그                                     files/<첨부 id>       첨부 원본
+```
+
+- 업데이트 덤프: `since` 10분 전부터(늦게 커밋된 변경까지) 이력·검토·생성이 있는 글과 그 이력·첨부, 바뀐 댓글·공감·알림·열람 기록. 사용자·카테고리·템플릿·API 토큰은 언제나 전부. 공지 고정만 바꾼 글은 다른 변경이 있을 때 함께 넘어간다.
+- 검사: 허용한 항목 이름만(경로 탈출 거부) · 항목 수 · 풀었을 때 크기(실제로 읽은 바이트, 업로드 한도의 4배까지) · 압축률 · 모든 항목의 SHA-256. 자기 서버가 만든 덤프는 거부.
+
+**병합 규칙** (매핑 표 = 원본 인스턴스 · 종류 · 원본 id → 대상 id · 마지막 반영 버전)
+
+| 대상 | 규칙 |
+|---|---|
+| 사용자 | 아이디(대소문자 무시)가 있으면 받는 서버 값 유지, 없으면 원본 bcrypt 해시 그대로 생성(같은 비밀번호로 로그인) |
+| 카테고리 | 전체 경로(이름)로 맞추고 없으면 만든다 |
+| 글 | 원본 버전이 지난번 반영보다 새로울 때만 갱신 → 새 버전, 이력 change note `데이터 가져오기: <덤프 이름>`. 받는 서버에서 그 사이 고친 글은 **충돌**로 보고하고 덮어쓰지 않는다. 받는 서버에서 영구 삭제한 글은 다시 만들지 않는다 |
+| 첨부 | 매핑 또는 같은 글의 같은 SHA-256 파일이 있으면 다시 만들지 않는다. 본문 `/api/files/<원본 id>` 를 새 id 로 바꾼다 |
+| 댓글 · 템플릿 | 원본이 더 새로우면 갱신. 받는 서버에서 지난 가져오기 뒤에 고쳤으면 **충돌**로 보고하고 덮어쓰지 않는다. 받는 서버에 같은 이름으로 원래 있던 템플릿은 계속 그대로 둔다 |
+| API 토큰 | 가져오기로 **만든 계정**의 토큰만 가져온다(받는 서버에 원래 있던 계정, 예: admin 에는 붙이지 않는다 — 원본 토큰으로 이 계정에 들어오는 것을 막기 위해). 원본에서 폐기한 토큰은 받는 서버에서도 폐기 |
+| 이력 · 공감 · 알림 · 열람 기록 | 매핑이나 자연 키로 중복 없이 추가 |
+
+- 가져오기는 받는 서버의 데이터를 지우지 않는다(병합). 방향은 한쪽(원본 → 받는 서버)이다: 받은 서버의 덤프를 원래 서버에 다시 넣으면 원래 글이 새 글로 한 번 더 만들어진다.
+
+- 본문 HTML 은 저장할 때와 같은 정화(HtmlSanitizer)를 거친다.
+- 단계(사용자 → 카테고리 → 템플릿 → 글·첨부 → 이력 → 댓글 → 공감 → 알림 → 열람 기록 → API 토큰)별로 50~500건씩 커밋한다. 실패하면 보고서에 멈춘 단계·마지막 커밋 위치가 남고, 같은 덤프를 다시 넣으면 이미 넣은 것은 건너뛰고 이어서 반영한다.

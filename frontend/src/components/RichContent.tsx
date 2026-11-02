@@ -46,11 +46,11 @@ DOMPurify.addHook('afterSanitizeAttributes', (node) => {
   if (l !== null && l < 0.12) el.setAttribute('data-ink-dark', '')
 })
 
-/** 외부 링크는 새 창(R11): `/`로 시작하는 내부 링크만 같은 창에 둔다. 정화 직후 한 번 거는 DOMPurify 훅. */
+/** 외부 링크는 새 창(R11): `/`로 시작하는 내부 링크(`//` 외부 주소 제외)와 `#` 만 같은 창에 둔다. 정화 직후 한 번 거는 DOMPurify 훅. */
 DOMPurify.addHook('afterSanitizeAttributes', (node) => {
   if (node.nodeName !== 'A') return
   const href = node.getAttribute('href') ?? ''
-  if (!href || href.startsWith('/') || href.startsWith('#')) return
+  if (!href || /^\/(?!\/)/.test(href) || href.startsWith('#')) return
   node.setAttribute('target', '_blank')
   node.setAttribute('rel', 'noopener noreferrer')
 })

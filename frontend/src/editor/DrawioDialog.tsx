@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { editorApi } from '../lib/editorApi'
+import { api } from '../lib/api'
 
 /**
  * draw.io(diagrams.net) 편집기를 embed 모드(iframe + postMessage, proto=json)로 띄운다.
@@ -11,26 +11,27 @@ export default function DrawioDialog({ initial, title, onSave, onClose }:
   const frame = useRef<HTMLIFrameElement>(null)
   const [url, setUrl] = useState<string | null>(null)
   const [status, setStatus] = useState<string>('편집기를 불러오는 중…')
-  const [ready, setReady] = useState(false)
-  const readyRef = useRef(false) // 타임아웃 콜백이 최신 로드 상태를 보도록(클로저의 ready 는 오래된 값)
+  const readyRef = useRef(false) // 타임아웃 콜백이 최신 로드 상태를 보도록
   const [failed, setFailed] = useState(false)
   const saving = useRef(false)
 
   useEffect(() => {
-    editorApi.options().then((o) => setUrl(o.drawioUrl)).catch(() => setUrl('https://embed.diagrams.net'))
+    api.auth.options().then((o) => setUrl(o.drawioUrl || 'https://embed.diagrams.net')).catch(() => setUrl('https://embed.diagrams.net'))
   }, [])
 
   useEffect(() => {
     if (!url) return
     const timer = window.setTimeout(() => { if (!readyRef.current) { setFailed(true); setStatus('편집기를 열지 못했습니다. 네트워크(인터넷 또는 사내 draw.io 서버) 연결을 확인하세요.') } }, 20_000)
-    const post = (msg: Record<string, unknown>) => frame.current?.contentWindow?.postMessage(JSON.stringify(msg), '*')
+    // 다이어그램 내용은 편집기 origin 으로만 보낸다
+    const origin = new URL(url, window.location.href).origin
+    const post = (msg: Record<string, unknown>) => frame.current?.contentWindow?.postMessage(JSON.stringify(msg), origin)
     const onMessage = (e: MessageEvent) => {
-      if (frame.current == null || e.source !== frame.current.contentWindow || typeof e.data !== 'string' || !e.data.startsWith('{')) return
+      if (frame.current == null || e.source !== frame.current.contentWindow || e.origin !== origin || typeof e.data !== 'string' || !e.data.startsWith('{')) return
       let msg: { event?: string; data?: string; xml?: string; message?: string }
       try { msg = JSON.parse(e.data) } catch { return }
       switch (msg.event) {
         case 'init':
-          readyRef.current = true; setReady(true); setStatus('')
+          readyRef.current = true; setStatus('')
           if (initial?.xmlpng) post({ action: 'load', xmlpng: initial.xmlpng, autosave: 0, title: title ?? '다이어그램' })
           else post({ action: 'load', xml: initial?.xml ?? '', autosave: 0, title: title ?? '다이어그램' })
           break
@@ -60,7 +61,6 @@ export default function DrawioDialog({ initial, title, onSave, onClose }:
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [url])
 
-  void ready
   const src = url ? `${url.replace(/\/+$/, '')}/?embed=1&proto=json&spin=1&libraries=1&saveAndExit=1&noSaveBtn=0&noExitBtn=0&lang=ko&ui=kennedy` : undefined
 
   return (

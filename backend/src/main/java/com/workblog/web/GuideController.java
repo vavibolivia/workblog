@@ -1,4 +1,4 @@
-package com.workblog.config;
+package com.workblog.web;
 
 import com.workblog.common.ApiException;
 import io.swagger.v3.oas.annotations.Operation;
@@ -15,12 +15,11 @@ import jakarta.servlet.http.HttpServletRequest;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
 /**
- * 사람·Claude Code 용 문서를 제공한다. 원본은 저장소 docs/ 와 scripts/ 이고 빌드 때 jar 의 guide/ 로 복사된다(pom.xml resources).
+ * 사람·Claude Code 용 문서를 제공한다. 원본은 backend/docs/ 와 backend/cli/ 이고 빌드 때 jar 의 guide/ 로 복사된다(pom.xml resources).
  * 토큰 없이 열린다(비밀 정보 없음). 대화형 문서는 /swagger-ui/index.html.
  */
 @Tag(name = "문서", description = "CLI 가이드·API 사용 안내·글 작성 지침·CLI 스크립트")

@@ -1,8 +1,7 @@
-package com.workblog.history;
+package com.workblog.revision;
 
 import com.workblog.auth.CurrentUser;
 import com.workblog.common.PageResponse;
-import com.workblog.revision.PostRevisionRepository;
 import com.workblog.revision.RevisionDtos.ActivityEntry;
 import com.workblog.user.User;
 import org.springframework.data.domain.PageRequest;

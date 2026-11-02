@@ -57,13 +57,18 @@ workblog:
     # 새 비밀번호 최소 길이(영문+숫자 필수, 기존 계정 로그인에는 적용 안 함). 로그인 5회 연속 실패 시 10분 잠금은 고정값.
     password-min-length: ${PASSWORD_MIN_LENGTH:8}
   drawio:
-    # 다이어그램(draw.io) 편집기. 브라우저가 이 주소를 열 수 있어야 한다. 자체 호스팅 시 http://<host>/drawio 등으로 교체.
-    url: ${DRAWIO_URL:https://embed.diagrams.net}
+    # 다이어그램(draw.io) 편집기. 브라우저가 이 주소를 열 수 있어야 한다.
+    # 비우면 static-extra/drawio 가 있을 때 같은 서버의 /drawio(자체 호스팅, 폐쇄망용), 없으면 https://embed.diagrams.net
+    url: ${DRAWIO_URL:}
   ops:
     # 운영 자동 정리(매일 03:30, com.workblog.ops). 휴지통 보존 일수 · 고아 첨부 보존 시간 · 자동 실행 여부
     trash-retention-days: ${TRASH_RETENTION_DAYS:30}
     orphan-attachment-hours: ${ORPHAN_ATTACHMENT_HOURS:24}
     cleanup-enabled: ${CLEANUP_ENABLED:true}
+  datamove:
+    # 데이터 이전(관리자 > 데이터 이전): 덤프 올리기 최대 크기(MB). 첨부 한도(MAX_FILE_MB)와 따로. 임시 폴더는 비우면 첨부 저장소 옆 imports
+    import-max-mb: ${IMPORT_MAX_MB:2048}
+    tmp-dir: ${IMPORT_TMP_DIR:}
   review:
     # 오래된 글 재검토(com.workblog.review): 마지막 수정·내용 확인에서 이 일수가 지난 발행 글에 안내. 0 이면 끔
     stale-days: ${REVIEW_STALE_DAYS:180}

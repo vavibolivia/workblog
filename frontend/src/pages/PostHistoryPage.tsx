@@ -30,7 +30,10 @@ export default function PostHistoryPage() {
 
   useEffect(() => {
     if (selected == null) return
-    api.posts.revision(postId, selected).then(setDetail).catch((e) => toast(errorMessage(e), 'error'))
+    let alive = true
+    setDetail(null)
+    api.posts.revision(postId, selected).then((d) => { if (alive) setDetail(d) }).catch((e) => { if (alive) toast(errorMessage(e), 'error') })
+    return () => { alive = false }
   }, [postId, selected, toast])
 
   const diff = useMemo(() => {

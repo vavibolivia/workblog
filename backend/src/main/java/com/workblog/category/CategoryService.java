@@ -168,7 +168,6 @@ public class CategoryService {
         repo.delete(c);
     }
 
-    /** 같은 부모 안에서 순서 한 칸 이동. direction = -1(위) / 1(아래) */
     /** 끌어 놓기: 필요하면 부모를 옮기고(update 의 검사 그대로), 새 형제 목록의 index 자리에 끼워 순서를 다시 매긴다. */
     public void place(Long id, Long parentId, int index) {
         Category c = get(id);

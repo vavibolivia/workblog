@@ -26,8 +26,10 @@ export default function PostDetailPage() {
   const bodyRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
+    let alive = true
     setPost(null); setErr(null)
-    api.posts.get(postId).then(setPost).catch((e) => setErr(errorMessage(e, '글을 불러오지 못했습니다.')))
+    api.posts.get(postId).then((p) => { if (alive) setPost(p) }).catch((e) => { if (alive) setErr(errorMessage(e, '글을 불러오지 못했습니다.')) })
+    return () => { alive = false }
   }, [postId])
 
   const remove = async () => {

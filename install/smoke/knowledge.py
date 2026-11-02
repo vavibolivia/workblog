@@ -1,7 +1,7 @@
-# 지식 구조(템플릿·관련 글·재검토·첨부 내용 검색) 스모크 테스트. scripts/smoke.py 의 call()/check()/upload() 와
+# 지식 구조(템플릿·관련 글·재검토·첨부 내용 검색) 스모크 테스트. smoke.py 의 call()/check()/upload() 와
 # 토큰(A=관리자, U=작성자, O=다른 사용자)을 그대로 쓴다. 만든 글·첨부·템플릿은 끝에서 스스로 영구 삭제한다.
-#   smoke.py 안에서 실행:  exec(open("scripts/smoke_knowledge.py", encoding="utf-8").read())
-#   단독 실행:            python scripts/smoke_knowledge.py http://localhost:8080 <admin_pw>
+#   smoke.py 안에서 실행:  exec(open("knowledge.py", encoding="utf-8").read())
+#   단독 실행:            python install/smoke/knowledge.py http://localhost:8080 <admin_pw>
 import io as _kio, time as _kt, zipfile as _kzip
 if "call" not in globals():
     import json, sys, urllib.request, urllib.parse

@@ -145,4 +145,32 @@ class ImportServiceTest {
         assertThatThrownBy(() -> service.convert("PK\u0003\u0004junk".getBytes(), "a.xlsx", null, false, user)).isInstanceOf(ApiException.class);
         assertThatThrownBy(() -> service.convert("<p>   </p>".getBytes(), "a.html", null, false, user)).hasMessageContaining("본문을 찾지");
     }
+
+    @Test
+    void pdfBecomesPageImagesAndOriginalIsAttached() throws Exception {
+        byte[] pdf;
+        try (var doc = new org.apache.pdfbox.pdmodel.PDDocument()) {
+            for (int i = 0; i < 2; i++) {
+                var page = new org.apache.pdfbox.pdmodel.PDPage();
+                doc.addPage(page);
+                try (var cs = new org.apache.pdfbox.pdmodel.PDPageContentStream(doc, page)) {
+                    cs.beginText();
+                    cs.setFont(new org.apache.pdfbox.pdmodel.font.PDType1Font(org.apache.pdfbox.pdmodel.font.Standard14Fonts.FontName.HELVETICA), 14);
+                    cs.newLineAtOffset(72, 700);
+                    cs.showText("Page " + (i + 1));
+                    cs.endText();
+                }
+            }
+            doc.getDocumentInformation().setTitle("Report");
+            var out = new java.io.ByteArrayOutputStream();
+            doc.save(out);
+            pdf = out.toByteArray();
+        }
+        var c = service.convert(pdf, "report.pdf", "application/pdf", false, user);
+        assertThat(c.sourceType()).isEqualTo(ImportService.SourceType.PDF);
+        assertThat(c.title()).isEqualTo("Report");
+        assertThat(c.html()).contains("1 / 2쪽").contains("2 / 2쪽");
+        assertThat(storedNames).containsExactly("report-p1.jpg", "report-p2.jpg");
+        assertThat(c.attachments()).extracting(Attachment::getPublicId).contains("orig");   // 원본 PDF 는 항상 첨부
+    }
 }
