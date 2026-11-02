@@ -993,3 +993,13 @@ tr:hover .mm-mini, .mm-mini:focus-visible { opacity: 1; }
 .front__post-body:has(.mm-embed) { max-height: none; -webkit-mask-image: none; mask-image: none; }
 .front__post-body .mm-embed { margin-top: 0; }
 @media (max-width: 760px) { .front__tabs { flex: 1 0 100%; } }
+.front__label { flex: none; margin: 0 6px 0 0; font-size: 17px; font-weight: 800; color: var(--navy); }
+@media (max-width: 760px) { .front__label { flex: 1 0 100%; } }
+/* 대문 표시: 색면 대신 위쪽 굵은 선 + 머리 아래 구분선 + 라벨 */
+.front { border-top: 3px solid var(--navy); box-shadow: var(--shadow); }
+:root[data-theme="dark"] .front { border-top-color: var(--sky); }
+.front__head { padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+.front--folded .front__head { padding-bottom: 0; border-bottom: 0; }
+.front__label { display: inline-flex; align-items: baseline; gap: 6px; letter-spacing: .02em; }
+.front__label small { font-size: 11.5px; font-weight: 500; color: var(--muted); letter-spacing: 0; }
+.front__label { flex: 1 0 100%; margin: 0; }

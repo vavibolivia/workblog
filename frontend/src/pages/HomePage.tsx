@@ -85,7 +85,8 @@ export default function HomePage() {
     const n = new URLSearchParams(params); n.set('sort', s); n.delete('page'); setParams(n)
   }
 
-  const front = !categoryId && !tag && !authorId && !status && page === 0
+  // 대문은 홈에 처음 들어왔을 때만(주소에 정렬·쪽·분류 등 아무 조건이 없을 때)
+  const front = params.toString() === ''
   return (
     <>
     <div className="shell shell--3">

@@ -46,7 +46,8 @@ export default function FrontGate() {
     if (!admin) return null
     return (
       <section className="front front--empty">
-        <span>대문이 비어 있습니다. 글이나 공수 표를 골라 홈 맨 위에 띄울 수 있습니다.</span>
+        <h3 className="front__label">대문</h3>
+        <span style={{ marginRight: 'auto' }}>대문이 비어 있습니다. 글이나 공수 표를 골라 홈 맨 위에 띄울 수 있습니다.</span>
         <button type="button" className="btn btn--primary btn--sm" onClick={() => setPicking(true)}>대문 고르기</button>
         {picking && <FrontPicker items={items} onClose={() => setPicking(false)} onSaved={(l) => { setItems(l); setPicking(false); setActive(l[0] ? keyOf(l[0]) : null) }} />}
       </section>
@@ -57,6 +58,7 @@ export default function FrontGate() {
   return (
     <section className={`front${folded ? ' front--folded' : ''}`} aria-label="대문">
       <div className="front__head">
+        <h3 className="front__label">대문 <small>관리자가 고른 글</small></h3>
         <div className="front__tabs" role="tablist" aria-label="대문 항목">
           {items.map((i) => (
             <button key={keyOf(i)} type="button" role="tab" aria-selected={keyOf(i) === keyOf(cur)} className={keyOf(i) === keyOf(cur) ? 'is-on' : undefined} onClick={() => pick(keyOf(i))} title={i.title}>
