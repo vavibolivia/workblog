@@ -1005,3 +1005,5 @@ tr:hover .mm-mini, .mm-mini:focus-visible { opacity: 1; }
 .front-sec { margin-bottom: 26px; }
 .front-sec .front { margin-bottom: 0; }
 .front__label { display: none; }
+.mm-title-btn { margin-left: 8px; vertical-align: middle; font-size: 12.5px; font-weight: 500; }
+.mm-title-edit .input { min-width: 320px; font-size: 18px; font-weight: 700; }

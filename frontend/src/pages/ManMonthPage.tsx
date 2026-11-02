@@ -50,6 +50,7 @@ export default function ManMonthPage() {
   const [busy, setBusy] = useState(false)
   const toast = useToast()
   const file = useRef<HTMLInputElement>(null)
+  const [titleEdit, setTitleEdit] = useState<string | null>(null)
 
   if (err) return <div className="shell"><div className="alert alert--error">{err}</div><Link to="/mm" className="btn">공수 표 목록</Link></div>
   if (!sheet) return <div className="shell"><div className="spinner" aria-label="불러오는 중" /></div>
@@ -92,7 +93,16 @@ export default function ManMonthPage() {
       <div className="page-head row row--between row--wrap">
         <div>
           <p className="small muted"><Link to="/mm">공수 표</Link> ›</p>
-          <h2>{sheet.title}</h2>
+          {titleEdit !== null ? (
+            <form className="row mm-title-edit" style={{ gap: 6 }} onSubmit={(e) => { e.preventDefault(); if (titleEdit.trim() && titleEdit.trim() !== sheet.title) run(() => mmApi.update(sheet.id, { title: titleEdit.trim() }), '제목을 바꿨습니다.').then((ok) => { if (ok) setTitleEdit(null) }); else setTitleEdit(null) }}>
+              <input className="input" value={titleEdit} onChange={(e) => setTitleEdit(e.target.value)} maxLength={200} autoFocus aria-label="표 제목"
+                     onKeyDown={(e) => { if (e.key === 'Escape') setTitleEdit(null) }} />
+              <button type="submit" className="btn btn--primary btn--sm" disabled={busy || !titleEdit.trim()}>저장</button>
+              <button type="button" className="btn btn--sm" onClick={() => setTitleEdit(null)}>취소</button>
+            </form>
+          ) : (
+            <h2>{sheet.title}{sheet.canManage && <button type="button" className="btn btn--ghost btn--sm mm-title-btn" onClick={() => setTitleEdit(sheet.title)} title="제목 고치기 (표 주인·관리자)">✎ 제목 고치기</button>}</h2>
+          )}
           {sheet.description && <p>{sheet.description}</p>}
           <p className="small muted">주인 {sheet.ownerName ?? '—'} · 편집자 {sheet.editors.length ? sheet.editors.map((e) => e.displayName).join(', ') : '없음'} (관리자는 항상 편집 가능)</p>
         </div>
