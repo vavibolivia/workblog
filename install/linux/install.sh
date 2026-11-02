@@ -286,14 +286,22 @@ restore_data() {
   [ -n "$posts" ] || fail "데이터를 넣지 못했습니다. 로그: /tmp/workblog-restore.log"
   local files=0
   if [ -d "$DATA_DIR/files" ]; then
-    no_link "$DIR" "$DIR/data" "$DIR/data/files"
-    mkdir -p "$DIR/data/files"
-    cp -a --no-preserve=ownership "$DATA_DIR/files/." "$DIR/data/files/"
+    tar -C "$DATA_DIR/files" -cf - . | runuser -u workblog -- tar -C "$DIR/data/files" -xf - --no-same-owner --no-same-permissions
     files=$(find "$DATA_DIR/files" -type f | wc -l)
   fi
   say "데이터: 글 ${posts}건 · 첨부·사진 ${files}개"
   DATA_INFO="넣음 — 글 ${posts}건 · 첨부 ${files}개 (공수 표·대문 포함)"
   RESTORED=1
+}
+
+# ---------- 폴더: $DIR 과 config/ 는 root 소유, 앱이 쓰는 data·logs·static-extra 만 workblog ----------
+setup_layout() {
+  id workblog >/dev/null 2>&1 || useradd --system --home "$DIR" --shell /usr/sbin/nologin workblog
+  no_link "$DIR" "$DIR/config" "$DIR/data" "$DIR/logs" "$DIR/static-extra"
+  install -d -m 755 -o root -g root "$DIR"
+  install -d -m 750 -o root -g workblog "$DIR/config"
+  local d; for d in data logs static-extra; do install -d -m 750 -o workblog -g workblog "$DIR/$d"; done
+  runuser -u workblog -- mkdir -p "$DIR/data/files"
 }
 
 # ---------- Java ----------
@@ -387,6 +395,8 @@ fi
 ensure_packages
 say "Java: $JAVA_BIN ($("$JAVA_BIN" -version 2>&1 | head -1))"
 
+setup_layout
+
 # ========== 3) DB ==========
 RESTORED=0
 if [ "$LOCAL_DB" = 1 ]; then
@@ -416,8 +426,6 @@ if port_busy "$PORT"; then
 fi
 
 # ========== 5) 설정 파일 ==========
-id workblog >/dev/null 2>&1 || useradd --system --home "$DIR" --shell /usr/sbin/nologin workblog
-mkdir -p "$DIR/config" "$DIR/data/files" "$DIR/logs" "$DIR/static-extra"
 [ -n "$PUBLIC_URL" ] || PUBLIC_URL="$(conf_get PUBLIC_BASE_URL)"
 if [ -z "$PUBLIC_URL" ] || { [ "$EXISTING" = 1 ] && [[ "$PUBLIC_URL" =~ :[0-9]+$ ]] && [ "${PUBLIC_URL##*:}" != "$PORT" ] && [[ "$PUBLIC_URL" =~ ^http://[0-9.]+:[0-9]+$ ]]; }; then
   PUBLIC_URL="http://$(hostname -I 2>/dev/null | awk '{print $1}'):$PORT"
@@ -463,10 +471,14 @@ umask 022
 say "프로그램 설치: $DIR/workblog.jar"
 [ -f "$DIR/workblog.jar" ] && cp "$DIR/workblog.jar" "$DIR/workblog.jar.bak"
 install -m 0644 "$JAR" "$DIR/workblog.jar"
-no_link "$DIR/config" "$CONF"
-chown -R workblog:workblog "$DIR"
-# 설정(비밀번호 들어 있음)은 root 소유로 — 서비스 계정은 읽기만, 바꿔 치기 못 함
-chown -R root:workblog "$DIR/config"; chmod 750 "$DIR/config"; chmod 640 "$DIR"/config/*
+no_link "$DIR" "$DIR/config" "$CONF" "$DIR/data" "$DIR/logs" "$DIR/static-extra"
+chown root:root "$DIR" "$DIR/workblog.jar"; chmod 755 "$DIR"
+[ -f "$DIR/workblog.jar.bak" ] && chown root:root "$DIR/workblog.jar.bak"
+# 앱이 쓰는 곳만 workblog (chown -R 은 안쪽 링크를 따라가지 않는다)
+chown -R workblog:workblog "$DIR/data" "$DIR/logs" "$DIR/static-extra"
+# 설정(비밀번호 들어 있음)은 root 소유 — 서비스 계정은 읽기만. 일반 파일만(링크는 건너뜀)
+chown root:workblog "$DIR/config"; chmod 750 "$DIR/config"
+find "$DIR/config" -maxdepth 1 -type f -exec chown root:workblog {} + -exec chmod 640 {} +
 
 # ========== 7) 서비스 ==========
 say "systemd 서비스 등록·시작"
