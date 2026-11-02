@@ -112,6 +112,7 @@ public class ManMonthExcel {
             rows.sort(Comparator.comparing((RowDto r) -> porder.getOrDefault(r.projectId(), 0)).thenComparing(RowDto::sortOrder).thenComparing(RowDto::id));
             int ri = FIRST_DATA;
             double[] weekSum = new double[d.weeks()];
+            double mmSum = 0;
             for (RowDto r : rows) {
                 Row row = sh.createRow(ri++);
                 cell(row, 0, projects.getOrDefault(r.projectId(), ""), text);
@@ -129,7 +130,9 @@ public class ManMonthExcel {
                 }
                 Cell t = row.createCell(totalCol);
                 t.setCellStyle(total);
-                t.setCellValue(withValues ? totalMm(d.startDate(), d.weeks(), r.cells()) : 0);
+                double mm = withValues ? totalMm(d.startDate(), d.weeks(), r.cells()) : 0;
+                t.setCellValue(mm);
+                mmSum += mm;
             }
             Row tr = sh.createRow(ri);
             cell(tr, 0, TOTAL_LABEL, head);
@@ -139,12 +142,21 @@ public class ManMonthExcel {
                 c.setCellStyle(total);
                 c.setCellValue(Math.round(weekSum[w] * 100) / 100.0);
             }
+            Cell tm = tr.createCell(totalCol);
+            tm.setCellStyle(total);
+            tm.setCellValue(Math.round(mmSum * 100) / 100.0);
             sh.setColumnWidth(0, 18 * 256);
             sh.setColumnWidth(1, 12 * 256);
             sh.setColumnWidth(2, 14 * 256);
             sh.setColumnWidth(3, 12 * 256);
             sh.setColumnWidth(totalCol, 10 * 256);
             sh.createFreezePane(LEFT, FIRST_DATA);
+            // 인쇄: 가로 · 폭 한 장에 맞춤 · 머리 줄 반복
+            sh.getPrintSetup().setLandscape(true);
+            sh.setFitToPage(true);
+            sh.getPrintSetup().setFitWidth((short) 1);
+            sh.getPrintSetup().setFitHeight((short) 0);
+            sh.setRepeatingRows(new CellRangeAddress(HEAD_MONTH, HEAD_WEEK, -1, -1));
             wb.write(out);
             return out.toByteArray();
         } catch (IOException e) {
