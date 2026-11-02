@@ -6,8 +6,8 @@ import Modal from '../components/Modal'
 import { Avatar } from '../components/Avatar'
 import { passwordHint, passwordProblem } from '../lib/password'
 
-type Form = { username: string; password: string; displayName: string; email: string; department: string; role: Role; active: boolean }
-const empty: Form = { username: '', password: '', displayName: '', email: '', department: '', role: 'USER', active: true }
+type Form = { username: string; password: string; displayName: string; email: string; department: string; position: string; role: Role; active: boolean }
+const empty: Form = { username: '', password: '', displayName: '', email: '', department: '', position: '', role: 'USER', active: true }
 
 export default function AdminUsersPage() {
   const { user: me } = useAuth()
@@ -33,7 +33,7 @@ export default function AdminUsersPage() {
 
   const open = (u: UserResponse | 'new') => {
     setErr(null)
-    setForm(u === 'new' ? empty : { username: u.username, password: '', displayName: u.displayName, email: u.email ?? '', department: u.department ?? '', role: u.role, active: u.active })
+    setForm(u === 'new' ? empty : { username: u.username, password: '', displayName: u.displayName, email: u.email ?? '', department: u.department ?? '', position: u.position ?? '', role: u.role, active: u.active })
     setEditing(u)
   }
 
@@ -44,17 +44,17 @@ export default function AdminUsersPage() {
     setBusy(true); setErr(null)
     try {
       if (editing === 'new') {
-        await api.users.create({ username: form.username.trim(), password: form.password, displayName: form.displayName.trim(), email: form.email.trim() || undefined, department: form.department.trim() || undefined, role: form.role })
+        await api.users.create({ username: form.username.trim(), password: form.password, displayName: form.displayName.trim(), email: form.email.trim() || undefined, department: form.department.trim() || undefined, position: form.position.trim() || undefined, role: form.role })
         toast(`${form.displayName} 계정을 만들었습니다.`, 'success')
       } else if (editing) {
-        await api.users.update(editing.id, { displayName: form.displayName.trim(), email: form.email.trim() || undefined, department: form.department.trim() || undefined, role: form.role, active: form.active, newPassword: form.password || undefined })
+        await api.users.update(editing.id, { displayName: form.displayName.trim(), email: form.email.trim() || undefined, department: form.department.trim() || undefined, position: form.position.trim(), role: form.role, active: form.active, newPassword: form.password || undefined })
         toast('저장했습니다.', 'success')
       }
       setEditing(null); load()
     } catch (e) { setErr(errorMessage(e)) } finally { setBusy(false) }
   }
 
-  const shown = users.filter((u) => !filter || [u.username, u.displayName, u.department ?? '', u.email ?? ''].some((s) => s.toLowerCase().includes(filter.toLowerCase())))
+  const shown = users.filter((u) => !filter || [u.username, u.displayName, u.department ?? '', u.position ?? '', u.email ?? ''].some((s) => s.toLowerCase().includes(filter.toLowerCase())))
 
   return (
     <div className="shell shell--wide">
@@ -79,7 +79,7 @@ export default function AdminUsersPage() {
                 <tr key={u.id} style={{ opacity: u.active ? 1 : .55 }}>
                   <td><span className="row"><Avatar name={u.displayName} size="xs" />{u.displayName}{u.id === me?.id && <span className="small muted">(나)</span>}</span></td>
                   <td><code>{u.username}</code></td>
-                  <td>{u.department ?? <span className="muted">–</span>}</td>
+                  <td>{u.department ?? <span className="muted">–</span>}{u.position && <span className="small muted"> · {u.position}</span>}</td>
                   <td>{u.email ?? <span className="muted">–</span>}</td>
                   <td>{u.role === 'ADMIN' ? <span className="chip">관리자</span> : <span className="chip chip--neutral">구성원</span>}</td>
                   <td>{u.active ? <span className="chip chip--success">활성</span> : <span className="chip chip--danger">비활성</span>}</td>
@@ -122,6 +122,10 @@ export default function AdminUsersPage() {
               <div className="field">
                 <label htmlFor="u-dept">부서</label>
                 <input id="u-dept" className="input" value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })} maxLength={100} placeholder="예) IT전략실" />
+              </div>
+              <div className="field">
+                <label htmlFor="u-pos">직급·직책 <span className="muted small">(선택)</span></label>
+                <input id="u-pos" className="input" value={form.position} onChange={(e) => setForm({ ...form, position: e.target.value })} maxLength={100} placeholder="예) 과장 · PM" />
               </div>
             </div>
             <div className="field">

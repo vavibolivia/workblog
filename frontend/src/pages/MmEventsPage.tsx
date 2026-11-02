@@ -3,8 +3,8 @@ import { Link } from 'react-router-dom'
 import { EVENT_KINDS, type MmEvent, type MmEventKind } from '../lib/manMonthApi'
 import { EventDialog, EventsTable, useMmEvents } from '../components/MmEvents'
 
-type Span = 'upcoming' | 'year' | 'all'
-const SPANS: [Span, string][] = [['upcoming', '오늘부터'], ['year', '올해'], ['all', '전체']]
+type Span = 'upcoming' | 'year' | 'next' | 'all'
+const SPANS: [Span, string][] = [['upcoming', '오늘부터'], ['year', '올해'], ['next', '내년'], ['all', '전체']]
 
 /** 시기별 이벤트(공용) 관리: 모든 공수 표의 '이벤트' 줄과 글 속 이벤트 표가 이 목록을 쓴다. */
 export default function MmEventsPage() {
@@ -17,6 +17,7 @@ export default function MmEventsPage() {
     const f = (x: Date) => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`
     if (span === 'upcoming') return [f(d), undefined] as const
     if (span === 'year') return [`${d.getFullYear()}-01-01`, `${d.getFullYear()}-12-31`] as const
+    if (span === 'next') return [`${d.getFullYear() + 1}-01-01`, `${d.getFullYear() + 1}-12-31`] as const
     return [undefined, undefined] as const
   }, [span])
   const { data, err } = useMmEvents(range[0], range[1])
@@ -28,7 +29,7 @@ export default function MmEventsPage() {
   const canEdit = !!data?.canEdit
 
   return (
-    <div className="shell">
+    <div className="shell shell--wide">
       <div className="page-head row row--between row--wrap">
         <div>
           <p className="small muted"><Link to="/mm">업무산정</Link> ›</p>
@@ -58,10 +59,10 @@ export default function MmEventsPage() {
         <div className="card ev-card">
           <EventsTable events={shown} canEdit={canEdit} onOpen={(e) => setOpen(e)}
                        empty={q || kind ? '찾는 이벤트가 없습니다.' : canEdit ? '이벤트가 없습니다. [+ 이벤트 넣기] 로 시작하세요.' : '이벤트가 없습니다.'} />
-          {!canEdit && <p className="small muted" style={{ margin: '10px 4px 0' }}>보기 전용 — 이벤트는 관리자나 공수 표의 주인·편집자가 고칠 수 있습니다.</p>}
+          <p className="small muted" style={{ margin: '10px 4px 0' }}>누구나 넣을 수 있고, 고치기·삭제는 등록한 사람과 관리자만 할 수 있습니다.</p>
         </div>
       )}
-      {open && <EventDialog event={open === 'new' ? undefined : open} canEdit={canEdit} onClose={() => setOpen(null)} />}
+      {open && <EventDialog event={open === 'new' ? undefined : open} canEdit={open === 'new' ? canEdit : open.canEdit} onClose={() => setOpen(null)} />}
     </div>
   )
 }

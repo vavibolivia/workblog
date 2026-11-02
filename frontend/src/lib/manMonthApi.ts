@@ -14,17 +14,18 @@ export interface MmSheet {
 export interface MmCellChange { rowId: number; week: number; value: number | null }
 export interface MmNoteChange { rowId: number; week: number; text: string }
 export type MmEventKind = 'MILESTONE' | 'MEETING' | 'RELEASE' | 'REVIEW' | 'HOLIDAY' | 'LEAVE' | 'ETC'
-export interface MmEvent { id: number; startDate: string; endDate: string | null; kind: MmEventKind; title: string; related: string | null; note: string | null; createdBy: string | null; updatedAt: string }
+export interface MmEvent { id: number; startDate: string; endDate: string | null; kind: MmEventKind; title: string; related: string | null; note: string | null; createdBy: string | null; updatedAt: string; /** 이 사람이 고치거나 삭제할 수 있는지(만든 사람·관리자) */ canEdit: boolean }
 export interface MmEventRequest { startDate: string; endDate?: string | null; kind: MmEventKind; title: string; related?: string; note?: string }
-/** 이벤트 종류: 이름 · 색(글자 색과 옅은 바탕을 함께 씀) */
-export const EVENT_KINDS: Record<MmEventKind, { label: string; color: string }> = {
-  RELEASE: { label: '릴리스·배포', color: '#d9480f' },
-  MILESTONE: { label: '마일스톤', color: '#7048e8' },
-  REVIEW: { label: '검토·감리', color: '#1971c2' },
-  MEETING: { label: '회의·보고', color: '#0c8599' },
-  HOLIDAY: { label: '공휴일', color: '#c92a2a' },
-  LEAVE: { label: '휴가·교육', color: '#5c940d' },
-  ETC: { label: '기타', color: '#495057' },
+/** 이벤트 종류: 이름 · 색 · 모양(색약·흑백에서도 갈리게 색과 함께 씀) */
+export const EVENT_KINDS: Record<MmEventKind, { label: string; color: string; sym: string }> = {
+  // 종류는 색 동그라미 하나로 구분(모양을 섞지 않음). 표·막대·대화상자·목록이 모두 이 색을 쓴다
+  RELEASE: { label: '릴리스·배포', color: '#e8590c', sym: '●' },
+  MILESTONE: { label: '마일스톤', color: '#7048e8', sym: '●' },
+  REVIEW: { label: '검토·감리', color: '#1864ab', sym: '●' },
+  MEETING: { label: '회의·보고', color: '#0b7285', sym: '●' },
+  HOLIDAY: { label: '공휴일', color: '#c2255c', sym: '●' },
+  LEAVE: { label: '휴가·교육', color: '#2b8a3e', sym: '●' },
+  ETC: { label: '기타', color: '#868e96', sym: '●' },
 }
 export interface MmImportResult { applied: boolean; projectsCreated: number; rowsCreated: number; cellsSet: number; cellsCleared: number; warnings: string[] }
 export interface MmRowRequest { projectId?: number; userId?: number | null; personName?: string; department?: string; role?: string }

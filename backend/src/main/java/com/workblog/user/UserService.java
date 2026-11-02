@@ -43,6 +43,7 @@ public class UserService {
         passwordPolicy.check(req.password());
         User u = new User(req.username(), encoder.encode(req.password()), req.displayName(),
                 req.email(), req.department(), req.role());
+        u.setPosition(req.position());
         return UserResponse.from(users.save(u));
     }
 
@@ -71,6 +72,7 @@ public class UserService {
         u.setDisplayName(req.displayName());
         u.setEmail(req.email());
         u.setDepartment(req.department());
+        if (req.position() != null) u.setPosition(req.position());   // 보내지 않으면(null) 그대로, 빈 글자면 지움
         if (req.role() != null) {
             if (u.getId().equals(actor.getId()) && req.role() != User.Role.ADMIN) {
                 throw ApiException.badRequest("자기 자신의 관리자 권한은 해제할 수 없습니다.");
@@ -112,6 +114,8 @@ public class UserService {
         u.setEmail(req.email());
         // 부서는 열람 제한의 근거라 관리자만 바꾼다(관리 > 사용자). 관리자는 자기 부서도 여기서 바꿀 수 있다.
         if (u.getRole() == User.Role.ADMIN) u.setDepartment(req.department());
+        // 직급·직책은 열람 권한과 관계없어 본인이 고친다. 보내지 않으면(null) 그대로
+        if (req.position() != null) u.setPosition(req.position());
         return UserResponse.from(u);
     }
 

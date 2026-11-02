@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ReactElement } from 'react'
 import { errorMessage } from '../lib/api'
 import { mmApi, periodText, type MmSheetSummary } from '../lib/manMonthApi'
 import Modal from '../components/Modal'
+import WeeksInput from '../components/WeeksInput'
 
 const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 const thisMonday = () => { const d = new Date(); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
@@ -50,8 +51,8 @@ function NewSheetDialog({ onClose, onDone }: { onClose: () => void; onDone: (id:
              <button type="button" className="btn btn--primary" disabled={busy || !title.trim() || !start} onClick={create}>만들어 글에 넣기</button></>}>
       <div className="field"><label htmlFor="wp-t">제목</label><input id="wp-t" className="input" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} autoFocus placeholder="예) 2027 상반기 AirDeck 인력 운영" /></div>
       <div className="row" style={{ gap: 8 }}>
-        <div className="field" style={{ flex: 1 }}><label htmlFor="wp-s">시작 주</label><input id="wp-s" type="date" className="input" value={start} onChange={(e) => setStart(e.target.value)} /></div>
-        <div className="field" style={{ width: 120 }}><label htmlFor="wp-w">주 수 (최대 104)</label><input id="wp-w" type="number" min={1} max={104} className="input" value={weeks} onChange={(e) => setWeeks(Math.max(1, Math.min(104, Number(e.target.value) || 1)))} /></div>
+        <div className="field" style={{ flex: 1 }}><label htmlFor="wp-s">시작 주 (고른 날의 월요일로 맞춤)</label><input id="wp-s" type="date" className="input" value={start} onChange={(e) => setStart(e.target.value)} /></div>
+        <div className="field" style={{ width: 120 }}><label htmlFor="wp-w">주 수 (최대 104)</label><WeeksInput id="wp-w" value={weeks} onChange={setWeeks} /></div>
       </div>
       <p className="small">기간: <strong>{periodText(start, weeks)}</strong></p>
       <p className="small muted">만든 사람이 표 주인이 됩니다. 프로젝트·인원은 글을 저장한 뒤 표에서 [+ 인원]·[프로젝트 추가] 로 넣거나, 표 화면의 [엑셀 ▾] 로 한 번에 넣습니다.</p>

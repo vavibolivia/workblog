@@ -25,6 +25,8 @@ export interface UserResponse {
   displayName: string
   email: string | null
   department: string | null
+  /** 직급·직책(예: 과장, PM) */
+  position: string | null
   role: Role
   active: boolean
   createdAt: string
@@ -262,14 +264,15 @@ export const api = {
   },
   users: {
     list: () => http.get<UserResponse[]>('/users').then((r) => r.data),
-    create: (body: { username: string; password: string; displayName: string; email?: string; department?: string; role: Role }) =>
+    create: (body: { username: string; password: string; displayName: string; email?: string; department?: string; position?: string; role: Role }) =>
       http.post<UserResponse>('/users', body).then((r) => r.data),
-    update: (id: number, body: { displayName: string; email?: string; department?: string; role?: Role; active?: boolean; newPassword?: string }) =>
+    /** position: 빈 글자 = 지움, 빼면 그대로 */
+    update: (id: number, body: { displayName: string; email?: string; department?: string; position?: string; role?: Role; active?: boolean; newPassword?: string }) =>
       http.put<UserResponse>(`/users/${id}`, body).then((r) => r.data),
     deactivate: (id: number) => http.delete(`/users/${id}`),
     /** 영구 삭제(관리자). 글이 있는 계정은 400 — 메시지를 그대로 보여 준다. */
     remove: (id: number) => http.delete(`/users/${id}`, { params: { purge: true } }),
-    updateProfile: (body: { displayName: string; email?: string; department?: string }) =>
+    updateProfile: (body: { displayName: string; email?: string; department?: string; position?: string }) =>
       http.put<UserResponse>('/users/me', body).then((r) => r.data),
     changePassword: (currentPassword: string, newPassword: string) =>
       http.put('/users/me/password', { currentPassword, newPassword }),

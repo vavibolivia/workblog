@@ -13,12 +13,13 @@ export default function ProfilePage() {
   const [displayName, setDisplayName] = useState(user?.displayName ?? '')
   const [email, setEmail] = useState(user?.email ?? '')
   const [department, setDepartment] = useState(user?.department ?? '')
+  const [position, setPosition] = useState(user?.position ?? '')
   const [cur, setCur] = useState(''); const [pw1, setPw1] = useState(''); const [pw2, setPw2] = useState('')
   const [busy, setBusy] = useState(false)
 
   const saveProfile = async (e: FormEvent) => {
     e.preventDefault(); setBusy(true)
-    try { await api.users.updateProfile({ displayName: displayName.trim(), email: email.trim() || undefined, department: department.trim() || undefined }); await refresh(); toast('내 정보를 저장했습니다.', 'success') }
+    try { await api.users.updateProfile({ displayName: displayName.trim(), email: email.trim() || undefined, department: department.trim() || undefined, position: position.trim() }); await refresh(); toast('내 정보를 저장했습니다.', 'success') }
     catch (er) { toast(errorMessage(er), 'error') } finally { setBusy(false) }
   }
   const savePw = async (e: FormEvent) => {
@@ -46,6 +47,11 @@ export default function ProfilePage() {
             <div className="form-row">
               <div className="field"><label htmlFor="p-dept">부서</label><input id="p-dept" className="input" value={department} onChange={(e) => setDepartment(e.target.value)} maxLength={100} readOnly={user?.role !== 'ADMIN'} />{user?.role !== 'ADMIN' && <p className="small muted">부서는 열람 권한에 쓰여 관리자가 정합니다.</p>}</div>
               <div className="field"><label htmlFor="p-email">이메일</label><input id="p-email" type="email" className="input" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={200} /></div>
+            </div>
+            <div className="form-row">
+              <div className="field"><label htmlFor="p-pos">직급·직책 <span className="muted small">(선택)</span></label>
+                <input id="p-pos" className="input" value={position} onChange={(e) => setPosition(e.target.value)} maxLength={100} placeholder="예) 과장 · PM" />
+                <p className="small muted">공수 표에서 인원을 고를 때 누구인지 알아보는 데 쓰입니다.</p></div>
             </div>
             <div><button type="submit" className="btn btn--primary" disabled={busy}>저장</button></div>
           </div>

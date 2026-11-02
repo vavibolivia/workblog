@@ -839,8 +839,8 @@ kbd { display: inline-block; min-width: 22px; padding: 1px 6px; border: 1px soli
 .mm-search { width: 220px; height: 32px; }
 .mm-meta { margin-left: auto; }
 .mm-hint { margin: 0 0 6px; }
-.mm-wrap { --mm-w0: 220px; --mm-w1: 110px; --mm-w2: 90px; --mm-w3: 72px; overflow: auto; max-height: calc(100vh - 230px); border: 1px solid var(--line); border-radius: var(--radius-s); outline: none; background: var(--paper);
-  scroll-padding: 54px 0 30px calc(var(--mm-w0) + var(--mm-w1) + var(--mm-w2) + var(--mm-w3)); user-select: none; }
+.mm-wrap { --mm-w0: 220px; --mm-w1: 110px; --mm-w2: 90px; overflow: auto; max-height: calc(100vh - 230px); border: 1px solid var(--line); border-radius: var(--radius-s); outline: none; background: var(--paper);
+  scroll-padding: 54px 0 30px calc(var(--mm-w0) + var(--mm-w1) + var(--mm-w2)); user-select: none; }
 .mm-wrap:focus-visible { box-shadow: 0 0 0 3px var(--sky-50); }
 .mm-wrap--compact { max-height: 460px; }
 .mm-grid { border-collapse: separate; border-spacing: 0; font-size: 12.5px; min-width: 100%; }
@@ -854,8 +854,9 @@ kbd { display: inline-block; min-width: 22px; padding: 1px 6px; border: 1px soli
 .mm-grid thead .mm-sticky { z-index: 3; background: var(--canvas); }
 .mm-c0 { left: 0; min-width: var(--mm-w0); max-width: var(--mm-w0); overflow: hidden; text-overflow: ellipsis; }
 .mm-c1 { left: var(--mm-w0); min-width: var(--mm-w1); max-width: var(--mm-w1); overflow: hidden; text-overflow: ellipsis; }
-.mm-c2 { left: calc(var(--mm-w0) + var(--mm-w1)); min-width: var(--mm-w2); max-width: var(--mm-w2); overflow: hidden; text-overflow: ellipsis; }
-.mm-c3 { left: calc(var(--mm-w0) + var(--mm-w1) + var(--mm-w2)); min-width: var(--mm-w3); max-width: var(--mm-w3); text-align: right; box-shadow: inset -2px 0 0 var(--line-strong); }
+.mm-c2 { left: calc(var(--mm-w0) + var(--mm-w1)); min-width: var(--mm-w2); max-width: var(--mm-w2); overflow: hidden; text-overflow: ellipsis; box-shadow: inset -2px 0 0 var(--line-strong); }
+/* 프로젝트 줄의 '이 표 기간 MM'(역할 칸 자리) */
+.mm-pmm { text-align: right; font-size: 11.5px; color: var(--ink-2); }
 .mm-dim { color: var(--muted); }
 .mm-sum { font-weight: 700; }
 .mm-project td { background: var(--canvas); font-weight: 700; }
@@ -905,6 +906,28 @@ tr:hover .mm-mini, .mm-mini:focus-visible { opacity: 1; }
 .mm-pick { list-style: none; margin: 4px 0 0; padding: 0; border: 1px solid var(--line); border-radius: var(--radius-s); max-height: 220px; overflow: auto; }
 .mm-pick button { width: 100%; text-align: left; border: 0; background: transparent; padding: 6px 10px; cursor: pointer; }
 .mm-pick button:hover { background: var(--sky-50); }
+/* 인원 고르기 목록: 열자마자 전부(묶음별), 한 사람 두 줄 */
+.mm-picklist { max-height: 340px; }
+.mm-picklist ul { list-style: none; margin: 0; padding: 0; }
+.mm-pick__grp { position: sticky; top: 0; z-index: 1; margin: 0; padding: 4px 10px; font-size: 12px; font-weight: 700; color: var(--navy); background: var(--canvas); border-bottom: 1px solid var(--line); }
+.mm-pick__l1, .mm-pick__l2 { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mm-pick__l2 { margin-top: 1px; }
+.mm-pick__dup { margin-left: 6px; font-size: 10.5px; font-weight: 700; padding: 0 5px; border-radius: 8px; background: color-mix(in srgb, var(--danger) 14%, var(--paper)); color: var(--danger); }
+.mm-pick__nodept { font-style: normal; color: var(--danger); }
+/* 공수 칸 오른쪽 클릭 메뉴 */
+.mm-ctx { position: fixed; z-index: 60; width: 224px; padding: 6px; background: var(--paper); border: 1px solid var(--line-strong); border-radius: var(--radius-s); box-shadow: 0 8px 24px rgba(0, 0, 0, .18); font-size: 13px; }
+.mm-ctx__head { padding: 4px 8px 6px; font-weight: 700; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mm-ctx__vals { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; padding: 0 4px 6px; }
+.mm-ctx__vals button { height: 28px; border: 1px solid var(--line-strong); background: var(--paper); border-radius: 4px; cursor: pointer; font-size: 12.5px; color: var(--ink); }
+.mm-ctx__vals button:hover, .mm-ctx__vals button:focus-visible { background: var(--sky-50); border-color: var(--navy); }
+.mm-ctx__item { display: flex; justify-content: space-between; align-items: center; width: 100%; height: 30px; padding: 0 8px; border: 0; background: transparent; border-radius: 4px; cursor: pointer; text-align: left; color: var(--ink); font-size: 13px; }
+.mm-ctx__item:hover, .mm-ctx__item:focus-visible { background: var(--sky-50); }
+.mm-ctx__item kbd { font-size: 11px; color: var(--muted); font-family: inherit; }
+.mm-ctx hr { border: 0; border-top: 1px solid var(--line); margin: 4px 0; }
+.mm-ctx__note { padding: 2px 8px 6px; }
+.mm-extras--one { grid-template-columns: minmax(0, 1fr); }
+.mm-pick__pos { font-size: 12px; font-weight: 600; color: var(--navy); }
+.mm-pick__none { margin: 0; padding: 10px; }
 .mm-editors { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 4px 12px; margin-top: 10px; max-height: 360px; overflow: auto; }
 .mm-editor { display: flex; align-items: center; gap: 6px; font-size: 13.5px; }
 :root[data-theme="dark"] { --mm-over: #6b1d26; --mm-now: rgba(224, 123, 0, .16); }
@@ -921,7 +944,7 @@ tr:hover .mm-mini, .mm-mini:focus-visible { opacity: 1; }
 .mm-status--ok { color: var(--success); }
 .mm-status--bad { color: var(--danger); font-weight: 700; }
 .mm-ro-note { margin-bottom: 8px; }
-.mm-grid thead th.mm-week.is-now { box-shadow: inset 0 -3px 0 #e07b00, inset 0 0 0 9999px var(--mm-now); color: #b85f00; }
+.mm-grid thead th.mm-week.is-now { box-shadow: inset 0 0 0 9999px var(--mm-now); color: #b85f00; font-weight: 800; }
 .mm-start { padding: 18px 20px; }
 .mm-start h3 { margin: 0 0 10px; }
 .mm-start li { margin: 8px 0; line-height: 2; }
@@ -936,7 +959,7 @@ tr:hover .mm-mini, .mm-mini:focus-visible { opacity: 1; }
 @media (max-width: 760px) {
   /* 좁은 화면: 이름만 고정하고 소속·역할·합계는 숨겨 주 칸이 보이게 */
   .mm-wrap { --mm-w0: 118px; scroll-padding-left: 118px; max-height: calc(100vh - 160px); }
-  .mm-c1, .mm-c2, .mm-c3 { display: none; }
+  .mm-c1, .mm-c2 { display: none; }
   .mm-c0 { box-shadow: inset -2px 0 0 var(--line-strong); }
   .mm-search { width: 100%; }
   .mm-meta { margin-left: 0; }
@@ -996,11 +1019,10 @@ tr:hover .mm-mini, .mm-mini:focus-visible { opacity: 1; }
 @container (max-width: 1000px) {
   .mm-wrap { --mm-w0: 170px; --mm-w1: 0px; --mm-w2: 0px; }
   .mm-c1, .mm-c2 { display: none; }
+  .mm-c0 { box-shadow: inset -2px 0 0 var(--line-strong); }
 }
 @container (max-width: 560px) {
-  .mm-wrap { --mm-w0: 118px; --mm-w3: 0px; }
-  .mm-c3 { display: none; }
-  .mm-c0 { box-shadow: inset -2px 0 0 var(--line-strong); }
+  .mm-wrap { --mm-w0: 118px; }
 }
 /* 대문의 글 미리보기: 공수 표가 든 글은 자르지 않고 그대로 */
 .front__post-body:has(.mm-embed) { max-height: none; -webkit-mask-image: none; mask-image: none; }
@@ -1031,16 +1053,21 @@ tr:hover .mm-mini, .mm-mini:focus-visible { opacity: 1; }
 
 /* ---------- 업무산정: 이벤트 줄(주 머리 아래) ---------- */
 .mm-grid thead .mm-evrow th { height: 24px; padding: 1px 2px; background: var(--paper); font-weight: 600; vertical-align: middle; }
-.mm-grid thead th.mm-evlabel { min-width: 0; max-width: none; text-align: left; padding: 0 8px; z-index: 4; background: var(--paper); font-size: 12px; color: var(--ink-2); box-shadow: inset -2px 0 0 var(--line-strong); }
+.mm-grid thead th.mm-evlabel { text-align: left; padding: 0 8px; z-index: 4; background: var(--paper); font-size: 12px; color: var(--ink-2); }
 .mm-grid thead th.mm-evlabel .mm-mini { opacity: .8; }
-/* 막대는 칸 너비에 영향을 주지 않게(절대 위치). 기간이 짧아도 제목이 다 보이게 옆 빈 주로 이어 그림 */
-.mm-evbar { position: absolute; left: 2px; width: calc(100% - 4px); top: 2px; display: flex; align-items: center; gap: 5px; height: 20px; padding: 0 6px; border: 0; border-left: 3px solid var(--ev); border-radius: 4px;
-  background: color-mix(in srgb, var(--ev) 13%, var(--paper)); color: color-mix(in srgb, var(--ev) 82%, #000); font-size: 11.5px; font-weight: 700;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; text-align: left; }
-.mm-evbar > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.mm-evbar i { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--ev); }
-.mm-evbar:hover { background: color-mix(in srgb, var(--ev) 22%, var(--paper)); }
-:root[data-theme="dark"] .mm-evbar { color: color-mix(in srgb, var(--ev) 55%, #fff); background: color-mix(in srgb, var(--ev) 22%, var(--paper)); }
+/* 이벤트 줄(간트): 색 막대(.mm-evspan)는 실제 기간만 요일 단위로 칠하고, 하루짜리는 그 요일 자리에 ◆.
+   날짜+제목 글자(.mm-evbar)는 시작점에서 오른쪽으로 배경 없이 이어 쓴다 — 막대 길이로 기간을 오해하지 않게. 모두 절대 위치라 칸 너비에 영향 없음 */
+.mm-evspan { position: absolute; top: 4px; bottom: 4px; border-radius: 3px; background: color-mix(in srgb, var(--ev) 20%, var(--paper)); pointer-events: none; }
+.mm-evspan.is-clip-l { border-left: 2px dashed var(--ev); border-radius: 0 3px 3px 0; }
+.mm-evspan.is-clip-r { border-right: 2px dashed var(--ev); border-radius: 3px 0 0 3px; }
+.mm-evbar { position: absolute; top: 2px; width: auto; display: flex; align-items: center; gap: 3px; height: 20px; padding: 0 4px; border: 0; border-radius: 4px; background: transparent;
+  color: color-mix(in srgb, var(--ev) 82%, #000); font-size: 11.5px; font-weight: 700; white-space: nowrap; cursor: pointer; text-align: left; }
+.mm-evbar.is-day { padding-left: 0; }
+.mm-evdia { flex: none; color: var(--ev); font-size: 12px; line-height: 1; }
+.mm-evcont { color: var(--ev); }
+.mm-evbar:hover, .mm-evbar:focus-visible { background: color-mix(in srgb, var(--ev) 12%, var(--paper)); }
+:root[data-theme="dark"] .mm-evbar { color: color-mix(in srgb, var(--ev) 55%, #fff); }
+:root[data-theme="dark"] .mm-evspan { background: color-mix(in srgb, var(--ev) 30%, var(--paper)); }
 .mm-ev--empty.is-addable { cursor: copy; }
 .mm-ev--empty.is-addable:hover { background: var(--canvas) !important; }
 .mm-evmore { border: 1px solid var(--line-strong); background: var(--paper); border-radius: 8px; font-size: 10.5px; padding: 0 5px; cursor: pointer; color: var(--ink-2); }
@@ -1063,16 +1090,21 @@ tr:hover .mm-mini, .mm-mini:focus-visible { opacity: 1; }
 /* ---------- 이벤트(공용) 표 · 대화상자 · 관리 화면 ---------- */
 .ev-kind { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; color: var(--ink-2); white-space: nowrap; }
 .ev-kind i, .ev-kinds i, .ev-kindfilter i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--ev); }
-.ev-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
-.ev-table thead th { text-align: left; font-size: 12px; color: var(--muted); font-weight: 600; padding: 6px 8px; border-bottom: 1px solid var(--line-strong); }
-.ev-month th { text-align: left; padding: 12px 8px 4px; font-size: 13px; color: var(--navy); border-bottom: 1px solid var(--line); }
-.ev-row td { padding: 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
-.ev-row { cursor: pointer; box-shadow: inset 3px 0 0 var(--ev); }
+/* 이벤트 표: 공수 표(.mm-grid)와 같은 모양 — 칸 테두리·머리 바탕·글자 크기·줄 높이를 맞춘다(GUI 통일) */
+.ev-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 12.5px; border: 1px solid var(--line); border-radius: var(--radius-s); overflow: hidden; background: var(--paper); }
+.ev-table th, .ev-table td { border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); height: 28px; padding: 0 8px; }
+.ev-table th:last-child, .ev-table td:last-child { border-right: 0; }
+.ev-table thead th { text-align: left; background: var(--canvas); font-weight: 700; font-size: 12.5px; color: var(--ink-2); }
+.ev-month th { text-align: left; background: var(--canvas); font-weight: 700; color: var(--navy); }
+.ev-row td { vertical-align: middle; }
+.ev-row { cursor: pointer; }
 .ev-row:hover td, .ev-row:focus-visible td { background: var(--canvas); }
 .ev-row.is-past td { color: var(--muted); }
 .ev-row.is-past .ev-title { text-decoration: line-through; text-decoration-color: var(--line-strong); }
 .ev-row.is-now td { background: color-mix(in srgb, var(--ev) 8%, var(--paper)); }
 .ev-date { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.ev-row.is-cont td { color: var(--muted); }
+.ev-cont { font-size: 11.5px; }
 .ev-title { font-weight: 600; }
 .ev-next { margin-left: 6px; font-size: 10.5px; font-weight: 700; padding: 1px 6px; border-radius: 8px; background: var(--sky-50); color: var(--navy); }
 .ev-next--now { background: color-mix(in srgb, var(--ev) 18%, var(--paper)); color: color-mix(in srgb, var(--ev) 80%, #000); }
@@ -1092,3 +1124,109 @@ tr:hover .mm-mini, .mm-mini:focus-visible { opacity: 1; }
 .ev-note { white-space: pre-wrap; }
 .ev-embed .ev-table { font-size: 13px; }
 .field__label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--ink-2); }
+
+/* ===== 업무산정 검수 반영(20명) ===== */
+/* 대비: 보조 글자색을 진하게(흰 바탕 4.5:1 이상) */
+:root { --muted: #5f6b7d; }
+/* 주 칸은 너비 고정 — 큰 값이 들어와도 열이 넓어져 머리·막대가 밀리지 않게(넘치면 … 와 툴팁) */
+.mm-grid td.mm-cell, .mm-grid td.mm-psum, .mm-grid th.mm-week, .mm-grid .mm-total td:not(.mm-sticky) {
+  width: 46px; min-width: 46px; max-width: 46px; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+.mm-grid tbody th { font-weight: 400; text-align: left; }
+.mm-grid .mm-project th { font-weight: 700; }
+.mm-grid .mm-total th { font-weight: 700; text-align: left; }
+/* 달 이름: 가로로 넘겨도 보이게 고정 열 오른쪽에 붙임 */
+.mm-month__l { position: sticky; left: calc(var(--mm-w0) + var(--mm-w1) + var(--mm-w2) + 6px); }
+/* 날짜(주 머리)에는 한쪽 색 줄을 긋지 않는다(사용자 지시) — 이번 주는 바탕색·글자색만 */
+.mm-grid thead th.mm-week.is-now { color: #9a4f00; }
+:root[data-theme="dark"] .mm-grid thead th.mm-week.is-now { color: #f0a243; }
+.mm-evmore { display: block; margin: 1px auto 0; border: 1px solid var(--line-strong); background: var(--paper); border-radius: 8px; font-size: 10px; line-height: 1.3; padding: 0 5px; cursor: pointer; color: var(--ink); }
+/* 이벤트 줄: 칠한 막대 = 실제 기간(요일 위치), 글자는 배경 없이 오른쪽으로 */
+.mm-grid thead .mm-evrow th { height: 24px; padding: 0; background: var(--paper); }
+.mm-grid thead th.mm-evlabel { padding: 0 8px; text-align: left; font-size: 12px; color: var(--ink-2); z-index: 4; }
+.mm-evtrack { padding: 0 !important; text-align: left; overflow: visible; }
+.mm-ev2 { position: absolute; top: 2px; height: 20px; display: flex; align-items: center; padding: 0; border: 0; background: transparent; cursor: pointer; white-space: nowrap; z-index: 1; }
+.mm-ev2__bar { position: absolute; left: 0; top: 3px; bottom: 3px; width: var(--bar); border-radius: 3px; background: color-mix(in srgb, var(--ev) 26%, var(--paper)); }
+.mm-ev2.is-day .mm-ev2__bar { width: 9px; height: 9px; top: 5.5px; bottom: auto; left: 0; border-radius: 50%; background: var(--ev); }
+.mm-ev2.cut0 .mm-ev2__bar { border-top-left-radius: 0; border-bottom-left-radius: 0; }
+.mm-ev2.cut1 .mm-ev2__bar { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.mm-ev2__txt { position: relative; padding-left: 10px; font-size: 11.5px; font-weight: 700; color: color-mix(in srgb, var(--ev) 70%, var(--ink)); }
+.mm-ev2__txt b { margin-right: 4px; color: var(--ev); }
+.mm-ev2:hover .mm-ev2__txt, .mm-ev2:focus-visible .mm-ev2__txt { text-decoration: underline; }
+:root[data-theme="dark"] .mm-ev2__txt { color: color-mix(in srgb, var(--ev) 55%, #fff); }
+:root[data-theme="dark"] .mm-ev2__bar { background: color-mix(in srgb, var(--ev) 40%, var(--paper)); }
+/* 프로젝트 줄의 관련 이벤트 표시·기간 MM·접힌 프로젝트의 초과 표시 */
+.mm-diamond { border: 0; background: transparent; padding: 0 3px 0 0; color: var(--ev); font-size: 11px; cursor: pointer; }
+.mm-pmm { text-align: right; font-size: 11.5px; color: var(--ink-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.mm-overtag { margin-left: 6px; font-size: 10.5px; font-weight: 700; padding: 0 6px; border-radius: 8px; color: var(--danger); border: 1px solid var(--danger); }
+/* 선택: 범위는 바깥 테두리, Ctrl+클릭 칸은 실선 테두리 + 모서리 점, 채우기 미리보기는 빗금 */
+.mm-cell.is-insel { --sel-ov: linear-gradient(var(--sel-tint), var(--sel-tint)); }
+.mm-cell.is-extra { --sel-ov: linear-gradient(var(--sel-tint), var(--sel-tint)); outline: 2px solid var(--navy); outline-offset: -2px; }
+.mm-cell.is-extra::after { content: ''; position: absolute; right: 2px; bottom: 2px; width: 5px; height: 5px; border-radius: 50%; background: var(--navy); }
+.mm-cell.is-fillprev { --sel-ov: repeating-linear-gradient(135deg, rgba(11, 42, 91, .14) 0 3px, transparent 3px 6px); outline: 2px dashed var(--ink); outline-offset: -2px; }
+:root[data-theme="dark"] .mm-cell { --sel-tint: rgba(5, 10, 18, .38); }
+:root[data-theme="dark"] { --mm-on: #1f6fb0; }
+:root[data-theme="dark"] .mm-edge { border-color: #fff; }
+:root[data-theme="dark"] .mm-cell.is-sel { outline-color: #fff; }
+:root[data-theme="dark"] .mm-handle { background: #fff; border-color: var(--canvas); }
+:root[data-theme="dark"] .mm-cell.is-extra { outline-color: #fff; }
+:root[data-theme="dark"] .mm-cell.is-fillprev { --sel-ov: repeating-linear-gradient(135deg, rgba(0, 0, 0, .4) 0 3px, transparent 3px 6px); outline-color: #fff; }
+/* 메모 표시: 노란 삼각형(더 크게, 테두리 그림자) — 저장 전 표시는 아래쪽 줄로 옮겨 겹치지 않게 */
+.mm-cell.has-note::before { content: ''; position: absolute; left: 0; top: 0; border-style: solid; border-width: 10px 10px 0 0; border-color: #e8b500 transparent transparent transparent; filter: drop-shadow(.5px .5px 0 rgba(0, 0, 0, .5)); }
+.mm-cell.is-pending { box-shadow: inset 0 -2px 0 var(--sky); }
+.mm-cell.is-pending:not(.has-note)::before { content: none; }
+/* 1.0 초과: 색만이 아니라 물결 밑줄로도 */
+.mm-cell.is-overp, .mm-cell.is-over { text-decoration: underline wavy var(--danger) 1px; text-underline-offset: 3px; }
+:root[data-theme="dark"] .mm-cell.is-overp { color: #ffb3bd; }
+/* 도구 줄: 왼쪽 설명은 너비 고정(눌러도 단추가 움직이지 않게) */
+.mm-tools__sel { flex: 0 0 300px; max-width: 300px; }
+@media (max-width: 760px) { .mm-tools__sel { flex: 1 0 100%; max-width: none; } }
+/* 표 위 정보 줄: 늘 같은 높이(메모 있는 칸을 눌러도 표가 밀리지 않게) */
+.mm-notebar { min-height: 36px; align-items: center; flex-wrap: wrap; row-gap: 2px; }
+.mm-notebar__load { color: var(--ink-2); margin-right: 8px; }
+.mm-notebar__load.is-over { color: var(--danger); font-weight: 700; }
+.mm-notebar__tag { display: inline-flex; align-items: center; gap: 4px; }
+.mm-notebar .btn { margin-left: auto; }
+/* 요약 한 줄(다음 일정 · 이번 주 초과) */
+.mm-summary { display: flex; flex-wrap: wrap; gap: 6px 22px; margin: 0 0 8px; font-size: 13.5px; }
+.mm-summary__over { display: inline-block; margin-left: 6px; color: var(--danger); font-weight: 700; }
+/* 메모 대화상자: 이미 있는 메모 목록 */
+.mm-note-exist { border: 1px solid var(--line); border-radius: var(--radius-s); padding: 8px 10px; margin-bottom: 10px; }
+.mm-note-exist p { margin: 0 0 4px; }
+.mm-note-exist ul { margin: 0; padding-left: 16px; font-size: 13px; max-height: 140px; overflow: auto; }
+.modal__ask { display: flex; align-items: center; gap: 8px; padding: 10px 20px; border-top: 1px solid var(--line); font-size: 13.5px; color: var(--danger); }
+.modal__ask span { margin-right: auto; }
+/* 표 아래 이벤트·메모: 상자 겹침을 줄이고(구분선만), 메모 줄은 눌러서 그 칸으로 */
+.mm-extra { padding: 10px 2px; border-top: 1px solid var(--line); }
+.mm-notelist li { display: block; padding: 0; }
+.mm-notelist__go { display: grid; grid-template-columns: 64px 170px minmax(0, 1fr); gap: 8px; width: 100%; text-align: left; border: 0; background: transparent; padding: 6px 2px; font: inherit; color: inherit; cursor: pointer; }
+.mm-notelist__go:hover, .mm-notelist__go:focus-visible { background: var(--canvas); }
+@media (max-width: 760px) { .mm-notelist__go { grid-template-columns: 56px minmax(0, 1fr); } .mm-notelist__t { grid-column: 1 / -1; } }
+.mm-notelist__w { color: #8f5b00; }
+.seg--sm button { padding: 2px 10px; font-size: 12.5px; }
+/* 이벤트: 종류 모양 표시, 행의 색 띠는 쓰지 않음(색면 금지 규칙) */
+.ev-row { box-shadow: none; }
+.ev-kind b, .ev-kinds b { color: var(--ev); font-size: 11px; }
+.ev-kinds button b { margin-right: 2px; }
+.ev-shared { margin: -4px 0 10px; }
+.ev-title { min-width: 9em; word-break: keep-all; }
+.ev-date { width: 1%; }
+@media (max-width: 760px) { .ev-table th:nth-child(2), .ev-table td:nth-child(2) { display: none; } }
+/* 작은 단추들: 늘 보이게, 터치에서는 진하게 */
+.mm-mini { opacity: .75; }
+@media (hover: none) { .mm-mini { opacity: 1; } }
+@media (pointer: coarse) { .mm-wrap { touch-action: manipulation; } .mm-tools .btn { min-height: 38px; } }
+/* 글 본문·대문 속 표: 본문 표 규칙(모바일 가로 스크롤 등)을 받지 않게 */
+@media (max-width: 640px) {
+  .post__body .rich table.mm-grid, .post__body .rich table.ev-table { display: table; width: auto; min-width: 100%; max-width: none; }
+  .post__body .rich .mm-grid th, .post__body .rich .mm-grid td { min-width: 0; }
+}
+.mm-embed a.btn, .ev-embed a.btn { text-decoration: none; }
+.mm-embed { font-size: 13px; }
+/* 펼침 메뉴: 줄바꿈 없이 */
+.menu .grow { white-space: nowrap; }
+/* 인쇄: 표를 자르지 않고 도구는 숨김 */
+@media print {
+  .mm-wrap { max-height: none !important; overflow: visible !important; }
+  .mm-tools, .mm-notebar, .mm-bar input, .mm-bar .btn, .mm-handle, .mm-mini { display: none !important; }
+  .mm-sticky { position: static !important; }
+}

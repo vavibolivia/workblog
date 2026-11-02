@@ -77,7 +77,7 @@ public class ManMonthService {
                 }, id);
         List<ChangeDto> changes = jdbc.query("SELECT actor_name, summary, created_at FROM mm_changes WHERE sheet_id = ? ORDER BY created_at DESC, id DESC LIMIT 30",
                 (rs, i) -> new ChangeDto(rs.getString(1), rs.getString(2), rs.getTimestamp(3).toInstant()), id);
-        List<EventDto> events = MmEventService.between(jdbc, s.startDate(), s.startDate().plusWeeks(s.weeks()).minusDays(1));
+        List<EventDto> events = MmEventService.between(jdbc, s.startDate(), s.startDate().plusWeeks(s.weeks()).minusDays(1), viewer);
         return new SheetDetail(s.id(), s.title(), s.description(), s.startDate(), s.weeks(), s.featured(), s.ownerId(), s.ownerName(), s.updatedAt(),
                 canEdit(s, viewer), canManage(s, viewer), editors, projects, rows, changes, events);
     }
@@ -236,10 +236,10 @@ public class ManMonthService {
         Sheet s = load(id);
         requireEdit(s, actor);
         Set<Long> rowIds = new HashSet<>(jdbc.queryForList("SELECT id FROM mm_rows WHERE sheet_id = ?", Long.class, id));
-        int set = 0, cleared = 0;
+        int set = 0, cleared = 0, skipped = 0;
         for (CellChange c : req.changes()) {
-            if (!rowIds.contains(c.rowId())) throw ApiException.badRequest("이 표의 행이 아닙니다: " + c.rowId());
-            if (c.week() < 0 || c.week() >= s.weeks()) throw ApiException.badRequest("주 범위 밖입니다: " + c.week());
+            // 그사이 다른 사람이 행을 지웠거나 기간을 줄였으면 그 칸만 건너뛴다(묶음 전체를 거절하면 나머지도 영영 저장되지 않음)
+            if (!rowIds.contains(c.rowId()) || c.week() < 0 || c.week() >= s.weeks()) { skipped++; continue; }
             BigDecimal v = normalize(c.value());
             if (v == null) {
                 cleared += jdbc.update("DELETE FROM mm_cells WHERE row_id = ? AND week = ?", c.rowId(), c.week());
@@ -248,8 +248,10 @@ public class ManMonthService {
                 set++;
             }
         }
+        if (skipped == req.changes().size() && !req.changes().isEmpty())
+            throw ApiException.badRequest("고친 칸이 모두 없어진 행이거나 표 기간 밖입니다(다른 사람이 표를 바꿨을 수 있음). 표를 다시 읽습니다.");
         touch(id);
-        log(id, actor, "칸 수정: " + set + "칸" + (cleared > 0 ? " · 비움 " + cleared + "칸" : ""));
+        log(id, actor, "칸 수정: " + set + "칸" + (cleared > 0 ? " · 비움 " + cleared + "칸" : "") + (skipped > 0 ? " · 없어진 칸 " + skipped + "개 건너뜀" : ""));
         return get(id, actor);
     }
 

@@ -48,7 +48,10 @@ s, r = call("PUT", f"/api/mm/sheets/{MM}/cells", {"changes": [{"rowId": R1, "wee
 s, r = call("GET", f"/api/mm/sheets/{MM}", tok=MO); check("MM other user can view, not edit", s == 200 and r["canEdit"] is False, (s, r and r.get("canEdit")))
 s, r = call("PUT", f"/api/mm/sheets/{MM}/cells", {"changes": [{"rowId": R1, "week": 3, "value": 0.5}]}, MO); check("MM non-editor edit 403", s == 403, s)
 s, r = call("PUT", f"/api/mm/sheets/{MM}/editors", {"userIds": [me_o["id"]]}, MO); check("MM non-owner set editors 403", s == 403, s)
-s, r = call("POST", "/api/mm/events", {"startDate": "2026-11-18", "kind": "RELEASE", "title": "스모크 릴리스"}, MO); check("EV non-editor create 403", s == 403, s)
+# 이벤트 넣기는 로그인한 누구나(고치기·지우기는 만든 사람과 관리자). 만든 것은 바로 지운다 — 공용 목록에 남지 않게
+s, r = call("POST", "/api/mm/events", {"startDate": "2026-11-18", "kind": "RELEASE", "title": "스모크 릴리스"}, MO); check("EV any user create 201", s == 201, s)
+if s == 201:
+    s, _ = call("DELETE", f"/api/mm/events/{r['id']}", tok=MO); check("EV creator deletes own 204", s == 204, s)
 s, r = call("PUT", f"/api/mm/sheets/{MM}/editors", {"userIds": [me_o["id"]]}, A); check("MM owner sets editors", s == 200 and [e["id"] for e in r["editors"]] == [me_o["id"]], (s, r and r.get("editors")))
 s, r = call("PUT", f"/api/mm/sheets/{MM}/cells", {"changes": [{"rowId": R1, "week": 3, "value": 0.5}]}, MO); check("MM editor can edit", s == 200, (s, r))
 s, r = call("PATCH", f"/api/mm/sheets/{MM}", {"weeks": 10}, MO); check("MM editor cannot change settings 403", s == 403, s)

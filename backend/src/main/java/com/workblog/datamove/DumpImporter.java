@@ -169,9 +169,9 @@ final class DumpImporter {
             String display = str(n, "displayName");
             Instant created = orNow(inst(n, "createdAt"));
             if (apply) {
-                tid = insert("INSERT INTO users (username, password, display_name, email, department, role, active, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?)",
+                tid = insert("INSERT INTO users (username, password, display_name, email, department, position, role, active, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
                         cut(uname.trim(), 50), cut(hash, 100), cut(display == null || display.isBlank() ? uname : display, 100), cut(str(n, "email"), 200),
-                        cut(str(n, "department"), 100), role, bool(n, "active"), ts(created), ts(orNow(inst(n, "updatedAt"))));
+                        cut(str(n, "department"), 100), cut(str(n, "position"), 100), role, bool(n, "active"), ts(created), ts(orNow(inst(n, "updatedAt"))));
             } else {
                 tid = fake();
             }

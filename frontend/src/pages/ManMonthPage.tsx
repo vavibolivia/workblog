@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { api, errorMessage, formatDate, type CategoryNode, type UserResponse } from '../lib/api'
-import { mmApi, mondayOf, periodText, type MmImportResult, type MmProject, type MmRow, type MmSheet } from '../lib/manMonthApi'
+import { api, errorMessage, formatDate, http, type CategoryNode, type UserResponse } from '../lib/api'
+import { mmApi, mondayOf, periodText, personKey, type MmImportResult, type MmProject, type MmRow, type MmSheet } from '../lib/manMonthApi'
 import { useToast } from '../lib/toast'
 import Modal from '../components/Modal'
+import WeeksInput from '../components/WeeksInput'
 import ManMonthBoard from '../components/ManMonthBoard'
 import { useMmSheet } from '../lib/useMmSheet'
 
@@ -15,6 +16,10 @@ type Dialog =
   | { kind: 'publish' }
   | { kind: 'import'; file: File; keepBlank: boolean; result: MmImportResult }
   | null
+
+/** 계정별 다른 공수 표 배치. 창을 열 때마다 새로(표가 바뀌었을 수 있으니 캐시하지 않음) */
+type Assignment = { userId: number; sheetId: number; sheetTitle: string; projectName: string; role: string | null }
+const otherAssignments = () => http.get<Assignment[]>('/mm/assignments').then((r) => r.data).catch(() => [] as Assignment[])
 
 let usersCache: Promise<UserResponse[]> | null = null
 function activeUsers() {
@@ -204,25 +209,136 @@ function RowDialog(props: { sheet: MmSheet; row?: MmRow; projectId?: number; bus
   return props.row ? <RowEditDialog {...props} row={props.row} /> : <RowAddDialog {...props} />
 }
 
-/** 인원 추가: 계정을 누르면 바로 추가(창은 열린 채), 외부 인력은 이름을 여러 줄로 한 번에 */
+/** 이 표에 이미 있는 사람(계정·외부 모두)을 사람 단위로: 누가 누군지 알 수 있게 어느 프로젝트에서 무슨 역할인지 함께 */
+interface SheetPerson { key: string; userId: number | null; name: string; department: string | null; where: string[]; projectIds: Set<number> }
+function sheetPeople(sheet: MmSheet): SheetPerson[] {
+  const pn = new Map(sheet.projects.map((p) => [p.id, p.name]))
+  const m = new Map<string, SheetPerson>()
+  for (const r of sheet.rows) {
+    const k = personKey(r)
+    const p = m.get(k) ?? { key: k, userId: r.userId, name: r.personName, department: r.department, where: [], projectIds: new Set<number>() }
+    p.where.push(`${pn.get(r.projectId) ?? ''}${r.role ? `(${r.role})` : ''}`)
+    p.projectIds.add(r.projectId)
+    if (!p.department && r.department) p.department = r.department
+    m.set(k, p)
+  }
+  return [...m.values()].sort((a, b) => a.name.localeCompare(b.name, 'ko'))
+}
+
+type Picked = { kind: 'user'; user: UserResponse } | { kind: 'person'; person: SheetPerson }
+
+/**
+ * 인원 고르기 목록: 창을 열면 바로 전부 보인다(찾기 칸은 줄이기용).
+ * 맨 위 '추천'(이름이 같은 계정) → '이 표의 인원'(외부 포함) → 계정을 부서별로. 한 줄에 이름·부서·이메일·아이디, 둘째 줄에 이 표에서 맡은 일.
+ */
+function PersonPicker({ sheet, users, pid, suggest, withSheetPeople, busy, onPick }:
+  { sheet: MmSheet; users: UserResponse[]; pid?: number; suggest?: string; withSheetPeople: boolean; busy: boolean; onPick: (p: Picked) => void }) {
+  const [q, setQ] = useState('')
+  const t = q.trim().toLowerCase()
+  const people = useMemo(() => sheetPeople(sheet), [sheet])
+  const inSheet = useMemo(() => new Map(people.filter((p) => p.userId != null).map((p) => [p.userId!, p])), [people])
+  const sameName = useMemo(() => {
+    const c = new Map<string, number>()
+    for (const u of users) c.set(u.displayName.trim(), (c.get(u.displayName.trim()) ?? 0) + 1)
+    return c
+  }, [users])
+  // 다른 공수 표에서 맡은 일(서버: /mm/assignments) — 누가 누군지 알아보는 단서
+  const [elsewhere, setElsewhere] = useState<Map<number, string[]>>(new Map())
+  useEffect(() => {
+    let alive = true
+    otherAssignments().then((l) => {
+      if (!alive) return
+      const m = new Map<number, string[]>()
+      for (const a of l) if (a.sheetId !== sheet.id) m.set(a.userId, [...(m.get(a.userId) ?? []), `${a.sheetTitle} · ${a.projectName}${a.role ? `(${a.role})` : ''}`])
+      setElsewhere(m)
+    })
+    return () => { alive = false }
+  }, [sheet.id])
+  const hit = (...xs: (string | null | undefined)[]) => !t || xs.some((x) => (x ?? '').toLowerCase().includes(t))
+  const userHit = (u: UserResponse) => hit(u.displayName, u.username, u.department, u.position, u.email, ...(inSheet.get(u.id)?.where ?? []), ...(elsewhere.get(u.id) ?? []))
+  const sugg = suggest ? users.filter((u) => u.displayName.trim() === suggest.trim() && userHit(u)) : []
+  const sp = withSheetPeople ? people.filter((p) => hit(p.name, p.department, ...p.where)) : []
+  // 이 표에 이미 있는 계정은 '이 표의 인원'에 나오므로 부서 묶음에서는 뺀다(목록이 짧아지게)
+  const groups = useMemo(() => {
+    const g = new Map<string, UserResponse[]>()
+    for (const u of users) {
+      if (withSheetPeople && inSheet.has(u.id)) continue
+      if (!userHit(u)) continue
+      const d = u.department?.trim() || ''
+      g.set(d, [...(g.get(d) ?? []), u])
+    }
+    return [...g.entries()].map(([d, l]) => [d, l.sort((a, b) => a.displayName.localeCompare(b.displayName, 'ko'))] as const)
+      .sort((a, b) => (a[0] ? 0 : 1) - (b[0] ? 0 : 1) || a[0].localeCompare(b[0], 'ko'))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [users, inSheet, withSheetPeople, t, elsewhere])
+  const total = sugg.length + sp.length + groups.reduce((n, [, l]) => n + l.length, 0)
+
+  const userLine = (u: UserResponse) => {
+    const has = pid != null && inSheet.get(u.id)?.projectIds.has(pid)
+    const where = inSheet.get(u.id)?.where
+    const dup = (sameName.get(u.displayName.trim()) ?? 0) > 1
+    const other = elsewhere.get(u.id)
+    const l2 = [has ? '이미 이 프로젝트에 있음' : '', where ? `이 표: ${where.join(', ')}` : '',
+      other ? `다른 표: ${other.slice(0, 2).join(', ')}${other.length > 2 ? ` 외 ${other.length - 2}` : ''}` : ''].filter(Boolean).join(' · ')
+    return (
+      <li key={`u${u.id}`}>
+        <button type="button" disabled={busy || has} onClick={() => onPick({ kind: 'user', user: u })} title={other ? `다른 표:\n${other.join('\n')}` : undefined}>
+          <span className="mm-pick__l1">{has ? '✓ ' : ''}<strong>{u.displayName}</strong>{u.position && <span className="mm-pick__pos"> {u.position}</span>}
+            {dup && <span className="mm-pick__dup" title="같은 이름의 계정이 여럿입니다 — 부서·직급·이메일로 확인하세요">동명이인</span>}
+            <span className="muted small"> · {u.department || <em className="mm-pick__nodept">부서 미입력</em>}{u.email ? ` · ${u.email}` : ''} · {u.username}</span></span>
+          {l2 && <span className="mm-pick__l2 small muted">{l2}</span>}
+        </button>
+      </li>
+    )
+  }
+
+  return (
+    <div className="mm-picker">
+      <input className="input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="이름 · 부서 · 직급 · 이메일 · 아이디 · 프로젝트로 줄이기" aria-label="인원 줄이기" />
+      <div className="mm-pick mm-picklist" role="listbox" aria-label="인원 목록">
+        {sugg.length > 0 && <><p className="mm-pick__grp">추천 — 이름이 같은 계정</p><ul>{sugg.map(userLine)}</ul></>}
+        {sp.length > 0 && <>
+          <p className="mm-pick__grp">이 표의 인원 · {sp.length}명</p>
+          <ul>{sp.map((p) => {
+            const has = pid != null && p.projectIds.has(pid)
+            const u = p.userId != null ? users.find((x) => x.id === p.userId) : undefined
+            return (
+              <li key={p.key}>
+                <button type="button" disabled={busy || has} onClick={() => onPick({ kind: 'person', person: p })}>
+                  <span className="mm-pick__l1">{has ? '✓ ' : ''}<strong>{p.name}</strong>{u?.position && <span className="mm-pick__pos"> {u.position}</span>}{p.userId == null && <span className="mm-ext">외부</span>}
+                    <span className="muted small"> · {p.department || '소속 미입력'}{u?.email ? ` · ${u.email}` : ''}</span></span>
+                  <span className="mm-pick__l2 small muted">{has ? '이미 이 프로젝트에 있음 · ' : ''}이 표: {p.where.join(', ')}</span>
+                </button>
+              </li>
+            )
+          })}</ul>
+        </>}
+        {groups.map(([d, l]) => (
+          <div key={d || '-'}>
+            <p className="mm-pick__grp">{d || '부서 미입력'} · {l.length}명</p>
+            <ul>{l.map(userLine)}</ul>
+          </div>
+        ))}
+        {total === 0 && <p className="small muted mm-pick__none">{t ? '찾는 사람이 없습니다.' : '고를 사람이 없습니다.'}{withSheetPeople ? ' 계정 없는 외부 인력은 오른쪽에 이름을 직접 넣으세요.' : ''}</p>}
+      </div>
+    </div>
+  )
+}
+
+/** 인원 추가: 목록에서 누르면 바로 추가(창은 열린 채), 외부 인력은 이름을 여러 줄로 한 번에 */
 function RowAddDialog({ sheet, projectId, busy, onClose, run }: { sheet: MmSheet; projectId?: number; busy: boolean; onClose: () => void; run: Run }) {
   const [users, setUsers] = useState<UserResponse[]>([])
   const [pid, setPid] = useState<number>(projectId ?? sheet.projects[0]?.id)
-  const [q, setQ] = useState('')
   const [role, setRole] = useState('')
   const [names, setNames] = useState('')
   const [dept, setDept] = useState('')
   const [added, setAdded] = useState<string[]>([])
   useEffect(() => { activeUsers().then(setUsers) }, [])
-  const inProject = useMemo(() => new Set(sheet.rows.filter((r) => r.projectId === pid && r.userId != null).map((r) => r.userId)), [sheet.rows, pid])
-  const shown = useMemo(() => {
-    const t = q.trim().toLowerCase()
-    return t ? users.filter((u) => u.displayName.toLowerCase().includes(t) || u.username.toLowerCase().includes(t) || (u.department ?? '').toLowerCase().includes(t)).slice(0, 12) : []
-  }, [users, q])
-  const pname = sheet.projects.find((p) => p.id === pid)?.name ?? ''
-  const addUser = async (u: UserResponse) => {
-    if (await run(() => mmApi.addRow(sheet.id, { projectId: pid, userId: u.id, personName: u.displayName, department: u.department ?? '', role: role.trim() }), undefined, true))
-      setAdded((a) => [...a, u.displayName])
+  const addPicked = async (p: Picked) => {
+    const body = p.kind === 'user'
+      ? { projectId: pid, userId: p.user.id, personName: p.user.displayName, department: p.user.department ?? '', role: role.trim() }
+      : { projectId: pid, userId: p.person.userId, personName: p.person.name, department: p.person.department ?? '', role: role.trim() }
+    if (await run(() => mmApi.addRow(sheet.id, body), undefined, true)) setAdded((a) => [...a, body.personName])
   }
   const lines = names.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
   const addNames = async () => {
@@ -236,7 +352,7 @@ function RowAddDialog({ sheet, projectId, busy, onClose, run }: { sheet: MmSheet
   return (
     <Modal title="인원 추가" onClose={onClose} wide
            footer={<>
-             <span className="small muted" style={{ marginRight: 'auto' }}>{added.length ? `이번에 ${added.length}명 추가: ${added.slice(-5).join(', ')}${added.length > 5 ? ' …' : ''}` : '계정을 누르면 바로 추가됩니다. 창은 닫히지 않습니다.'}</span>
+             <span className="small muted" style={{ marginRight: 'auto' }}>{added.length ? `이번에 ${added.length}명 추가: ${added.slice(-5).join(', ')}${added.length > 5 ? ' …' : ''}` : '목록에서 누르면 바로 추가됩니다. 창은 닫히지 않습니다.'}</span>
              <button type="button" className="btn btn--primary" onClick={onClose}>{added.length ? '다 했어요' : '닫기'}</button>
            </>}>
       <div className="row row--wrap" style={{ gap: 8 }}>
@@ -249,25 +365,12 @@ function RowAddDialog({ sheet, projectId, busy, onClose, run }: { sheet: MmSheet
       </div>
       <div className="mm-add">
         <div>
-          <h4>계정에서 찾기</h4>
-          <input className="input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="이름 · 아이디 · 부서" autoFocus aria-label="계정 찾기" />
-          {q.trim() && shown.length === 0 && <p className="small muted">찾는 계정이 없습니다. 오른쪽에 이름을 직접 넣으세요.</p>}
-          <ul className="mm-pick">
-            {shown.map((u) => {
-              const has = inProject.has(u.id)
-              return (
-                <li key={u.id}>
-                  <button type="button" disabled={busy || has} onClick={() => addUser(u)}>
-                    {has ? '✓ ' : '+ '}{u.displayName} <span className="muted small">{u.username} · {u.department ?? '부서 없음'}{has ? ` · 이미 ${pname}에 있음` : ''}</span>
-                  </button>
-                </li>
-              )
-            })}
-          </ul>
+          <h4>목록에서 고르기 <span className="muted small">— 누르면 바로 추가</span></h4>
+          <PersonPicker sheet={sheet} users={users} pid={pid} withSheetPeople busy={busy} onPick={addPicked} />
         </div>
         <div>
           <h4>직접 입력 <span className="muted small">— 계정 없는 외부 인력, 한 줄에 한 명</span></h4>
-          <textarea className="input" rows={5} value={names} onChange={(e) => setNames(e.target.value)} placeholder={'홍길동\n김협력\n(엑셀 이름 열을 복사해 붙여넣어도 됩니다)'} aria-label="이름 여러 줄" />
+          <textarea className="textarea" rows={5} value={names} onChange={(e) => setNames(e.target.value)} placeholder={'홍길동\n김협력\n(엑셀 이름 열을 복사해 붙여넣어도 됩니다)'} aria-label="이름 여러 줄" />
           <input className="input" style={{ marginTop: 6 }} value={dept} onChange={(e) => setDept(e.target.value)} maxLength={100} placeholder="소속 (선택, 모두 같게)" aria-label="소속" />
           <button type="button" className="btn" style={{ marginTop: 6 }} disabled={busy || !lines.length || !pid} onClick={addNames}>{lines.length ? `${lines.length}명 추가` : '이름을 넣으세요'}</button>
         </div>
@@ -284,14 +387,10 @@ function RowEditDialog({ sheet, row, busy, onClose, run }: { sheet: MmSheet; row
   const [name, setName] = useState(row.personName)
   const [dept, setDept] = useState(row.department ?? '')
   const [role, setRole] = useState(row.role ?? '')
-  const [q, setQ] = useState('')
   const [confirm, setConfirm] = useState(false)
   useEffect(() => { activeUsers().then(setUsers) }, [])
-  const shown = useMemo(() => {
-    const t = q.trim().toLowerCase()
-    return t ? users.filter((u) => u.displayName.toLowerCase().includes(t) || u.username.toLowerCase().includes(t) || (u.department ?? '').toLowerCase().includes(t)).slice(0, 8) : []
-  }, [users, q])
-  const pick = (u: UserResponse) => { setUserId(u.id); setName(u.displayName); setDept(u.department ?? ''); setQ('') }
+  const pick = (p: Picked) => { if (p.kind !== 'user') return; setUserId(p.user.id); setName(p.user.displayName); setDept(p.user.department ?? '') }
+  const linked = userId != null ? users.find((u) => u.id === userId) : undefined
   const body = { projectId: pid, userId, personName: name.trim(), department: dept.trim(), role: role.trim() }
   const filled = Object.keys(row.cells).length
   return (
@@ -312,11 +411,10 @@ function RowEditDialog({ sheet, row, busy, onClose, run }: { sheet: MmSheet; row
       </div>
       <div className="field"><label htmlFor="mm-user">계정 연결 <span className="muted small">(연결하면 사람별 부하에서 다른 프로젝트와 합산)</span></label>
         {userId != null
-          ? <p className="small">연결됨: <strong>{users.find((u) => u.id === userId)?.displayName ?? row.personName}</strong> <button type="button" className="btn btn--ghost btn--sm" onClick={() => setUserId(null)}>연결 해제</button></p>
-          : <>
-              <input id="mm-user" className="input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="이름 · 아이디 · 부서로 계정 찾기" />
-              {shown.length > 0 && <ul className="mm-pick">{shown.map((u) => <li key={u.id}><button type="button" onClick={() => pick(u)}>{u.displayName} <span className="muted small">{u.username} · {u.department ?? '부서 없음'}</span></button></li>)}</ul>}
-            </>}
+          ? <p className="small">연결됨: <strong>{linked?.displayName ?? row.personName}</strong>
+              {linked && <span className="muted">{linked.position ? ` ${linked.position}` : ''} · {linked.department || '부서 미입력'}{linked.email ? ` · ${linked.email}` : ''} · {linked.username}</span>}{' '}
+              <button type="button" className="btn btn--ghost btn--sm" onClick={() => setUserId(null)}>연결 해제</button></p>
+          : <PersonPicker sheet={sheet} users={users} suggest={row.personName} withSheetPeople={false} busy={busy} onPick={pick} />}
       </div>
     </Modal>
   )
@@ -393,7 +491,7 @@ function SettingsDialog({ sheet, busy, onClose, run }: { sheet: MmSheet; busy: b
       <div className="field"><label htmlFor="mm-d">설명</label><input id="mm-d" className="input" value={desc} onChange={(e) => setDesc(e.target.value)} maxLength={1000} /></div>
       <div className="row" style={{ gap: 8 }}>
         <div className="field" style={{ flex: 1 }}><label htmlFor="mm-s">시작 주 (월요일로 맞춤)</label><input id="mm-s" type="date" className="input" value={start} onChange={(e) => { setStart(e.target.value); setConfirmLoss(false) }} /></div>
-        <div className="field" style={{ width: 120 }}><label htmlFor="mm-w">주 수</label><input id="mm-w" type="number" min={1} max={104} className="input" value={weeks} onChange={(e) => { setWeeks(Math.max(1, Math.min(104, Number(e.target.value) || 1))); setConfirmLoss(false) }} /></div>
+        <div className="field" style={{ width: 120 }}><label htmlFor="mm-w">주 수</label><WeeksInput id="mm-w" value={weeks} onChange={(n) => { setWeeks(n); setConfirmLoss(false) }} /></div>
       </div>
       <p className="small">기간: <strong>{periodText(start, weeks)}</strong>{start && mondayOf(start) !== start && <span className="muted"> — 고른 {start} 은 그 주 월요일로 맞춥니다</span>}</p>
       {lost > 0

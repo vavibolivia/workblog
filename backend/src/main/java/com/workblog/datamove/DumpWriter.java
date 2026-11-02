@@ -82,7 +82,7 @@ final class DumpWriter {
         ZipOutputStream zip = new ZipOutputStream(new java.io.BufferedOutputStream(new NonClosing(out), 64 * 1024));
 
         counts.put("users", table(zip, files, DumpFormat.USERS,
-                "SELECT id, username, password, display_name, email, department, role, active, created_at, updated_at FROM users ORDER BY id",
+                "SELECT id, username, password, display_name, email, department, position, role, active, created_at, updated_at FROM users ORDER BY id",
                 List.of(), (g, rs) -> {
                     g.writeNumberField("id", rs.getLong("id"));
                     g.writeStringField("username", rs.getString("username"));
@@ -90,6 +90,7 @@ final class DumpWriter {
                     g.writeStringField("displayName", rs.getString("display_name"));
                     g.writeStringField("email", rs.getString("email"));
                     g.writeStringField("department", rs.getString("department"));
+                    g.writeStringField("position", rs.getString("position"));
                     g.writeStringField("role", rs.getString("role"));
                     g.writeBooleanField("active", rs.getBoolean("active"));
                     time(g, "createdAt", instant(rs, "created_at"));

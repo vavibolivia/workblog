@@ -38,12 +38,12 @@ public final class ManMonthDtos {
 
     /** 시기별 이벤트(공용). endDate 가 없으면 하루짜리. related(예: AirDeck)가 이름에 든 프로젝트 줄에도 표시. */
     public record EventDto(Long id, LocalDate startDate, LocalDate endDate, EventKind kind, String title, String related, String note,
-                           String createdBy, Instant updatedAt) {}
+                           String createdBy, Instant updatedAt, boolean canEdit) {}
 
     public record EventRequest(@NotNull LocalDate startDate, LocalDate endDate, EventKind kind, @NotBlank @Size(max = 200) String title,
                                @Size(max = 100) String related, @Size(max = 2000) String note) {}
 
-    /** 이벤트 목록 + 이 사람이 고칠 수 있는지(관리자, 또는 공수 표 하나라도 주인·편집자). */
+    /** 이벤트 목록 + 이 사람이 새로 넣을 수 있는지(로그인한 누구나). 이벤트마다 canEdit = 만든 사람·관리자. */
     public record EventList(List<EventDto> events, boolean canEdit) {}
 
     public record CreateSheetRequest(@NotBlank @Size(max = 200) String title, @Size(max = 1000) String description,

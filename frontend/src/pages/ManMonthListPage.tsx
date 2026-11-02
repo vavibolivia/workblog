@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { errorMessage, relativeTime } from '../lib/api'
 import { mmApi, type MmSheetSummary, periodText } from '../lib/manMonthApi'
 import Modal from '../components/Modal'
+import WeeksInput from '../components/WeeksInput'
 
 function thisMonday(): string {
   const d = new Date()
@@ -70,7 +71,7 @@ export default function ManMonthListPage() {
           <div className="field"><label htmlFor="mmn-t">제목</label><input id="mmn-t" className="input" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} placeholder="예) 2027 상반기 프로젝트 인력 운영" autoFocus /></div>
           <div className="row" style={{ gap: 8 }}>
             <div className="field" style={{ flex: 1 }}><label htmlFor="mmn-s">시작 주 (고른 날의 월요일로 맞춤)</label><input id="mmn-s" type="date" className="input" value={start} onChange={(e) => setStart(e.target.value)} /></div>
-            <div className="field" style={{ width: 120 }}><label htmlFor="mmn-w">주 수 (최대 104)</label><input id="mmn-w" type="number" min={1} max={104} className="input" value={weeks} onChange={(e) => setWeeks(Math.max(1, Math.min(104, Number(e.target.value) || 1)))} /></div>
+            <div className="field" style={{ width: 120 }}><label htmlFor="mmn-w">주 수 (최대 104)</label><WeeksInput id="mmn-w" value={weeks} onChange={setWeeks} /></div>
           </div>
           <p className="small">기간: <strong>{periodText(start, weeks)}</strong></p>
           <p className="small muted">만든 사람이 표 주인이 되어 편집자를 지정합니다. 프로젝트 → 인원 순서로 추가하거나, 만든 뒤 [엑셀 ▾ → 양식 내려받기] 를 채워 [엑셀 ▾ → 올리기] 로 한 번에 넣을 수 있습니다.</p>

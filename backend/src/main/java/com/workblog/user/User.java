@@ -32,6 +32,10 @@ public class User {
     @Column(length = 100)
     private String department;
 
+    /** 직급·직책(예: 과장, PM). 인원을 고를 때 알아보는 단서 */
+    @Column(length = 100)
+    private String position;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private Role role = Role.USER;
@@ -64,6 +68,7 @@ public class User {
     public String getDisplayName() { return displayName; }
     public String getEmail() { return email; }
     public String getDepartment() { return department; }
+    public String getPosition() { return position; }
     public Role getRole() { return role; }
     public boolean isActive() { return active; }
     public Instant getCreatedAt() { return createdAt; }
@@ -73,6 +78,7 @@ public class User {
     public void setDisplayName(String displayName) { this.displayName = displayName; }
     public void setEmail(String email) { this.email = email; }
     public void setDepartment(String department) { this.department = department; }
+    public void setPosition(String position) { this.position = position == null || position.isBlank() ? null : position.strip(); }
     public void setRole(Role role) { this.role = role; }
     public void setActive(boolean active) { this.active = active; }
 

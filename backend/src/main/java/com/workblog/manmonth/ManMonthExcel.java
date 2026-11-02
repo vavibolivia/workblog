@@ -71,7 +71,7 @@ public class ManMonthExcel {
             Row r0 = sh.createRow(0);
             r0.createCell(0).setCellValue(d.title());
             r0.getCell(0).setCellStyle(titleStyle(wb));
-            sh.createRow(1).createCell(0).setCellValue("시작 " + d.startDate() + " (월) · " + d.weeks() + "주 · 칸 = 그 주 투입률 0~1.0 · 합계 MM = 달마다 (투입률 합 ÷ 그 달 월요일 수) 의 합");
+            sh.createRow(1).createCell(0).setCellValue("시작 " + d.startDate() + " (월) · " + d.weeks() + "주 · 칸 = 그 주 값(보통 투입률 0~1.0) · 메모는 칸 메모 · 합계 MM = 달마다 (투입률 합 ÷ 그 달 월요일 수) 의 합");
 
             Row hm = sh.createRow(HEAD_MONTH), hw = sh.createRow(HEAD_WEEK);
             String[] left = {"프로젝트", "이름", "소속", "역할"};
@@ -312,8 +312,11 @@ public class ManMonthExcel {
         if (c.getCellType() == CellType.NUMERIC) v = BigDecimal.valueOf(c.getNumericCellValue());
         else if (c.getCellType() == CellType.FORMULA && c.getCachedFormulaResultType() == CellType.NUMERIC) v = BigDecimal.valueOf(c.getNumericCellValue());
         else {
-            String s = fmt.formatCellValue(c).trim().replace(',', '.');
+            String s = fmt.formatCellValue(c).trim().replace(" ", "");
             if (s.isEmpty()) return null;
+            // 화면 입력과 같은 규칙: 1,234 처럼 천 단위 쉼표는 지우고, 그 밖의 쉼표는 소수점
+            if (s.matches("-?\\d{1,3}(,\\d{3})+(\\.\\d+)?%?")) s = s.replace(",", "");
+            else s = s.replace(',', '.');
             boolean pct = s.endsWith("%");
             try {
                 v = new BigDecimal(pct ? s.substring(0, s.length() - 1).trim() : s);

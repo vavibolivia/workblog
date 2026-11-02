@@ -50,27 +50,50 @@ export function useMmSheet(id: number) {
     return () => window.clearInterval(t)
   }, [id, setSheet])
 
+  const inFlight = useRef(false)
   const flush = useCallback(async () => {
-    const batch = [...queue.current.values()]
+    // 한 번에 하나씩 보낸다(앞 요청이 끝나기 전에 다음 묶음이 나가 순서가 뒤바뀌지 않게)
+    if (inFlight.current) { window.clearTimeout(timer.current); timer.current = window.setTimeout(() => void flushRef.current(), 300); return }
+    const all = [...queue.current.values()]
     queue.current.clear()
-    if (!batch.length) return
+    if (!all.length) return
+    inFlight.current = true
     setSaving(true)
     try {
-      const s = await mmApi.setCells(id, batch)
-      setSheet(s)
-      const n = { ...overlayRef.current }
-      const f = new Set(failedRef.current)
-      for (const c of batch) { const k = keyOf(c); f.delete(k); if (!queue.current.has(k)) delete n[k] }
-      setOverlay(n); markFailed(f)
-      setSavedAt(new Date())
-    } catch (e) {
-      // 입력한 값은 화면에 남기고(빨간 점선) [다시 시도] 를 기다린다
-      const f = new Set(failedRef.current)
-      for (const c of batch) f.add(keyOf(c))
-      markFailed(f)
-      toast(errorMessage(e, '저장하지 못했습니다.') + ' — 표 위 [다시 시도] 를 누르세요.', 'error')
-    } finally { setSaving(false) }
-  }, [id, toast, setSheet])
+      // 서버는 한 번에 5000칸까지 — 나눠 보낸다
+      for (let i = 0; i < all.length; i += 4000) {
+        const batch = all.slice(i, i + 4000)
+        try {
+          const s = await mmApi.setCells(id, batch)
+          setSheet(s)
+          const n = { ...overlayRef.current }
+          const f = new Set(failedRef.current)
+          for (const c of batch) { const k = keyOf(c); f.delete(k); if (!queue.current.has(k)) delete n[k] }
+          setOverlay(n); markFailed(f)
+          setSavedAt(new Date())
+        } catch (e) {
+          const status = (e as { response?: { status?: number } })?.response?.status
+          if (status && status >= 400 && status < 500 && status !== 401 && status !== 403) {
+            // 다른 사람이 행을 지웠거나 기간을 줄인 경우 등: 다시 보내도 안 되므로 표를 다시 읽고 그 칸은 버린다
+            const n = { ...overlayRef.current }
+            const f = new Set(failedRef.current)
+            for (const c of batch) { const k = keyOf(c); delete n[k]; f.delete(k) }
+            setOverlay(n); markFailed(f)
+            toast(errorMessage(e, '일부 칸을 저장하지 못했습니다.') + ' — 다른 사람이 표를 바꿨을 수 있어 표를 다시 읽었습니다.', 'error')
+            void reload()
+          } else {
+            // 연결 문제 등: 입력한 값은 화면에 남기고(빨간 점선) [다시 시도] 를 기다린다
+            const f = new Set(failedRef.current)
+            for (const c of batch) f.add(keyOf(c))
+            markFailed(f)
+            toast(errorMessage(e, '저장하지 못했습니다.') + ' — 표 위 [다시 시도] 를 누르세요.', 'error')
+          }
+        }
+      }
+    } finally { inFlight.current = false; setSaving(false) }
+  }, [id, toast, setSheet, reload])
+  const flushRef = useRef(flush)
+  useEffect(() => { flushRef.current = flush }, [flush])
 
   const valueNow = useCallback((rowId: number, week: number): number | null => {
     const k = `${rowId}:${week}`
@@ -83,8 +106,8 @@ export function useMmSheet(id: number) {
     for (const c of changes) { const k = keyOf(c); n[k] = c.value; queue.current.set(k, c) }
     setOverlay(n)
     window.clearTimeout(timer.current)
-    timer.current = window.setTimeout(flush, 500)
-  }, [flush])
+    timer.current = window.setTimeout(() => void flushRef.current(), 500)
+  }, [])
 
   /** 칸 바꾸기. 되돌리기 기록에 남는다. */
   const change = useCallback((changes: MmCellChange[]) => {
@@ -101,9 +124,14 @@ export function useMmSheet(id: number) {
     const step = undoStack.current.pop()
     if (!step) return 0
     redoStack.current.push(step); syncHistory()
-    apply(step.before)
-    return step.before.length
-  }, [apply])
+    // 내가 바꾼 뒤 다른 사람이 다시 바꾼 칸은 덮어쓰지 않는다
+    const mine = new Map(step.after.map((c) => [keyOf(c), c.value]))
+    const back = step.before.filter((c) => valueNow(c.rowId, c.week) === mine.get(keyOf(c)))
+    const skipped = step.before.length - back.length
+    if (back.length) apply(back)
+    if (skipped) toast(`다른 사람이 그사이 바꾼 ${skipped}칸은 되돌리지 않았습니다.`, 'info')
+    return back.length
+  }, [apply, valueNow, toast])
   const redo = useCallback(() => {
     const step = redoStack.current.pop()
     if (!step) return 0

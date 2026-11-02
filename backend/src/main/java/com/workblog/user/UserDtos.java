@@ -11,11 +11,12 @@ import java.time.Instant;
 public final class UserDtos {
     private UserDtos() {}
 
-    public record UserResponse(Long id, String username, String displayName, String email, String department,
+    /** position = 직급·직책(예: 과장, PM) */
+    public record UserResponse(Long id, String username, String displayName, String email, String department, String position,
                                User.Role role, boolean active, Instant createdAt) {
         public static UserResponse from(User u) {
             return new UserResponse(u.getId(), u.getUsername(), u.getDisplayName(), u.getEmail(),
-                    u.getDepartment(), u.getRole(), u.isActive(), u.getCreatedAt());
+                    u.getDepartment(), u.getPosition(), u.getRole(), u.isActive(), u.getCreatedAt());
         }
     }
 
@@ -25,7 +26,8 @@ public final class UserDtos {
             @NotBlank @Size(max = 100) String displayName,
             @Email @Size(max = 200) String email,
             @Size(max = 100) String department,
-            User.Role role) {}
+            User.Role role,
+            @Size(max = 100) String position) {}
 
     /** 회원 가입(본인). 역할은 항상 USER. 아이디 규칙은 관리자 생성과 같다. */
     public record SignupRequest(
@@ -41,12 +43,14 @@ public final class UserDtos {
             @Size(max = 100) String department,
             User.Role role,
             Boolean active,
-            @Size(max = 100) String newPassword) {}
+            @Size(max = 100) String newPassword,
+            @Size(max = 100) String position) {}
 
     public record ChangePasswordRequest(@NotBlank String currentPassword,
                                         @NotBlank @Size(max = 100) String newPassword) {}
 
     public record UpdateProfileRequest(@NotBlank @Size(max = 100) String displayName,
                                        @Email @Size(max = 200) String email,
-                                       @Size(max = 100) String department) {}
+                                       @Size(max = 100) String department,
+                                       @Size(max = 100) String position) {}
 }

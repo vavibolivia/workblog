@@ -33,3 +33,5 @@ export function BrandMark({ size = 32 }: { size?: number }) {
     </svg>
   )
 }
+export const IcNote = ({ size = 15, ...p }: P) => <svg {...base(size)} {...p}><path d="M5 4h10l4 4v12H5z" /><path d="M15 4v4h4M8.5 12h7M8.5 16h5" /></svg>
+export const IcChart = ({ size = 16, ...p }: P) => <svg {...base(size)} {...p}><path d="M4 20h16" /><rect x="6" y="11" width="3" height="7" rx=".8" /><rect x="11" y="6" width="3" height="12" rx=".8" /><rect x="16" y="9" width="3" height="9" rx=".8" /></svg>

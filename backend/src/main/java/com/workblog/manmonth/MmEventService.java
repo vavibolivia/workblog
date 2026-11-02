@@ -13,11 +13,11 @@ import java.util.List;
 
 /**
  * 시기별 이벤트(공용 목록). 공수 표와 따로 관리하고, 각 공수 표는 자기 기간에 걸친 것만 보여 준다.
- * 보기는 로그인한 모두, 고치기는 관리자 또는 공수 표 하나라도 주인·편집자인 사람.
+ * 보기·넣기는 로그인한 누구나, 고치기·지우기는 만든 사람과 관리자만.
  */
 @Service
 public class MmEventService {
-    private static final String COLS = "id, start_date, end_date, kind, title, related, note, created_by, updated_at";
+    private static final String COLS = "id, start_date, end_date, kind, title, related, note, created_by, updated_at, created_by_id";
     private final JdbcTemplate jdbc;
 
     public MmEventService(JdbcTemplate jdbc) {
@@ -25,60 +25,60 @@ public class MmEventService {
     }
 
     /** from~to(포함)에 하루라도 걸치는 이벤트. 둘 다 null 이면 전부. */
-    static List<EventDto> between(JdbcTemplate jdbc, LocalDate from, LocalDate to) {
+    static List<EventDto> between(JdbcTemplate jdbc, LocalDate from, LocalDate to, User viewer) {
         String where = from == null && to == null ? "" : " WHERE start_date <= ? AND COALESCE(end_date, start_date) >= ?";
         Object[] args = from == null && to == null ? new Object[0]
                 : new Object[]{Date.valueOf(to == null ? LocalDate.of(9999, 12, 31) : to), Date.valueOf(from == null ? LocalDate.of(1, 1, 1) : from)};
         return jdbc.query("SELECT " + COLS + " FROM mm_events" + where + " ORDER BY start_date, end_date NULLS FIRST, id", (rs, i) -> {
-            Date end = rs.getDate(3);
-            return new EventDto(rs.getLong(1), rs.getDate(2).toLocalDate(), end == null ? null : end.toLocalDate(),
-                    EventKind.valueOf(rs.getString(4)), rs.getString(5), rs.getString(6), rs.getString(7), rs.getString(8),
-                    rs.getTimestamp(9).toInstant());
+            return row(rs, viewer);
         }, args);
     }
 
     public EventList list(LocalDate from, LocalDate to, User viewer) {
-        return new EventList(between(jdbc, from, to), canEdit(viewer));
+        return new EventList(between(jdbc, from, to, viewer), true);
+    }
+
+    private static EventDto row(java.sql.ResultSet rs, User viewer) throws java.sql.SQLException {
+        Date end = rs.getDate(3);
+        long owner = rs.getLong(10);
+        boolean mine = !rs.wasNull() && viewer != null && owner == viewer.getId();
+        return new EventDto(rs.getLong(1), rs.getDate(2).toLocalDate(), end == null ? null : end.toLocalDate(),
+                EventKind.valueOf(rs.getString(4)), rs.getString(5), rs.getString(6), rs.getString(7), rs.getString(8),
+                rs.getTimestamp(9).toInstant(), viewer != null && (viewer.isAdmin() || mine));
     }
 
     public EventDto create(EventRequest req, User actor) {
-        requireEdit(actor);
         check(req);
-        Long id = jdbc.queryForObject("INSERT INTO mm_events (start_date, end_date, kind, title, related, note, created_by) VALUES (?,?,?,?,?,?,?) RETURNING id",
-                Long.class, Date.valueOf(req.startDate()), end(req), kind(req), req.title().trim(), blank(req.related()), blank(req.note()), actor.getDisplayName());
-        return get(id);
+        Long id = jdbc.queryForObject("INSERT INTO mm_events (start_date, end_date, kind, title, related, note, created_by, created_by_id) VALUES (?,?,?,?,?,?,?,?) RETURNING id",
+                Long.class, Date.valueOf(req.startDate()), end(req), kind(req), req.title().trim(), blank(req.related()), blank(req.note()), actor.getDisplayName(), actor.getId());
+        return get(id, actor);
     }
 
     public EventDto update(long id, EventRequest req, User actor) {
-        requireEdit(actor);
+        requireOwner(id, actor);
         check(req);
         int n = jdbc.update("UPDATE mm_events SET start_date = ?, end_date = ?, kind = ?, title = ?, related = ?, note = ?, updated_at = now() WHERE id = ?",
                 Date.valueOf(req.startDate()), end(req), kind(req), req.title().trim(), blank(req.related()), blank(req.note()), id);
         if (n == 0) throw ApiException.notFound("이벤트를 찾을 수 없습니다.");
-        return get(id);
+        return get(id, actor);
     }
 
     public void delete(long id, User actor) {
-        requireEdit(actor);
+        requireOwner(id, actor);
         if (jdbc.update("DELETE FROM mm_events WHERE id = ?", id) == 0) throw ApiException.notFound("이벤트를 찾을 수 없습니다.");
     }
 
-    boolean canEdit(User u) {
-        if (u.isAdmin()) return true;
-        return jdbc.queryForObject("SELECT (SELECT count(*) FROM mm_sheets WHERE owner_id = ?) + (SELECT count(*) FROM mm_sheet_editors WHERE user_id = ?)",
-                Integer.class, u.getId(), u.getId()) > 0;
+    /** 고치기·지우기: 관리자 또는 만든 사람 */
+    private void requireOwner(long id, User u) {
+        List<Long> owner = jdbc.query("SELECT created_by_id FROM mm_events WHERE id = ?", (rs, i) -> { long v = rs.getLong(1); return rs.wasNull() ? -1L : v; }, id);
+        if (owner.isEmpty()) throw ApiException.notFound("이벤트를 찾을 수 없습니다.");
+        // Long 끼리 != 는 참조 비교라 id 128 이상이면 만든 사람도 막힌다 — 값으로 비교
+        if (!u.isAdmin() && !owner.get(0).equals(u.getId())) throw ApiException.forbidden("이벤트는 만든 사람과 관리자만 고치거나 삭제할 수 있습니다.");
     }
 
-    private void requireEdit(User u) {
-        if (!canEdit(u)) throw ApiException.forbidden("이벤트는 관리자나 공수 표의 주인·편집자가 고칠 수 있습니다.");
-    }
-
-    private EventDto get(long id) {
+    private EventDto get(long id, User viewer) {
         return jdbc.query("SELECT " + COLS + " FROM mm_events WHERE id = ?", (rs, i) -> {
-            Date end = rs.getDate(3);
-            return new EventDto(rs.getLong(1), rs.getDate(2).toLocalDate(), end == null ? null : end.toLocalDate(),
-                    EventKind.valueOf(rs.getString(4)), rs.getString(5), rs.getString(6), rs.getString(7), rs.getString(8),
-                    rs.getTimestamp(9).toInstant());
+            return row(rs, viewer);
         }, id).stream().findFirst().orElseThrow(() -> ApiException.notFound("이벤트를 찾을 수 없습니다."));
     }
 
