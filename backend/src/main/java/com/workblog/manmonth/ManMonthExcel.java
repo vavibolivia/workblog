@@ -30,6 +30,8 @@ public class ManMonthExcel {
     static final int LEFT = 4;           // A~D: 프로젝트 · 이름 · 소속 · 역할
     static final int HEAD_MONTH = 2, HEAD_WEEK = 3, FIRST_DATA = 4;
     static final String TOTAL_LABEL = "주별 합계";
+    /** 한 번에 가져오는 데이터 행 수 상한(업로드 크기 한도와 별도로 처리량을 묶는다). */
+    static final int MAX_IMPORT_ROWS = 3000;
 
     private final ManMonthService service;
     private final JdbcTemplate jdbc;
@@ -183,6 +185,8 @@ public class ManMonthExcel {
             for (ProjectDto p : d.projects()) projectIds.put(p.name().trim().toLowerCase(Locale.ROOT), p.id());
             Map<String, Long> rowIds = new HashMap<>();
             for (RowDto r : d.rows()) rowIds.putIfAbsent(r.projectId() + "|" + r.personName().trim().toLowerCase(Locale.ROOT), r.id());
+            if (sh.getLastRowNum() - headRow > MAX_IMPORT_ROWS + 1)
+                throw ApiException.badRequest("행이 너무 많습니다(최대 " + MAX_IMPORT_ROWS + "행). 파일을 나눠 올리세요.");
             DataFormatter fmt = new DataFormatter();
             String lastProject = null;
             for (int r = headRow + 1; r <= sh.getLastRowNum(); r++) {
@@ -196,8 +200,7 @@ public class ManMonthExcel {
                 lastProject = project;
                 Long pid = projectIds.get(project.toLowerCase(Locale.ROOT));
                 if (pid == null) {
-                    service.addProject(sheetId, new ProjectRequest(project, null), actor);
-                    pid = jdbc.queryForObject("SELECT MAX(id) FROM mm_projects WHERE sheet_id = ? AND name = ?", Long.class, sheetId, project);
+                    pid = service.insertProject(sheetId, project.length() > 100 ? project.substring(0, 100) : project);
                     projectIds.put(project.toLowerCase(Locale.ROOT), pid);
                     projectsCreated++;
                 }
@@ -207,8 +210,7 @@ public class ManMonthExcel {
                     List<Long> users = jdbc.queryForList("SELECT id FROM users WHERE display_name = ? AND active = TRUE", Long.class, name);
                     String dept = fmt.formatCellValue(row.getCell(2)).trim();
                     String role = fmt.formatCellValue(row.getCell(3)).trim();
-                    service.addRow(sheetId, new RowRequest(pid, users.size() == 1 ? users.get(0) : null, name, dept, role, null), actor);
-                    rid = jdbc.queryForObject("SELECT MAX(id) FROM mm_rows WHERE sheet_id = ? AND project_id = ?", Long.class, sheetId, pid);
+                    rid = service.insertRow(sheetId, pid, users.size() == 1 ? users.get(0) : null, cut(name), cut(dept), cut(role));
                     rowIds.put(key, rid);
                     rowsCreated++;
                 }
@@ -297,4 +299,6 @@ public class ManMonthExcel {
     }
 
     private static String nz(String s) { return s == null ? "" : s; }
+
+    private static String cut(String s) { return s == null || s.length() <= 100 ? s : s.substring(0, 100); }
 }

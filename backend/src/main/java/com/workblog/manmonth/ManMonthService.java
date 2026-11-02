@@ -249,6 +249,38 @@ public class ManMonthService {
         return get(id, actor);
     }
 
+    /** 엑셀 가져오기용: 변경 이력·전체 다시 읽기 없이 프로젝트를 넣고 id 를 돌려준다. */
+    long insertProject(long sheetId, String name) {
+        KeyHolder kh = new GeneratedKeyHolder();
+        jdbc.update(c -> {
+            PreparedStatement ps = c.prepareStatement("INSERT INTO mm_projects (sheet_id, name, sort_order) " +
+                    "VALUES (?, ?, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM mm_projects WHERE sheet_id = ?))", new String[]{"id"});
+            ps.setLong(1, sheetId);
+            ps.setString(2, name);
+            ps.setLong(3, sheetId);
+            return ps;
+        }, kh);
+        return Objects.requireNonNull(kh.getKey()).longValue();
+    }
+
+    /** 엑셀 가져오기용 행 추가(변경 이력·전체 다시 읽기 없음). */
+    long insertRow(long sheetId, long projectId, Long userId, String name, String dept, String role) {
+        KeyHolder kh = new GeneratedKeyHolder();
+        jdbc.update(c -> {
+            PreparedStatement ps = c.prepareStatement("INSERT INTO mm_rows (sheet_id, project_id, user_id, person_name, department, role, sort_order) " +
+                    "VALUES (?,?,?,?,?,?, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM mm_rows WHERE sheet_id = ?))", new String[]{"id"});
+            ps.setLong(1, sheetId);
+            ps.setLong(2, projectId);
+            if (userId == null) ps.setNull(3, java.sql.Types.BIGINT); else ps.setLong(3, userId);
+            ps.setString(4, name);
+            ps.setString(5, blankToNull(dept));
+            ps.setString(6, blankToNull(role));
+            ps.setLong(7, sheetId);
+            return ps;
+        }, kh);
+        return Objects.requireNonNull(kh.getKey()).longValue();
+    }
+
     void upsert(long rowId, int week, BigDecimal v) {
         if (jdbc.update("UPDATE mm_cells SET value = ? WHERE row_id = ? AND week = ?", v, rowId, week) == 0) {
             jdbc.update("INSERT INTO mm_cells (row_id, week, value) VALUES (?,?,?)", rowId, week, v);
