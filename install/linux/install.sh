@@ -15,7 +15,7 @@
 # 옵션: --dir /opt/workblog  --port 8080  --admin-pass <비밀번호>  --public-url http://host:8080  --jar <파일>
 #       --data <폴더>    넣을 데이터(db_*.dump + files/). 기본: 옆의 data/
 #       --no-data        데이터를 넣지 않음
-#       --force-data     DB 에 글이 있어도 데이터로 바꿈(바꾸기 전 DB 를 $DIR/backup 에 덤프)
+#       --force-data     DB 에 글이 있어도 데이터로 바꿈(바꾸기 전 DB 를 /var/backups/workblog 에 덤프, root 만 읽음)
 #       --pg-pass <비밀번호>  PostgreSQL 관리자(postgres) 비밀번호가 없을 때 만들 값 (기본 postgres — 사내 요청. 5432 를 외부에 열지 말 것)
 #
 # 상황별로 알아서 처리한다:
@@ -97,10 +97,13 @@ fi
 # ---------- 설정 파일 읽기·고치기 (값에 ! & / \ 가 있어도 그대로) ----------
 conf_get() { [ -f "$CONF" ] && grep -E "^$1=" "$CONF" | tail -1 | cut -d= -f2- || true; }
 conf_set() {
-  local tmp="$CONF.tmp"
+  no_link "$CONF"
+  local tmp; tmp=$(mktemp)
   K="$1" V="$2" awk 'BEGIN{k=ENVIRON["K"]; v=ENVIRON["V"]; d=0} index($0, k "=") == 1 {print k "=" v; d=1; next} {print} END{if(!d) print k "=" v}' "$CONF" > "$tmp"
   cat "$tmp" > "$CONF"; rm -f "$tmp"
 }
+# root 가 쓰는 곳이 서비스 계정이 바꿔 둔 심볼릭 링크면(다른 파일을 덮어쓰게 됨) 멈춘다
+no_link() { local x; for x in "$@"; do [ ! -L "$x" ] || fail "심볼릭 링크라 쓰지 않습니다: $x (직접 확인 후 지우세요)"; done; }
 
 # ---------- PostgreSQL ----------
 PG_KIND=""; PG_VER=""; PG_CLUSTER=""; PG_DATA=""; PG_CONF_FILE=""; PG_HBA=""; PG_PORT=5432; PG_SUPER_INFO=""
@@ -268,11 +271,10 @@ restore_data() {
   sv=$(pgsu psql -w -tAc "SELECT current_setting('server_version_num')::int / 10000")
   [ -z "$dv" ] || [ "$sv" -ge "$dv" ] || fail "데이터는 PostgreSQL $dv 에서 만든 것입니다. 이 서버는 $sv — $dv 이상이 필요합니다."
   if [ "$tables" != 0 ]; then
-    mkdir -p "$DIR/backup"
-    local bk="$DIR/backup/before-data-$(date +%Y%m%d-%H%M%S).dump"
+    install -d -m 700 -o root -g root /var/backups/workblog
+    local bk="/var/backups/workblog/before-data-$(date +%Y%m%d-%H%M%S).dump"
     say "데이터: 지금 DB 를 먼저 덤프 → $bk"
-    pgsu pg_dump -Fc -d "$DB_NAME" > "$bk"
-    chmod 600 "$bk"
+    ( umask 077; pgsu pg_dump -Fc -d "$DB_NAME" > "$bk" )
     say "데이터: 지금 DB 비우기 (글 ${posts}건)"
     { psql_set u "$DB_USER"; echo 'DROP SCHEMA public CASCADE; CREATE SCHEMA public AUTHORIZATION :"u";'; } | pgsu psql -q -v ON_ERROR_STOP=1 -d "$DB_NAME" >/dev/null
     pgsu psql -q -d "$DB_NAME" -c "CREATE EXTENSION IF NOT EXISTS pg_trgm;" >/dev/null
@@ -284,8 +286,9 @@ restore_data() {
   [ -n "$posts" ] || fail "데이터를 넣지 못했습니다. 로그: /tmp/workblog-restore.log"
   local files=0
   if [ -d "$DATA_DIR/files" ]; then
+    no_link "$DIR" "$DIR/data" "$DIR/data/files"
     mkdir -p "$DIR/data/files"
-    cp -a "$DATA_DIR/files/." "$DIR/data/files/"
+    cp -a --no-preserve=ownership "$DATA_DIR/files/." "$DIR/data/files/"
     files=$(find "$DATA_DIR/files" -type f | wc -l)
   fi
   say "데이터: 글 ${posts}건 · 첨부·사진 ${files}개"
@@ -359,6 +362,7 @@ if [ ! -f "$JAR" ]; then
 fi
 
 # ========== 1) 지금 상태 ==========
+no_link "$DIR" "$DIR/config" "$CONF"
 EXISTING=0; [ -f "$CONF" ] && EXISTING=1
 if [ "$EXISTING" = 1 ]; then
   say "기존 설치 발견: $CONF — 설정은 유지하고 주어진 옵션만 반영"
@@ -374,6 +378,7 @@ fi
 
 # 같은 서버 DB 인가(비었거나 localhost/127.0.0.1) — DB 이름은 주소에서
 LOCAL_DB=0; DB_NAME=workblog
+NAME_RE='^[A-Za-z_][A-Za-z0-9_]{0,62}$'
 if [ -z "$DB_URL" ]; then LOCAL_DB=1
 elif [[ "$DB_URL" =~ ^jdbc:postgresql://(localhost|127\.0\.0\.1)(:[0-9]+)?/([A-Za-z0-9_]+) ]]; then LOCAL_DB=1; DB_NAME="${BASH_REMATCH[3]}"
 fi
@@ -389,6 +394,8 @@ if [ "$LOCAL_DB" = 1 ]; then
   ensure_pg_peer
   ensure_pg_superuser_password
   DB_USER="${DB_USER:-workblog}"; DB_PASS="${DB_PASS:-$(rand 24)}"
+  [[ "$DB_USER" =~ $NAME_RE ]] || fail "DB 계정 이름은 영문·숫자·_ 만 됩니다: $DB_USER"
+  [[ "$DB_NAME" =~ $NAME_RE ]] || fail "DB 이름은 영문·숫자·_ 만 됩니다: $DB_NAME"
   say "DB: 이 서버 PostgreSQL $(pgsu psql -w -tAc 'SHOW server_version' | cut -d' ' -f1) (포트 $PG_PORT) · 계정 $DB_USER · DB $DB_NAME"
   ensure_db
   restore_data
@@ -428,6 +435,7 @@ if [ "$EXISTING" = 1 ]; then
 else
   [ -n "$ADMIN_PASS" ] || ADMIN_PASS="$(rand 14)"
   say "설정 파일 작성: $CONF"
+  no_link "$DIR/config" "$CONF"
   cat > "$CONF" <<EOF
 # WorkBlog 설정 (install.sh 작성). 바꾼 뒤: sudo systemctl restart workblog
 SERVER_PORT=$PORT
@@ -455,8 +463,10 @@ umask 022
 say "프로그램 설치: $DIR/workblog.jar"
 [ -f "$DIR/workblog.jar" ] && cp "$DIR/workblog.jar" "$DIR/workblog.jar.bak"
 install -m 0644 "$JAR" "$DIR/workblog.jar"
+no_link "$DIR/config" "$CONF"
 chown -R workblog:workblog "$DIR"
-chmod 600 "$CONF"
+# 설정(비밀번호 들어 있음)은 root 소유로 — 서비스 계정은 읽기만, 바꿔 치기 못 함
+chown -R root:workblog "$DIR/config"; chmod 750 "$DIR/config"; chmod 640 "$DIR"/config/*
 
 # ========== 7) 서비스 ==========
 say "systemd 서비스 등록·시작"
