@@ -2,13 +2,13 @@
 """
 릴리스 묶음 만들기 (Linux · Docker). 먼저 `bash install/build.sh` 로 jar 를 만든다.
 
-    python install/package.py 0.1.0   → install/dist/workblog-0.1.0-linux.tar.gz, -linux.zip(같은 내용), -docker.tar.gz, SHA256SUMS.txt
+    python install/package.py 0.1.1   → install/dist/workblog-0.1.1-linux.tar.gz, -linux.zip(같은 내용), -docker.tar.gz, SHA256SUMS.txt
 """
-import hashlib, io, os, sys, tarfile, zipfile
+import glob, hashlib, io, os, sys, tarfile, zipfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 VERSION = sys.argv[1] if len(sys.argv) > 1 else "0.0.0"
-JAR = os.path.join(ROOT, "backend", "target", "workblog-backend-0.1.0.jar")
+JAR = next(iter(sorted(glob.glob(os.path.join(ROOT, "backend", "target", "workblog-backend-*.jar")))), "")
 DIST = os.path.join(ROOT, "install", "dist")
 NAME = f"workblog-{VERSION}"
 

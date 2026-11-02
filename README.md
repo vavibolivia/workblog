@@ -140,7 +140,7 @@ sudo ./install.sh --uninstall        # 서비스·프로그램 제거 (설정·�
 
 ```bash
 bash install/build.sh                                # 프론트 빌드 → jar 에 포함 (backend/target/*.jar)
-python3 install/package.py 0.1.0                     # install/dist/ 에 Linux(tar.gz·zip)·Docker 묶음
+python3 install/package.py 0.1.1                     # install/dist/ 에 Linux(tar.gz·zip)·Docker 묶음
 DEPLOY_HOST=user@host bash install/deploy/deploy.sh  # 원격 서버 설치 + 서버에서 스모크 테스트
 ```
 `v*` 태그를 올리면 GitHub Actions 가 테스트·빌드 후 Releases 에 묶음을 올립니다.

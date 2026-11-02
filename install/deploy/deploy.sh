@@ -5,8 +5,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 H="${DEPLOY_HOST:?DEPLOY_HOST 를 user@host 로 지정하세요 (예: export DEPLOY_HOST=user@your-server)}"
 SSH="ssh -o BatchMode=yes -i $HOME/.ssh/id_ed25519"
-JAR="$ROOT/backend/target/workblog-backend-0.1.0.jar"
-[ -f "$JAR" ] || { echo "jar 없음 — bash install/build.sh 먼저"; exit 1; }
+JAR="$(ls -1 "$ROOT"/backend/target/workblog-backend-*.jar 2>/dev/null | grep -v plain | head -1)"
+[ -n "$JAR" ] && [ -f "$JAR" ] || { echo "jar 없음 — bash install/build.sh 먼저"; exit 1; }
 TS=$(date +%Y%m%d-%H%M)
 $SSH "$H" "mkdir -p /project/workblog/backup ~/.config/systemd/user && [ -f /project/workblog/app.jar ] && cp /project/workblog/app.jar /project/workblog/backup/app.jar.$TS || true; ls -1t /project/workblog/backup/app.jar.* 2>/dev/null | tail -n +4 | xargs -r rm -f"
 scp -o BatchMode=yes -i "$HOME/.ssh/id_ed25519" "$JAR" "$H:/project/workblog/app.jar.new"
