@@ -1,6 +1,7 @@
 package com.workblog.common;
 
 import jakarta.validation.ConstraintViolationException;
+import org.apache.catalina.connector.ClientAbortException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -11,6 +12,7 @@ import org.springframework.security.authentication.DisabledException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
@@ -85,6 +87,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     public ResponseEntity<ErrorBody> handleMethod(HttpRequestMethodNotSupportedException e) {
         return body(HttpStatus.METHOD_NOT_ALLOWED, "지원하지 않는 요청 방식입니다.");
+    }
+
+    /** 받는 쪽이 먼저 끊음(사진을 받다가 페이지를 떠남 등). 서버 오류가 아니고 응답도 보낼 수 없다. */
+    @ExceptionHandler({AsyncRequestNotUsableException.class, ClientAbortException.class})
+    public void handleClientGone(Exception e) {
+        log.debug("클라이언트가 연결을 끊음: {}", e.getMessage());
     }
 
     @ExceptionHandler(Exception.class)
