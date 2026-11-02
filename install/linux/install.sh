@@ -13,11 +13,13 @@
 #   sudo ./install.sh --uninstall              # 서비스·프로그램 제거 (설정·데이터는 남김)
 #
 # 옵션: --dir /opt/workblog  --port 8080  --admin-pass <비밀번호>  --public-url http://host:8080  --jar <파일>
+#       --pg-pass <비밀번호>   PostgreSQL 관리자(postgres) 비밀번호가 없을 때 만들 값 (기본 postgres)
+# Java 21·PostgreSQL 이 없으면 apt/dnf 로 설치하고, PostgreSQL 은 켜고(처음이면 초기화), 계정(workblog·postgres)이 없으면 만든다.
 # 이미 설치돼 있으면 설정·데이터를 그대로 두고 프로그램만 바꾼다(업그레이드).
 # 끝나면 접속 주소와 초기 관리자 계정(아이디 admin)을 출력한다.
 set -euo pipefail
 
-DIR=/opt/workblog; PORT=8080; DB_URL=""; DB_USER=""; DB_PASS=""; ADMIN_PASS=""; PUBLIC_URL=""; MODE=install
+DIR=/opt/workblog; PORT=8080; DB_URL=""; DB_USER=""; DB_PASS=""; ADMIN_PASS=""; PUBLIC_URL=""; MODE=install; PG_PASS=postgres
 REPO="${WORKBLOG_REPO:-vavibolivia/workblog}"
 VER="${WORKBLOG_VERSION:-}"
 # curl | bash 로 실행하면 $0 이 bash 라 현재 폴더를 본다
@@ -32,11 +34,12 @@ while [ $# -gt 0 ]; do
     --db-user) DB_USER="$2"; shift 2 ;;
     --db-pass) DB_PASS="$2"; shift 2 ;;
     --admin-pass) ADMIN_PASS="$2"; shift 2 ;;
+    --pg-pass) PG_PASS="$2"; shift 2 ;;
     --public-url) PUBLIC_URL="$2"; shift 2 ;;
     --jar) JAR="$2"; shift 2 ;;
     --upgrade) MODE=upgrade; shift ;;
     --uninstall) MODE=uninstall; shift ;;
-    -h|--help) sed -n '2,18p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,20p' "$0"; exit 0 ;;
     *) echo "알 수 없는 옵션: $1"; exit 2 ;;
   esac
 done
@@ -62,18 +65,112 @@ fi
 
 # postgres 계정으로 실행. 지금 폴더(홈 등)에 postgres 가 못 들어가 'could not change directory … Permission denied'
 # 경고가 나지 않도록 / 에서 실행한다(파일은 절대 경로나 리다이렉트로만 넘긴다).
-pgsu() { (cd / && sudo -u postgres "$@"); }
+pgsu() { (cd / && runuser -u postgres -- "$@"); }
+# -w: 비밀번호를 묻지 않는다(묻는 설정이면 실패로 보고 아래에서 고친다)
+pg_ready() { pgsu psql -w -qtAc 'select 1' >/dev/null 2>&1; }
+pg_up() { command -v pg_isready >/dev/null && pg_isready -q 2>/dev/null; }
+
+# 서버는 떠 있는데 postgres 계정이 이 서버 안에서도 비밀번호를 요구하면(pg_hba 의 local 이 md5/scram) 설치를 못 한다.
+# → pg_hba.conf 맨 위에 'local all postgres peer' 한 줄을 넣고(백업 남김) 다시 읽게 한다. (Ubuntu·Rocky 기본과 같은 규칙)
+ensure_pg_peer() {
+  pg_ready && return 0
+  pg_up || return 0
+  local hba
+  for hba in /etc/postgresql/*/main/pg_hba.conf /var/lib/pgsql/data/pg_hba.conf /var/lib/pgsql/*/data/pg_hba.conf; do
+    [ -f "$hba" ] || continue
+    if ! grep -qE '^local\s+all\s+postgres\s+peer' "$hba"; then
+      say "PostgreSQL: postgres 계정의 서버 안 접속을 비밀번호 없이(peer) 허용 — $hba (백업 $hba.bak-workblog)"
+      cp "$hba" "$hba.bak-workblog"
+      sed -i '1i local   all   postgres   peer   # workblog install.sh' "$hba"
+    fi
+  done
+  systemctl reload postgresql >/dev/null 2>&1 || systemctl reload 'postgresql@*' >/dev/null 2>&1 || true
+  command -v pg_ctlcluster >/dev/null && for v in $(ls /etc/postgresql 2>/dev/null); do pg_ctlcluster "$v" main reload >/dev/null 2>&1 || true; done
+  for _ in $(seq 1 10); do pg_ready && return 0; sleep 1; done
+  fail "postgres 계정으로 접속하지 못했습니다. pg_hba.conf 의 local 규칙을 확인하세요."
+}
+PG_SUPER_INFO=""
+
+# 필요한 것이 없으면 깐다: Java 21, (같은 서버 DB 를 쓸 때) PostgreSQL 서버·확장. apt(Ubuntu/Debian) 또는 dnf(Rocky/RHEL).
+ensure_packages() {
+  local need_java=0 need_pg=0
+  if ! command -v java >/dev/null || ! java -version 2>&1 | grep -E 'version "(2[1-9]|[3-9][0-9])' >/dev/null; then need_java=1; fi
+  if [ -z "$DB_URL" ] && ! command -v postgres >/dev/null && ! ls /usr/lib/postgresql/*/bin/postgres >/dev/null 2>&1; then need_pg=1; fi
+  [ $need_java = 0 ] && [ $need_pg = 0 ] && return 0
+  if command -v apt-get >/dev/null; then
+    say "필요한 패키지 설치 (apt):$( [ $need_java = 1 ] && printf ' Java 21')$( [ $need_pg = 1 ] && printf ' PostgreSQL')"
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update -qq
+    local pk="curl ca-certificates"
+    [ $need_java = 1 ] && pk="$pk openjdk-21-jre-headless"
+    [ $need_pg = 1 ] && pk="$pk postgresql postgresql-contrib"
+    # shellcheck disable=SC2086
+    apt-get install -y -qq $pk >/dev/null || fail "apt 설치 실패: $pk"
+  elif command -v dnf >/dev/null; then
+    say "필요한 패키지 설치 (dnf):$( [ $need_java = 1 ] && printf ' Java 21')$( [ $need_pg = 1 ] && printf ' PostgreSQL')"
+    local pk=""
+    [ $need_java = 1 ] && pk="$pk java-21-openjdk-headless"
+    if [ $need_pg = 1 ]; then
+      pk="$pk postgresql-server postgresql-contrib"
+      # Rocky/RHEL 기본 스트림은 13 — 백업(14) 복원이 되도록 16(없으면 15)으로
+      dnf module reset -y -q postgresql >/dev/null 2>&1 || true
+      dnf module enable -y -q postgresql:16 >/dev/null 2>&1 || dnf module enable -y -q postgresql:15 >/dev/null 2>&1 || true
+    fi
+    # shellcheck disable=SC2086
+    dnf install -y -q $pk >/dev/null || fail "dnf 설치 실패:$pk"
+  else
+    fail "apt 도 dnf 도 없어 자동 설치를 못 합니다. Java 21 과 PostgreSQL 을 먼저 설치하세요."
+  fi
+}
+
+# PostgreSQL 서버를 켜고(처음이면 초기화), 이 서버 안(127.0.0.1)에서 비밀번호로 접속되게 한다.
+ensure_postgres_running() {
+  ensure_pg_peer
+  pg_ready && return 0
+  # Rocky/RHEL: 처음엔 데이터 폴더 초기화가 필요
+  if command -v postgresql-setup >/dev/null && [ ! -f /var/lib/pgsql/data/PG_VERSION ]; then
+    say "PostgreSQL 초기화"
+    postgresql-setup --initdb >/dev/null
+  fi
+  # Rocky/RHEL 기본은 127.0.0.1 접속이 ident(비밀번호 불가) → 비밀번호(scram) 로
+  local hba=/var/lib/pgsql/data/pg_hba.conf
+  if [ -f "$hba" ] && grep -qE '^host\s+all\s+all\s+(127\.0\.0\.1/32|::1/128)\s+ident' "$hba"; then
+    cp "$hba" "$hba.bak-workblog"
+    sed -i -E 's/^(host\s+all\s+all\s+(127\.0\.0\.1\/32|::1\/128)\s+)ident/\1scram-sha-256/' "$hba"
+  fi
+  systemctl enable --now postgresql >/dev/null 2>&1 || true
+  systemctl reload postgresql >/dev/null 2>&1 || true
+  # systemd 가 서비스를 못 켜는 환경(컨테이너 등)이면 직접 켠다
+  if ! pg_ready; then
+    if command -v pg_ctlcluster >/dev/null; then
+      local v; v=$(ls /etc/postgresql 2>/dev/null | sort -V | tail -1)
+      [ -n "$v" ] && pg_ctlcluster "$v" main start >/dev/null 2>&1 || true
+    elif [ -f /var/lib/pgsql/data/PG_VERSION ]; then
+      pgsu pg_ctl -D /var/lib/pgsql/data -l /var/lib/pgsql/logfile start >/dev/null 2>&1 || true
+    fi
+  fi
+  for _ in $(seq 1 30); do pg_up && break; sleep 1; done
+  ensure_pg_peer
+  pg_ready && return 0
+  fail "PostgreSQL 이 시작되지 않았습니다 (systemctl status postgresql)."
+}
+
+# postgres 관리자 계정에 비밀번호가 없으면 만든다(기본 postgres / postgres, --pg-pass 로 지정). 이미 있으면 건드리지 않는다.
+ensure_pg_superuser_password() {
+  local has
+  has=$(pgsu psql -w -qtAc "SELECT rolpassword IS NOT NULL FROM pg_authid WHERE rolname = 'postgres'" 2>/dev/null || true)
+  if [ "$has" = t ]; then PG_SUPER_INFO="postgres (기존 비밀번호 그대로)"; return 0; fi
+  if [ -z "$has" ]; then
+    pgsu psql -v ON_ERROR_STOP=1 -qc "CREATE ROLE postgres LOGIN SUPERUSER PASSWORD '${PG_PASS}'" >/dev/null
+  else
+    pgsu psql -v ON_ERROR_STOP=1 -qc "ALTER ROLE postgres PASSWORD '${PG_PASS}'" >/dev/null
+  fi
+  PG_SUPER_INFO="postgres / ${PG_PASS}"
+}
 
 # 0) 옆에 jar 가 없으면 온라인 설치: 필요한 패키지를 apt 로 깔고 Releases 에서 묶음을 받는다
 if [ ! -f "$JAR" ]; then
-  command -v apt-get >/dev/null || fail "workblog.jar 가 없고 apt 도 없습니다. Releases 의 linux.tar.gz 를 받아 푼 폴더에서 실행하세요(README)."
-  say "필요한 패키지 설치 (Java 21 · PostgreSQL)"
-  export DEBIAN_FRONTEND=noninteractive
-  apt-get update -qq
-  apt-get install -y -qq curl ca-certificates tar openjdk-21-jre-headless postgresql >/dev/null
-  systemctl enable --now postgresql >/dev/null 2>&1 || true
-  for _ in $(seq 1 30); do pgsu psql -qtAc 'select 1' >/dev/null 2>&1 && break; sleep 1; done
-  pgsu psql -qtAc 'select 1' >/dev/null 2>&1 || fail "PostgreSQL 이 시작되지 않았습니다 (systemctl status postgresql)."
+  command -v curl >/dev/null || fail "workblog.jar 가 없고 curl 도 없습니다. Releases 의 linux.tar.gz 를 받아 푼 폴더에서 실행하세요(README)."
 
   if [ -z "$VER" ]; then
     say "최신 버전 확인"
@@ -94,7 +191,10 @@ if [ ! -f "$JAR" ]; then
   [ -f "$JAR" ] || fail "묶음에 workblog.jar 가 없습니다: $NAME"
 fi
 
-# 1) Java 21
+# 1) 없는 것 설치 (Java 21 · PostgreSQL) — 업그레이드·외부 DB 면 PostgreSQL 은 건드리지 않는다
+if [ "$MODE" = upgrade ] || [ -f "$CONF" ]; then DB_URL="${DB_URL:-keep}"; fi
+ensure_packages
+[ "$DB_URL" = keep ] && DB_URL=""
 say "Java 21 확인"
 if ! command -v java >/dev/null || ! java -version 2>&1 | grep -E 'version "(2[1-9]|[3-9][0-9])' >/dev/null; then
   fail "Java 21 이상이 필요합니다.
@@ -113,8 +213,8 @@ else
   # 2) DB
   if [ -z "$DB_URL" ]; then
     say "같은 서버의 PostgreSQL 에 DB 생성"
-    command -v psql >/dev/null || fail "psql 이 없습니다. PostgreSQL 을 설치하거나 --db-url/--db-user/--db-pass 로 외부 DB 를 지정하세요.
-  Ubuntu/Debian: sudo apt install -y postgresql postgresql-contrib"
+    ensure_postgres_running
+    ensure_pg_superuser_password
     DB_USER=workblog; DB_PASS="$(rand 24)"
     pgsu psql -v ON_ERROR_STOP=1 -q <<SQL
 DO \$\$ BEGIN
@@ -202,7 +302,8 @@ cat <<EOF
     WorkBlog 설치 완료
     주소        : ${URL}
     초기 아이디 : admin
-    초기 비밀번호: ${ADMIN_INFO}
+    초기 비밀번호: ${ADMIN_INFO}${PG_SUPER_INFO:+
+    DB 관리자   : ${PG_SUPER_INFO}}
     설정 파일   : ${CONF}
     로그        : journalctl -u workblog -f
   └──────────────────────────────────────────────┘
