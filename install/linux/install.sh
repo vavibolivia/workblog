@@ -9,6 +9,7 @@
 # 인터넷 안 되는 서버 — 받은 묶음(linux.zip/tar.gz)을 풀고 그 폴더에서(workblog.jar 가 옆에 있으면 그것을 쓴다):
 #   sudo ./install.sh                          # 같은 서버의 PostgreSQL 에 DB 를 만들고 설치
 #   sudo ./install.sh --db-url jdbc:postgresql://db:5432/workblog --db-user wb --db-pass '***'
+#   sudo ./install.sh --db-user aam --db-pass '***'   # 같은 서버 DB 를 이 계정으로(없으면 만듦)
 #   sudo ./install.sh --upgrade                # 설정은 그대로 두고 프로그램만 교체
 #   sudo ./install.sh --uninstall              # 서비스·프로그램 제거 (설정·데이터는 남김)
 #
@@ -216,15 +217,20 @@ else
     say "같은 서버의 PostgreSQL 에 DB 생성"
     ensure_postgres_running
     ensure_pg_superuser_password
-    DB_USER=workblog; DB_PASS="$(rand 24)"
-    pgsu psql -v ON_ERROR_STOP=1 -q <<SQL
-DO \$\$ BEGIN
-  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '${DB_USER}') THEN CREATE ROLE ${DB_USER} LOGIN PASSWORD '${DB_PASS}';
-  ELSE ALTER ROLE ${DB_USER} PASSWORD '${DB_PASS}'; END IF;
-END \$\$;
+    # DB 계정: --db-user/--db-pass 를 주면 그 값(없으면 만들고, 있으면 비밀번호를 맞춤), 안 주면 workblog + 난수
+    DB_USER="${DB_USER:-workblog}"; DB_PASS="${DB_PASS:-$(rand 24)}"
+    # 이름·비밀번호는 psql 변수로 넘긴다(특수문자 안전)
+    pgsu psql -v ON_ERROR_STOP=1 -q -v u="$DB_USER" -v p="$DB_PASS" <<'SQL'
+SELECT NOT EXISTS (SELECT FROM pg_roles WHERE rolname = :'u') AS need_role \gset
+\if :need_role
+  CREATE ROLE :"u" LOGIN PASSWORD :'p';
+\else
+  ALTER ROLE :"u" LOGIN PASSWORD :'p';
+\endif
 SQL
     pgsu psql -tAc "SELECT 1 FROM pg_database WHERE datname='workblog'" | grep 1 >/dev/null \
       || pgsu createdb -O "$DB_USER" workblog
+    pgsu psql -q -v u="$DB_USER" -c 'ALTER DATABASE workblog OWNER TO :"u"' >/dev/null 2>&1       || echo 'ALTER DATABASE workblog OWNER TO :"u";' | pgsu psql -q -v ON_ERROR_STOP=1 -v u="$DB_USER" >/dev/null
     pgsu psql -q -d workblog -c "CREATE EXTENSION IF NOT EXISTS pg_trgm;"
     DB_URL="jdbc:postgresql://localhost:5432/workblog"
   else
