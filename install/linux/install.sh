@@ -60,6 +60,10 @@ if [ "$MODE" = uninstall ]; then
   exit 0
 fi
 
+# postgres 계정으로 실행. 지금 폴더(홈 등)에 postgres 가 못 들어가 'could not change directory … Permission denied'
+# 경고가 나지 않도록 / 에서 실행한다(파일은 절대 경로나 리다이렉트로만 넘긴다).
+pgsu() { (cd / && sudo -u postgres "$@"); }
+
 # 0) 옆에 jar 가 없으면 온라인 설치: 필요한 패키지를 apt 로 깔고 Releases 에서 묶음을 받는다
 if [ ! -f "$JAR" ]; then
   command -v apt-get >/dev/null || fail "workblog.jar 가 없고 apt 도 없습니다. Releases 의 linux.tar.gz 를 받아 푼 폴더에서 실행하세요(README)."
@@ -68,8 +72,8 @@ if [ ! -f "$JAR" ]; then
   apt-get update -qq
   apt-get install -y -qq curl ca-certificates tar openjdk-21-jre-headless postgresql >/dev/null
   systemctl enable --now postgresql >/dev/null 2>&1 || true
-  for _ in $(seq 1 30); do sudo -u postgres psql -qtAc 'select 1' >/dev/null 2>&1 && break; sleep 1; done
-  sudo -u postgres psql -qtAc 'select 1' >/dev/null 2>&1 || fail "PostgreSQL 이 시작되지 않았습니다 (systemctl status postgresql)."
+  for _ in $(seq 1 30); do pgsu psql -qtAc 'select 1' >/dev/null 2>&1 && break; sleep 1; done
+  pgsu psql -qtAc 'select 1' >/dev/null 2>&1 || fail "PostgreSQL 이 시작되지 않았습니다 (systemctl status postgresql)."
 
   if [ -z "$VER" ]; then
     say "최신 버전 확인"
@@ -112,15 +116,15 @@ else
     command -v psql >/dev/null || fail "psql 이 없습니다. PostgreSQL 을 설치하거나 --db-url/--db-user/--db-pass 로 외부 DB 를 지정하세요.
   Ubuntu/Debian: sudo apt install -y postgresql postgresql-contrib"
     DB_USER=workblog; DB_PASS="$(rand 24)"
-    sudo -u postgres psql -v ON_ERROR_STOP=1 -q <<SQL
+    pgsu psql -v ON_ERROR_STOP=1 -q <<SQL
 DO \$\$ BEGIN
   IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '${DB_USER}') THEN CREATE ROLE ${DB_USER} LOGIN PASSWORD '${DB_PASS}';
   ELSE ALTER ROLE ${DB_USER} PASSWORD '${DB_PASS}'; END IF;
 END \$\$;
 SQL
-    sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='workblog'" | grep 1 >/dev/null \
-      || sudo -u postgres createdb -O "$DB_USER" workblog
-    sudo -u postgres psql -q -d workblog -c "CREATE EXTENSION IF NOT EXISTS pg_trgm;"
+    pgsu psql -tAc "SELECT 1 FROM pg_database WHERE datname='workblog'" | grep 1 >/dev/null \
+      || pgsu createdb -O "$DB_USER" workblog
+    pgsu psql -q -d workblog -c "CREATE EXTENSION IF NOT EXISTS pg_trgm;"
     DB_URL="jdbc:postgresql://localhost:5432/workblog"
   else
     [ -n "$DB_USER" ] && [ -n "$DB_PASS" ] || fail "--db-url 을 쓰면 --db-user, --db-pass 도 필요합니다. (DB 에 pg_trgm 확장이 있어야 합니다)"

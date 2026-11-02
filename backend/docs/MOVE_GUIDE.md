@@ -110,6 +110,7 @@ tar -czf files.tar.gz -C <STORAGE_DIR> .
 ```bash
 sudo systemctl stop workblog
 # 빈 DB 로 새로 만든 뒤 복원 (pg_trgm 확장도 workblog 소유로 만들어짐)
+cd /tmp    # postgres 계정이 들어갈 수 있는 곳에서(홈 폴더면 'could not change directory' 경고)
 sudo -u postgres dropdb workblog
 sudo -u postgres createdb -O workblog workblog
 sudo -u postgres pg_restore --no-owner --no-acl --role=workblog -d workblog < workblog.dump   # 파일은 리다이렉트로 넘김(권한 문제 없음)
@@ -162,6 +163,7 @@ curl -s http://127.0.0.1:8080/api/health
 | 올리기 실패 · 디스크 부족 | 받는 서버 `data/imports`(설정 `IMPORT_TMP_DIR`)에 덤프 크기만큼 여유 필요 |
 | 글이 '카테고리 열람 제한 충돌로 가져오지 않음' | 받는 서버의 같은 카테고리에 원래 서버와 같은 열람 부서 제한을 건 뒤 같은 덤프를 다시 적용 |
 | 사진이 안 보임 (B) | 압축을 푼 위치 확인 — 직접 묶은 압축은 `data/files` 에, backup.sh 압축은 `data` 에(안에 `files/` 가 있음). 소유자가 `workblog` 인지 |
+| could not change directory to … Permission denied | 경고일 뿐 명령은 실행됨. `sudo -u postgres` 명령을 홈 폴더에서 실행해서 그럼 → `cd /tmp` 뒤 실행 |
 | pg_restore: could not open input file | 파일을 `sudo -u postgres` 가 못 읽음 → `< workblog.dump` 리다이렉트로 넘김 |
 | pg_restore: unsupported version in file header | 받는 서버 PostgreSQL 이 원래보다 낮음 → 같거나 높은 버전으로 |
 | 기동 실패 (B) | `journalctl -u workblog -n 80` — 대개 설정의 DB 접속 정보를 원래 서버 값으로 바꿨거나, WorkBlog 버전이 다름 |
