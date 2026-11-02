@@ -54,7 +54,7 @@ workblog:
     enabled: ${SIGNUP_ENABLED:true}
     approval: ${SIGNUP_APPROVAL:false}
   security:
-    # 새 비밀번호 최소 길이(영문+숫자 필수, 기존 계정 로그인에는 적용 안 함). 로그인 5회 연속 실패 시 10분 잠금은 고정값.
+    # 새 비밀번호 최소 길이(글자 종류 제한 없음, 기존 계정 로그인에는 적용 안 함). 로그인 5회 연속 실패 시 10분 잠금은 고정값.
     password-min-length: ${PASSWORD_MIN_LENGTH:8}
   drawio:
     # 다이어그램(draw.io) 편집기. 브라우저가 이 주소를 열 수 있어야 한다.

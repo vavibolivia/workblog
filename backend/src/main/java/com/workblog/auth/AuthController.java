@@ -27,7 +27,7 @@ public class AuthController {
     public record LoginResponse(String token, long expiresIn, UserResponse user) {}
     /** 가입 결과: 즉시 승인이면 token 이 채워지고, 승인 대기면 token 은 null. */
     public record SignupResponse(boolean approved, String message, String token, Long expiresIn, UserResponse user) {}
-    /** 로그인 전에도 볼 수 있는 공개 설정. drawioUrl: 다이어그램 편집기 주소. passwordMinLength: 새 비밀번호 최소 길이(영문+숫자 필수). */
+    /** 로그인 전에도 볼 수 있는 공개 설정. drawioUrl: 다이어그램 편집기 주소. passwordMinLength: 새 비밀번호 최소 길이(글자 종류 제한 없음). */
     public record AuthOptions(boolean signupEnabled, boolean signupRequiresApproval, String drawioUrl, int passwordMinLength) {}
 
     private final AuthenticationManager authManager;

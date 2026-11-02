@@ -9,12 +9,13 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class PasswordPolicyTest {
 
     @Test
-    void requires_min_length_letter_and_digit() {
+    void requires_min_length_only() {
         assertThat(PasswordPolicy.violation("pass1234", 8)).isNull();
         assertThat(PasswordPolicy.violation("pass123", 8)).contains("8자 이상");
-        assertThat(PasswordPolicy.violation("password", 8)).contains("영문과 숫자");
-        assertThat(PasswordPolicy.violation("12345678", 8)).contains("영문과 숫자");
-        assertThat(PasswordPolicy.violation("한글비밀번호1234", 8)).contains("영문과 숫자");
+        // 글자 종류 제한 없음: 8자 이상이면 무엇이든
+        assertThat(PasswordPolicy.violation("password", 8)).isNull();
+        assertThat(PasswordPolicy.violation("12345678", 8)).isNull();
+        assertThat(PasswordPolicy.violation("한글비밀번호입니다", 8)).isNull();
         assertThat(PasswordPolicy.violation(null, 8)).contains("8자 이상");
         assertThat(PasswordPolicy.violation("a1".repeat(51), 8)).contains("100자 이하");
     }

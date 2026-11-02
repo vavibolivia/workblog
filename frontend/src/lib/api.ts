@@ -172,7 +172,7 @@ export interface TagCount { name: string; count: number }
 export interface ApiErrorBody { status: number; error: string; message: string }
 
 /** 로그인 전에도 볼 수 있는 가입 설정 */
-export interface AuthOptions { signupEnabled: boolean; signupRequiresApproval: boolean; /** 새 비밀번호 최소 길이(영문+숫자 필수) */ passwordMinLength?: number; /** draw.io 편집기 주소 */ drawioUrl?: string }
+export interface AuthOptions { signupEnabled: boolean; signupRequiresApproval: boolean; /** 새 비밀번호 최소 길이(글자 종류 제한 없음) */ passwordMinLength?: number; /** draw.io 편집기 주소 */ drawioUrl?: string }
 
 export interface SignupRequest { username: string; password: string; displayName: string; email?: string; department?: string }
 

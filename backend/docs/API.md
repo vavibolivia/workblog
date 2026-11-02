@@ -233,7 +233,7 @@ curl -s -X PATCH $WB/api/posts/31 -H "Authorization: Bearer $TOKEN" -H 'Content-
 
 ### 비밀번호 정책 · 로그인 보호
 
-- 새 비밀번호(가입 · 내 비밀번호 변경 · 관리자 생성/재설정)는 **8자 이상 + 영문과 숫자 모두** → 어기면 400 과 이유. 최소 길이는 설정 `workblog.security.password-min-length`(기본 8, env `PASSWORD_MIN_LENGTH`)이고 `GET /api/auth/options` 의 `passwordMinLength` 로 알 수 있다. 이미 있는 계정의 로그인에는 적용하지 않는다.
+- 새 비밀번호(가입 · 내 비밀번호 변경 · 관리자 생성/재설정)는 **8자 이상**(글자 종류 제한 없음) → 짧으면 400 과 이유. 최소 길이는 설정 `workblog.security.password-min-length`(기본 8, env `PASSWORD_MIN_LENGTH`)이고 `GET /api/auth/options` 의 `passwordMinLength` 로 알 수 있다. 이미 있는 계정의 로그인에는 적용하지 않는다.
 - 같은 아이디로 로그인에 **5회 연속 실패하면 10분 잠금**. 잠긴 동안은 맞는 비밀번호도 **429** `"… 9분 30초 뒤에 다시 시도하세요."`. 성공하면 실패 횟수는 0. 메모리에만 두므로 서버를 다시 시작하면 풀린다.
 
 ## 12. 데이터 이전 (관리자 — 다른 망으로 옮기기)

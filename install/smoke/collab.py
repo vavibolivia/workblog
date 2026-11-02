@@ -10,8 +10,10 @@ _s, _r = call("GET", "/api/auth/me", tok=U); _uname_u = _r["username"]
 # ---- 비밀번호 정책 ----
 _s, _r = call("GET", "/api/auth/options"); check("PW options passwordMinLength 8", _s == 200 and _r.get("passwordMinLength") == 8, _r)
 _s, _r = call("POST", "/api/users", {"username": "colW" + _cs, "password": "ab12", "displayName": "약한"}, A); check("PW admin create too short 400", _s == 400 and "8자" in _r["message"], (_s, _r))
-_s, _r = call("POST", "/api/users", {"username": "colW" + _cs, "password": "abcdefgh", "displayName": "약한"}, A); check("PW admin create letters only 400", _s == 400 and "영문과 숫자" in _r["message"], (_s, _r))
-_s, _r = call("POST", "/api/auth/signup", {"username": "colS" + _cs, "password": "12345678", "displayName": "약한"}); check("PW signup digits only rejected", _s in (400, 403), (_s, _r))
+_s, _r = call("POST", "/api/users", {"username": "colW" + _cs, "password": "abcdefg", "displayName": "짧음"}, A); check("PW admin create 7 chars 400", _s == 400 and "8자 이상" in _r["message"], (_s, _r))
+_s, _r = call("POST", "/api/auth/signup", {"username": "colS" + _cs, "password": "1234567", "displayName": "짧음"}); check("PW signup 7 chars rejected", _s in (400, 403), (_s, _r))
+_s, _r = call("POST", "/api/users", {"username": "colL" + _cs, "password": "abcdefgh", "displayName": "글자만"}, A); check("PW letters-only 8 chars OK", _s in (200, 201), (_s, _r))
+if _s in (200, 201): call("DELETE", f"/api/users/{_r['id']}?purge=true", tok=A)
 _ids = {}
 for _n, _d in ((_c1n, "인프라팀"), (_c2n, "기획팀"), (_c3n, None)):
     _s, _r = call("POST", "/api/users", {"username": _n, "password": "pass1234", "displayName": "협업" + _n[-7:], "department": _d, "role": "USER"}, A)
@@ -21,7 +23,7 @@ _s, _r = call("POST", "/api/auth/login", {"username": _c2n, "password": "pass123
 _s, _r = call("PUT", "/api/users/me/password", {"currentPassword": "pass1234", "newPassword": "short"}, C2); check("PW change weak 400", _s == 400, (_s, _r))
 _s, _r = call("PUT", "/api/users/me/password", {"currentPassword": "pass1234", "newPassword": "pass5678"}, C2); check("PW change strong 204", _s == 204, (_s, _r))
 _s, _r = call("PUT", "/api/users/me/password", {"currentPassword": "pass5678", "newPassword": "pass1234"}, C2); check("PW change back 204", _s == 204, (_s, _r))
-_s, _r = call("PUT", f"/api/users/{_ids[_c2n]}", {"displayName": "협업B", "department": "기획팀", "newPassword": "onlyletters"}, A); check("PW admin reset weak 400", _s == 400, (_s, _r))
+_s, _r = call("PUT", f"/api/users/{_ids[_c2n]}", {"displayName": "협업B", "department": "기획팀", "newPassword": "short"}, A); check("PW admin reset short 400", _s == 400, (_s, _r))
 
 # ---- 로그인 잠금(5회 연속 실패 → 10분, 429) ----
 for _i in range(4):

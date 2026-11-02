@@ -7,7 +7,7 @@ import jakarta.validation.constraints.Size;
 
 import java.time.Instant;
 
-/** 비밀번호 길이·영문+숫자 규칙은 {@link PasswordPolicy} 가 서비스에서 검사한다(메시지를 한 곳에서). */
+/** 비밀번호 길이 규칙은 {@link PasswordPolicy} 가 서비스에서 검사한다(메시지를 한 곳에서). */
 public final class UserDtos {
     private UserDtos() {}
 
