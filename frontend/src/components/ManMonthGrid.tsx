@@ -740,7 +740,8 @@ export default function ManMonthGrid(props: Props) {
   const focusLoad = focusRow && focus ? personLoad.get(personKey(focusRow))?.get(focus.week) : undefined
   const selInfo = focusRow && focus
     ? <><strong>{focusRow.personName}</strong> · {weeks[focus.week]?.label} 주{count > 1 ? <> — <strong>{count}칸</strong></> : ''}</>
-    : <span className="muted">{coarse() ? '칸을 누르세요 (다시 누르면 입력)' : '칸을 누르세요'}</span>
+    : <span className="muted" title={editable ? '숫자 입력 후 Enter · 칸 오른쪽 클릭 = 메모 · 끌거나 Shift 로 범위 · Ctrl+클릭으로 여러 칸 · Delete 비움 · Ctrl+Z 되돌리기 · 바로 저장됨' : undefined}>
+        {coarse() ? '칸을 누르세요 (다시 누르면 입력)' : editable ? '칸을 누르고 숫자 입력 · 오른쪽 클릭 = 메모' : '칸을 누르세요'}</span>
   const showBar = !compact && mode === 'project'
   return (
     <>
@@ -786,7 +787,7 @@ export default function ManMonthGrid(props: Props) {
           {thisWeek >= 0 && <button type="button" className="btn btn--sm mm-tools__now" onClick={() => jumpToNow(true)}>이번 주로</button>}
         </div>
       )}
-      {showBar && (
+      {showBar && focusRow && focus && (
         <div className={`mm-notebar${focusNote ? ' has-note' : ''}`} role="note">
           {focusRow && focus ? <>
             {focusLoad && focusLoad.parts.length > 0 && (

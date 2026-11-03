@@ -103,9 +103,8 @@ export default function ManMonthPage() {
 
   return (
     <div className="shell shell--wide">
-      <div className="page-head row row--between row--wrap">
-        <div>
-          <p className="small muted"><Link to="/mm">업무산정</Link> ›</p>
+      <div className="page-head mm-head">
+        <div className="mm-head__main">
           {titleEdit !== null ? (
             <form className="row mm-title-edit" style={{ gap: 6 }} onSubmit={(e) => { e.preventDefault(); if (titleEdit.trim() && titleEdit.trim() !== sheet.title) run(() => mmApi.update(sheet.id, { title: titleEdit.trim() }), '제목을 바꿨습니다.').then((ok) => { if (ok) setTitleEdit(null) }); else setTitleEdit(null) }}>
               <input className="input" value={titleEdit} onChange={(e) => setTitleEdit(e.target.value)} maxLength={200} autoFocus aria-label="표 제목"
@@ -114,15 +113,16 @@ export default function ManMonthPage() {
               <button type="button" className="btn btn--sm" onClick={() => setTitleEdit(null)}>취소</button>
             </form>
           ) : (
-            <h2>{sheet.title}{sheet.canManage && <button type="button" className="btn btn--ghost btn--sm mm-title-btn" onClick={() => setTitleEdit(sheet.title)} title="제목 고치기 (표 주인·관리자)">✎ 제목 고치기</button>}</h2>
+            <h2><Link to="/mm" className="mm-head__crumb">업무산정 ›</Link> {sheet.title}{sheet.canManage && <button type="button" className="btn btn--ghost btn--sm mm-title-btn" onClick={() => setTitleEdit(sheet.title)} title="제목 고치기 (표 주인·관리자)" aria-label="제목 고치기">✎</button>}</h2>
           )}
-          {sheet.description && <p>{sheet.description}</p>}
-          {posts.length > 0 && (
-            <p className="small mm-backlinks">이 표를 담은 글: {posts.map((p, i) => <span key={p.id}>{i > 0 && ' · '}<Link to={`/posts/${p.id}`}>{p.title}</Link></span>)}</p>
-          )}
-          <p className="small muted">주인 {sheet.ownerName ?? '—'} · 편집자 {sheet.editors.length ? sheet.editors.map((e) => e.displayName).join(', ') : '없음'} (관리자는 항상 편집 가능)</p>
+          {/* 설명 · 담은 글 · 주인/편집자를 한 줄로(넘치면 … — 전체는 마우스를 올리면) */}
+          <p className="mm-head__info" title={[sheet.description, posts.length ? `이 표를 담은 글: ${posts.map((p) => p.title).join(', ')}` : '', `주인 ${sheet.ownerName ?? '—'} · 편집자 ${sheet.editors.map((e) => e.displayName).join(', ') || '없음'} (관리자는 항상 편집 가능)`].filter(Boolean).join('\n')}>
+            {sheet.description && <span>{sheet.description}</span>}
+            {posts.length > 0 && <span>담은 글 {posts.map((p, i) => <span key={p.id}>{i > 0 && ', '}<Link to={`/posts/${p.id}`}>{p.title}</Link></span>)}</span>}
+            <span>주인 {sheet.ownerName ?? '—'} · 편집자 {sheet.editors.length ? sheet.editors.map((e) => e.displayName).join(', ') : '없음'}</span>
+          </p>
         </div>
-        <div className="row row--wrap" style={{ gap: 6 }}>
+        <div className="mm-head__acts">
           <button type="button" className="btn" onClick={() => setDialog({ kind: 'publish' })} title="이 표를 담은 글을 만듭니다. 글에서도 바로 고칠 수 있고, 그 글을 대문에 올릴 수 있습니다.">글로 게시</button>
           {sheet.canEdit && <button type="button" className="btn btn--primary" onClick={() => setDialog({ kind: 'project' })}>프로젝트 추가</button>}
           {sheet.canEdit && <button type="button" className="btn" onClick={() => setDialog({ kind: 'row' })} disabled={noProjects} title={noProjects ? '먼저 프로젝트를 추가하세요' : undefined}>인원 추가</button>}
