@@ -28,7 +28,7 @@
 | 인터넷 없는 Linux (systemd) | [Releases](https://github.com/vavibolivia/workblog/releases) 의 `workblog-<버전>-linux.tar.gz`(또는 `.zip`) 을 옮겨 → `tar -xzf …` → `cd workblog-<버전>` → `sudo ./install.sh` |
 | Docker · Podman | `workblog-<버전>-docker.tar.gz` → `.env.example` 를 `.env` 로 복사·수정 → `docker compose up -d` |
 
-1. 인터넷 없는 서버는 Java 21 과 PostgreSQL 14 이상을 먼저 설치 (Ubuntu: `sudo apt install -y openjdk-21-jre-headless postgresql`, 사내 미러 사용). RHEL·Rocky 는 `postgresql-contrib`(pg_trgm)·initdb 와, 127.0.0.1 접속을 비밀번호(md5/scram)로 받도록 `pg_hba.conf` 설정이 따로 필요.
+1. 인터넷 없는 서버는 podman 과 PostgreSQL 14 이상을 먼저 설치 (Ubuntu: `sudo apt install -y podman postgresql`, 사내 미러 사용)하고, 컨테이너 이미지 tar 를 묶음 폴더의 `image/` 에 넣어 옮긴다(만들기: `podman save -o corretto21.tar docker.io/library/amazoncorretto:21-alpine`). 앱은 podman 컨테이너로 돌므로 Java 는 깔지 않는다. RHEL·Rocky 는 `postgresql-contrib`(pg_trgm)·initdb 와, 127.0.0.1 접속을 비밀번호(md5/scram)로 받도록 `pg_hba.conf` 설정이 따로 필요.
 2. Docker 판을 인터넷 없는 서버에 둘 때는 `eclipse-temurin:21-jre` · `postgres:16` 이미지를 미리 `docker save` → 옮겨서 `docker load`.
 3. 설치가 끝나면 화면에 **주소 · 초기 아이디 `admin` · 초기 비밀번호**가 나옴 → 적어 둠.
 4. 접속 확인: `curl -s http://<받는 서버>:8080/api/health` → 응답에 `"status":"UP"` 이 있으면 정상.
@@ -166,4 +166,4 @@ curl -s http://127.0.0.1:8080/api/health
 | could not change directory to … Permission denied | 경고일 뿐 명령은 실행됨. `sudo -u postgres` 명령을 홈 폴더에서 실행해서 그럼 → `cd /tmp` 뒤 실행 |
 | pg_restore: could not open input file | 파일을 `sudo -u postgres` 가 못 읽음 → `< workblog.dump` 리다이렉트로 넘김 |
 | pg_restore: unsupported version in file header | 받는 서버 PostgreSQL 이 원래보다 낮음 → 같거나 높은 버전으로 |
-| 기동 실패 (B) | `journalctl -u workblog -n 80` — 대개 설정의 DB 접속 정보를 원래 서버 값으로 바꿨거나, WorkBlog 버전이 다름 |
+| 기동 실패 (B) | `sudo podman logs --tail 80 workblog` — 대개 설정의 DB 접속 정보를 원래 서버 값으로 바꿨거나, WorkBlog 버전이 다름 |

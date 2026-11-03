@@ -1,7 +1,7 @@
 # build outputs
 backend/target/
 backend/src/main/resources/static/
-frontendinstall/dist/
+frontend/dist/
 frontend/node_modules/
 # local env / secrets
 *.env

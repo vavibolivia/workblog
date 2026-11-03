@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
-# WorkBlog 설치 (Linux, systemd) — 처음 설치·다시 설치·업그레이드 모두 이 하나로
+# WorkBlog 설치 (Linux, systemd + podman) — 처음 설치·다시 설치·업그레이드 모두 이 하나로
+# 앱은 podman 컨테이너(amazoncorretto:21-alpine)로 돌고, PostgreSQL 은 이 서버에 직접 둔다(20번 서버와 같은 구성).
 #
-# 인터넷 되는 Ubuntu/Debian — 명령 한 줄(Java 21·PostgreSQL 을 apt 로 깔고 GitHub Releases 에서 받아 설치):
+# 인터넷 되는 Ubuntu/Debian — 명령 한 줄(podman·PostgreSQL 을 apt 로 깔고 GitHub Releases 에서 받아 설치):
 #   curl -fsSL https://raw.githubusercontent.com/vavibolivia/workblog/main/install/linux/install.sh | sudo bash
 #   ... | sudo bash -s -- --port 8080 --public-url http://host:8080      (옵션 지정)
 #   ... | sudo WORKBLOG_VERSION=0.1.1 bash                              (특정 버전)
 #
-# 받은 묶음을 푼 폴더에서(workblog.jar 가 옆에 있으면 그것을 쓴다, 옆에 data/ 가 있으면 데이터도 넣는다):
+# 받은 묶음을 푼 폴더에서(workblog.jar 가 옆에 있으면 그것을 쓴다, 옆에 data/ 가 있으면 데이터도 넣고, image/*.tar 가 있으면 인터넷 없이 그 이미지를 쓴다):
 #   sudo ./install.sh                                   # 같은 서버의 PostgreSQL 에 DB 를 만들고 설치
 #   sudo ./install.sh --db-user aam --db-pass '***'     # 같은 서버 DB 를 이 계정으로(없으면 만듦)
 #   sudo ./install.sh --db-url jdbc:postgresql://db:5432/workblog --db-user wb --db-pass '***'   # 다른 서버 DB
@@ -19,12 +20,13 @@
 #       --pg-pass <비밀번호>  PostgreSQL 관리자(postgres) 비밀번호가 없을 때 만들 값 (기본 postgres — 사내 요청. 5432 를 외부에 열지 말 것)
 #
 # 상황별로 알아서 처리한다:
-#   - Java 21 이 없거나 낮은 버전만 있으면 설치(apt/dnf), 여러 버전이면 21 이상을 골라 쓴다
+#   - podman 이 없으면 설치(apt/dnf). 컨테이너 이미지는 옆의 image/*.tar 에서 읽고(오프라인), 없으면 docker.io 에서 받는다
+#   - Java 는 호스트에 깔지 않는다(컨테이너 안에 있음)
 #   - PostgreSQL 이 없으면 설치·초기화, 꺼져 있으면 켜고, 포트를 다른 프로그램이 쓰고 있으면 빈 포트로 옮겨 켠다
 #   - postgres 계정이 서버 안에서도 비밀번호를 요구하면 peer 접속을 허용(pg_hba.conf 백업 남김)
 #   - DB 계정·DB 가 없으면 만들고, 있으면 비밀번호·소유자를 맞춘다. 127.0.0.1 비밀번호 접속이 막혀 있으면 허용
 #   - 데이터: DB 가 비었거나 글이 0건이면(지난 설치가 중간에 멈춘 경우 등) 넣는다. 글이 있으면 그대로 둔다(--force-data 로 바꿈)
-#   - WorkBlog 이 이미 설치·실행 중이면 멈추고 설정은 유지(주어진 옵션만 반영)한 채 프로그램을 바꾸고 다시 켠다
+#   - WorkBlog 이 이미 설치·실행 중이면(옛 java 직접 실행 방식 포함) 멈추고 설정은 유지(주어진 옵션만 반영)한 채 컨테이너를 다시 만든다
 #   - 웹 포트를 다른 프로그램이 쓰고 있으면 새 설치는 다음 빈 포트로, 기존 설치는 무엇이 쓰는지 알려 주고 멈춘다
 # 끝나면 접속 주소와 관리자 계정(아이디 admin)을 출력한다.
 set -euo pipefail
@@ -40,6 +42,7 @@ fi
 
 DIR=/opt/workblog; PORT=8080; PORT_SET=0; DB_URL=""; DB_USER=""; DB_PASS=""; ADMIN_PASS=""; PUBLIC_URL=""; MODE=install
 PG_PASS=postgres; DATA_DIR=""; NO_DATA=0; FORCE_DATA=0
+IMAGE="${WORKBLOG_IMAGE:-docker.io/library/amazoncorretto:21-alpine}"; CONTAINER=workblog
 REPO="${WORKBLOG_REPO:-vavibolivia/workblog}"
 VER="${WORKBLOG_VERSION:-}"
 # curl | bash 로 실행하면 $0 이 bash 라 현재 폴더를 본다
@@ -67,6 +70,7 @@ while [ $# -gt 0 ]; do
   esac
 done
 [ -n "$DATA_DIR" ] || DATA_DIR="$HERE/data"
+IMAGE_DIR="$HERE/image"
 
 say()  { printf '\033[1;34m==\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m주의:\033[0m %s\n' "$*"; }
@@ -89,6 +93,7 @@ if [ "$MODE" = uninstall ]; then
   say "서비스 중지·제거"
   systemctl disable --now workblog 2>/dev/null || true
   rm -f "$UNIT"; systemctl daemon-reload
+  command -v podman >/dev/null && podman rm -f "$CONTAINER" >/dev/null 2>&1 || true
   rm -f "$DIR/workblog.jar"
   say "제거 완료. 설정($CONF)과 데이터($DIR/data), DB 는 남겼습니다. 필요 없으면 직접 지우세요."
   exit 0
@@ -304,35 +309,26 @@ setup_layout() {
   runuser -u workblog -- mkdir -p "$DIR/data/files"
 }
 
-# ---------- Java ----------
-JAVA_BIN=""
-find_java21() {
-  local j
-  for j in $(ls -d /usr/lib/jvm/*/bin/java 2>/dev/null) $(command -v java 2>/dev/null || true); do
-    [ -x "$j" ] && "$j" -version 2>&1 | grep -qE 'version "(2[1-9]|[3-9][0-9])' && { JAVA_BIN="$j"; return 0; }
-  done
-  return 1
-}
-
-# 필요한 것이 없으면 깐다: Java 21, (같은 서버 DB 를 쓸 때) PostgreSQL 서버·확장. apt(Ubuntu/Debian) 또는 dnf(Rocky/RHEL).
+# ---------- podman ----------
+# 필요한 것이 없으면 깐다: podman, (같은 서버 DB 를 쓸 때) PostgreSQL 서버·확장. apt(Ubuntu/Debian) 또는 dnf(Rocky/RHEL).
 ensure_packages() {
-  local need_java=0 need_pg=0
-  find_java21 || need_java=1
+  local need_podman=0 need_pg=0
+  command -v podman >/dev/null || need_podman=1
   if [ "$LOCAL_DB" = 1 ] && ! command -v postgres >/dev/null && ! ls /usr/lib/postgresql/*/bin/postgres >/dev/null 2>&1; then need_pg=1; fi
-  [ $need_java = 0 ] && [ $need_pg = 0 ] && return 0
+  [ $need_podman = 0 ] && [ $need_pg = 0 ] && return 0
   if command -v apt-get >/dev/null; then
-    say "필요한 패키지 설치 (apt):$( [ $need_java = 1 ] && printf ' Java 21')$( [ $need_pg = 1 ] && printf ' PostgreSQL')"
+    say "필요한 패키지 설치 (apt):$( [ $need_podman = 1 ] && printf ' podman')$( [ $need_pg = 1 ] && printf ' PostgreSQL')"
     export DEBIAN_FRONTEND=noninteractive
     apt-get update -qq || warn "apt-get update 실패 — 받아 둔 목록으로 계속합니다"
     local pk="curl ca-certificates"
-    [ $need_java = 1 ] && pk="$pk openjdk-21-jre-headless"
+    [ $need_podman = 1 ] && pk="$pk podman"
     [ $need_pg = 1 ] && pk="$pk postgresql postgresql-contrib"
     # shellcheck disable=SC2086
     apt-get install -y -qq $pk >/dev/null || fail "apt 설치 실패: $pk (인터넷·패키지 저장소를 확인하세요)"
   elif command -v dnf >/dev/null; then
-    say "필요한 패키지 설치 (dnf):$( [ $need_java = 1 ] && printf ' Java 21')$( [ $need_pg = 1 ] && printf ' PostgreSQL')"
+    say "필요한 패키지 설치 (dnf):$( [ $need_podman = 1 ] && printf ' podman')$( [ $need_pg = 1 ] && printf ' PostgreSQL')"
     local pk=""
-    [ $need_java = 1 ] && pk="$pk java-21-openjdk-headless"
+    [ $need_podman = 1 ] && pk="$pk podman"
     if [ $need_pg = 1 ]; then
       pk="$pk postgresql-server postgresql-contrib"
       # Rocky/RHEL 기본 스트림은 13 — 백업(14) 복원이 되도록 16(없으면 15)으로
@@ -342,9 +338,23 @@ ensure_packages() {
     # shellcheck disable=SC2086
     dnf install -y -q $pk >/dev/null || fail "dnf 설치 실패:$pk (인터넷·패키지 저장소를 확인하세요)"
   else
-    fail "apt 도 dnf 도 없어 자동 설치를 못 합니다. Java 21 과 PostgreSQL 을 먼저 설치하세요."
+    fail "apt 도 dnf 도 없어 자동 설치를 못 합니다. podman 과 PostgreSQL 을 먼저 설치하세요."
   fi
-  find_java21 || fail "Java 21 을 설치했지만 찾지 못했습니다 (ls /usr/lib/jvm)."
+  command -v podman >/dev/null || fail "podman 을 설치했지만 찾지 못했습니다."
+}
+
+# 컨테이너 이미지: 옆의 image/*.tar 가 있으면 읽어 들이고(오프라인), 없으면 받는다. 이미 있으면 그대로.
+ensure_image() {
+  if podman image exists "$IMAGE" 2>/dev/null; then say "이미지 있음: $IMAGE"; return 0; fi
+  local t
+  for t in "$IMAGE_DIR"/*.tar; do
+    [ -f "$t" ] || continue
+    say "이미지 읽기: $(basename "$t")"
+    podman load -q -i "$t" >/dev/null || fail "이미지를 읽지 못했습니다: $t"
+    podman image exists "$IMAGE" 2>/dev/null && return 0
+  done
+  say "이미지 내려받기: $IMAGE"
+  podman pull -q "$IMAGE" >/dev/null || fail "이미지를 받지 못했습니다: $IMAGE (인터넷이 없으면 묶음의 image/ 폴더를 함께 옮기세요)"
 }
 
 # ========== 0) 옆에 jar 가 없으면 Releases 에서 받는다 ==========
@@ -383,6 +393,7 @@ if systemctl is-active --quiet workblog 2>/dev/null; then
   say "실행 중인 WorkBlog 멈춤 (끝나면 다시 켬)"
   systemctl stop workblog
 fi
+command -v podman >/dev/null && podman container exists "$CONTAINER" 2>/dev/null && podman stop -t 15 "$CONTAINER" >/dev/null 2>&1 || true
 
 # 같은 서버 DB 인가(비었거나 localhost/127.0.0.1) — DB 이름은 주소에서
 LOCAL_DB=0; DB_NAME=workblog
@@ -391,9 +402,10 @@ if [ -z "$DB_URL" ]; then LOCAL_DB=1
 elif [[ "$DB_URL" =~ ^jdbc:postgresql://(localhost|127\.0\.0\.1)(:[0-9]+)?/([A-Za-z0-9_]+) ]]; then LOCAL_DB=1; DB_NAME="${BASH_REMATCH[3]}"
 fi
 
-# ========== 2) 없는 것 설치 (Java 21 · PostgreSQL) ==========
+# ========== 2) 없는 것 설치 (podman · 컨테이너 이미지 · PostgreSQL) ==========
 ensure_packages
-say "Java: $JAVA_BIN ($("$JAVA_BIN" -version 2>&1 | head -1))"
+ensure_image
+say "podman $(podman --version 2>/dev/null | sed 's/podman version //') · 이미지 $IMAGE"
 
 setup_layout
 
@@ -480,22 +492,41 @@ chown -R workblog:workblog "$DIR/data" "$DIR/logs" "$DIR/static-extra"
 chown root:workblog "$DIR/config"; chmod 750 "$DIR/config"
 find "$DIR/config" -maxdepth 1 -type f -exec chown root:workblog {} + -exec chmod 640 {} +
 
-# ========== 7) 서비스 ==========
+# ========== 7) 컨테이너 ==========
+# --network=host: 호스트의 PostgreSQL(localhost:5432)에 그대로 붙고, 웹 포트도 설정값 그대로.
+# 설치 폴더를 컨테이너 안 같은 경로에 붙여 설정 파일의 경로(STORAGE_DIR 등)를 그대로 쓴다. 프로그램·설정은 읽기 전용.
+# 컨테이너 안 사용자는 호스트의 workblog 계정과 같은 uid 로 돌려 data/·logs/ 에 쓸 수 있게 한다.
+say "컨테이너 만들기: $CONTAINER ($IMAGE)"
+podman rm -f "$CONTAINER" >/dev/null 2>&1 || true
+WB_UID=$(id -u workblog); WB_GID=$(id -g workblog)
+podman create --name "$CONTAINER" --network=host --user "$WB_UID:$WB_GID" -w "$DIR" \
+  --security-opt label=disable \
+  -e LANG=C.UTF-8 -e TZ=Asia/Seoul -e WORKBLOG_CONFIG="$CONF" \
+  -v "$DIR/workblog.jar:$DIR/workblog.jar:ro" -v "$DIR/config:$DIR/config:ro" \
+  -v "$DIR/data:$DIR/data" -v "$DIR/logs:$DIR/logs" -v "$DIR/static-extra:$DIR/static-extra" \
+  "$IMAGE" java -Xms256m -Xmx768m -jar "$DIR/workblog.jar" >/dev/null || fail "컨테이너를 만들지 못했습니다 (podman create)."
+CONMON_PID_FILE=$(podman inspect -f '{{.ConmonPidFile}}' "$CONTAINER" 2>/dev/null)
+[ -n "$CONMON_PID_FILE" ] || CONMON_PID_FILE=/run/workblog-conmon.pid
+
+# ========== 8) 서비스 ==========
 say "systemd 서비스 등록·시작"
 PG_UNIT="postgresql.service"; [ "$PG_KIND" = deb ] && PG_UNIT="postgresql@$PG_VER-$PG_CLUSTER.service"
 cat > "$UNIT" <<EOF
 [Unit]
-Description=WorkBlog
+Description=WorkBlog (podman container $CONTAINER)
 After=network-online.target $PG_UNIT
 Wants=network-online.target
 
 [Service]
-User=workblog
-WorkingDirectory=$DIR
-Environment=WORKBLOG_CONFIG=$CONF
-ExecStart=$JAVA_BIN -Xms256m -Xmx768m -jar $DIR/workblog.jar
+Type=forking
+Environment=PODMAN_SYSTEMD_UNIT=%n
+ExecStart=$(command -v podman) start $CONTAINER
+ExecStop=$(command -v podman) stop -t 15 $CONTAINER
+PIDFile=$CONMON_PID_FILE
 Restart=on-failure
 RestartSec=5
+TimeoutStartSec=200
+TimeoutStopSec=70
 
 [Install]
 WantedBy=multi-user.target
@@ -512,8 +543,8 @@ for _ in $(seq 1 120); do
   sleep 1
 done
 if [ "$OK" != 1 ]; then
-  journalctl -u workblog -n 40 --no-pager 2>/dev/null | tail -40 || true
-  fail "기동하지 않았습니다(위 로그). 전체: journalctl -u workblog -n 200"
+  podman logs --tail 40 "$CONTAINER" 2>&1 | tail -40 || true
+  fail "기동하지 않았습니다(위 로그). 전체: podman logs $CONTAINER"
 fi
 
 cat <<EOF
@@ -527,7 +558,8 @@ cat <<EOF
     DB          : ${DB_URL} (계정 ${DB_USER})${PG_SUPER_INFO:+
     DB 관리자   : ${PG_SUPER_INFO}}
     설정 파일   : ${CONF}
-    로그        : journalctl -u workblog -f
+    로그        : podman logs -f ${CONTAINER}
+    컨테이너    : ${CONTAINER} (${IMAGE}) · 재시작: systemctl restart workblog
   └──────────────────────────────────────────────┘
   처음 로그인한 뒤 '내 정보'에서 비밀번호를 바꾸세요.
 EOF

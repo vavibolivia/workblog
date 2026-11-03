@@ -12,11 +12,11 @@
 curl -fsSL https://raw.githubusercontent.com/vavibolivia/workblog/main/install/linux/install.sh | sudo bash
 ```
 
-1. Java 21 · PostgreSQL 을 apt 로 설치 (DB 가 없어도 됨)
+1. podman · PostgreSQL 을 apt 로 설치 (DB 가 없어도 됨). 앱은 podman 컨테이너(`amazoncorretto:21-alpine`)로 돌고 Java 는 호스트에 깔지 않습니다
 2. 최신 릴리스를 받아 SHA-256 확인
-3. DB·계정 생성 → systemd 서비스 등록 → 주소·초기 아이디 `admin`·비밀번호 표시
+3. DB·계정 생성 → 컨테이너 만들기 → systemd 서비스(`workblog`) 등록 → 주소·초기 아이디 `admin`·비밀번호 표시
 
-옵션은 뒤에 붙입니다: `… | sudo bash -s -- --port 8080 --public-url http://서버:8080`. 다시 실행하면 업그레이드(설정·데이터 유지).
+옵션은 뒤에 붙입니다: `… | sudo bash -s -- --port 8080 --public-url http://서버:8080`. 다시 실행하면 업그레이드(설정·데이터 유지, 예전 Java 직접 실행 설치도 컨테이너로 바뀜). 로그는 `sudo podman logs -f workblog`.
 
 **인터넷 없는 서버·다른 배포판** — [Releases](https://github.com/vavibolivia/workblog/releases) 에서 파일을 받아 옮긴 뒤 실행합니다.
 
@@ -26,9 +26,10 @@ curl -fsSL https://raw.githubusercontent.com/vavibolivia/workblog/main/install/l
 | Docker · Podman | `workblog-<버전>-docker.tar.gz` | `cp .env.example .env` (값 수정) → `docker compose up -d` |
 
 **준비물**
-1. Java 21 — Linux `sudo apt install -y openjdk-21-jre-headless`
-2. PostgreSQL 14 이상 — 같은 서버에 있으면 설치 프로그램이 DB·계정·`pg_trgm` 확장을 만들어 줍니다
-3. Docker 방식은 둘 다 필요 없습니다
+1. podman — 없으면 설치 프로그램이 apt/dnf 로 깝니다
+2. 컨테이너 이미지 `amazoncorretto:21-alpine` — 묶음 옆에 `image/*.tar` 가 있으면 그것을 읽고(인터넷 불필요), 없으면 docker.io 에서 받습니다. 인터넷 없는 서버용 tar 만들기: `podman pull docker.io/library/amazoncorretto:21-alpine && podman save -o image/corretto21.tar docker.io/library/amazoncorretto:21-alpine` (묶음 폴더 안 `image/` 에 넣기)
+3. PostgreSQL 14 이상 — 같은 서버에 있으면 설치 프로그램이 DB·계정·`pg_trgm` 확장을 만들어 줍니다
+4. Docker 방식은 위가 필요 없습니다
 
 **다른 DB 서버를 쓸 때**
 ```bash
