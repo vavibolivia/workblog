@@ -708,7 +708,7 @@ kbd { display: inline-block; min-width: 22px; padding: 1px 6px; border: 1px soli
   :root[data-theme="dark"] .cat-drop-root { border-color: var(--line-strong); color: var(--muted); }
   :root[data-theme="dark"] .cat-drop-root.is-over { border-color: var(--sky); color: var(--ink); background: var(--sky-50); }
   /* 본문: 밝은 셀 배경·형광펜 위 글자는 어둡게, 검정으로 지정된 글자는 밝게, 투명 다이어그램은 흰 바탕 */
-  :root[data-theme="dark"] .rich td[style*="background-color"], :root[data-theme="dark"] .rich th[style*="background-color"] { color: #1b2430; }
+  :root[data-theme="dark"] .rich td[style*="background-color"]:not(.mm-cell), :root[data-theme="dark"] .rich th[style*="background-color"] { color: #1b2430; }
   :root[data-theme="dark"] .rich [style*="color: #000000"]:not([style*="background"]),
   :root[data-theme="dark"] .rich [style*="color: rgb(0, 0, 0)"]:not([style*="background"]),
   :root[data-theme="dark"] .rich [style*="color:#000000"]:not([style*="background"]) { color: var(--ink) !important; }
@@ -1290,7 +1290,6 @@ tr:hover .mm-mini, .mm-mini:focus-visible { opacity: 1; }
 .mm-hovernote { position: fixed; z-index: 70; max-width: 290px; padding: 6px 9px; background: #fffbe0; color: #1b2430; border: 1px solid #d8c84a; border-radius: 6px; box-shadow: 0 6px 18px rgba(0, 0, 0, .16); font-size: 12.5px; line-height: 1.45; white-space: pre-wrap; pointer-events: none; }
 .mm-hovernote__tag { display: inline-block; margin-right: 6px; font-size: 11px; font-weight: 700; color: #8a7400; }
 /* 인원 줄: 역할 옆에 이 표 기간 MM */
-.mm-grid td.mm-rowmm { display: table-cell; }
 .mm-rowmm__role { display: inline-block; max-width: 48px; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; }
 .mm-grid td.mm-rowmm b { float: right; color: var(--ink); font-weight: 700; font-size: 12.5px; font-variant-numeric: tabular-nums; }
 /* 인원 칸 숫자: 더 크게·굵게 */
