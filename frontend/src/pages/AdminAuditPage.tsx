@@ -80,7 +80,9 @@ export default function AdminAuditPage() {
 
       {err && <div className="alert alert--error">{err}</div>}
 
-      <div className="card table-wrap">
+      <div className="card">
+        <div className="card__head"><h3>열람 기록</h3>{data && <span className="small muted">전체 {data.totalElements.toLocaleString()}건</span>}</div>
+        <div className="table-wrap">
         <table className="table">
           <thead><tr><th>시각</th><th>사용자</th><th>글</th><th>접근</th></tr></thead>
           <tbody>
@@ -104,8 +106,8 @@ export default function AdminAuditPage() {
             {data && data.content.length === 0 && <tr><td colSpan={4} className="empty">조건에 맞는 열람 기록이 없습니다.</td></tr>}
           </tbody>
         </table>
+        </div>
       </div>
-      {data && <p className="small muted" style={{ margin: '10px 2px' }}>전체 {data.totalElements.toLocaleString()}건</p>}
       {data && <Pagination page={data.page} totalPages={data.totalPages} onChange={goPage} />}
     </div>
   )

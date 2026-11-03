@@ -45,7 +45,7 @@ interface Rect { r0: number; r1: number; w0: number; w1: number }
 interface PersonAgg { key: string; name: string; department: string | null; projects: string[]; cells: Record<string, number>; parts: Record<string, string[]>; notes: Record<string, string[]> }
 const QUICK = [0.25, 0.5, 0.75, 1]
 const MAX_LANES = 3
-const COL = 46            // 주 칸 너비(px) — CSS .mm-cell 과 같게
+const COL = 92            // 주 칸 너비(px) — CSS --mm-col 과 같게(사용자: 날짜·이벤트 제목 겹침 → 2배)
 const BIG = 10            // 한 칸 값이 이보다 크면 "맞는지" 알림
 const r2 = (n: number) => Math.round(n * 100) / 100
 const kOf = (p: Pos) => `${p.rowId}:${p.week}`
@@ -145,7 +145,7 @@ export default function ManMonthGrid(props: Props) {
         const d0 = Math.max(0, r0), d1 = Math.min(total - 1, r1)
         const md = (s: string) => shortDate(s).replace(/\(.\)$/, '')
         // 여러 날이면 날 수도 적는다 — 앞의 옅은 막대가 그 기간(요일 위치까지)이라는 걸 글로도
-        const label = `${e.endDate ? `${md(e.startDate)}~${md(e.endDate)} (${r1 - r0 + 1}일)` : shortDate(e.startDate)} ${e.title}`
+        const label = `${e.endDate ? `${md(e.startDate)}~${md(e.endDate)} (${r1 - r0 + 1}일)` : shortDate(e.startDate)}${e.related ? ` ${e.related}` : ''} ${e.title}`
         const textPx = [...label].reduce((t, ch) => t + (ch.charCodeAt(0) > 255 ? 12 : 7), 30)
         // 칠한 막대는 실제 기간만(요일 위치까지), 글자는 오른쪽으로 이어진다 — 겹치지 않게 글자 끝까지 자리 잡음
         const px0 = d0 * COL / 7, barPx = Math.max(8, (d1 - d0 + 1) * COL / 7)

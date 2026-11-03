@@ -842,7 +842,7 @@ kbd { display: inline-block; min-width: 22px; padding: 1px 6px; border: 1px soli
 .dm-items { max-height: 420px; overflow: auto; border: 1px solid var(--line); border-radius: var(--radius-s); }
 
 /* ---------- 공수(Man-month) 표 ---------- */
-:root { --mm-on: #2F9BE3; --mm-over: #f6c1c7; --mm-now: rgba(224, 123, 0, .10); }
+:root { --mm-col: 92px; --mm-on: #2F9BE3; --mm-over: #f6c1c7; --mm-now: rgba(224, 123, 0, .10); }
 .mm-front { padding-bottom: 0; }
 .mm-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
 .mm-search { width: 220px; height: 32px; }
@@ -858,7 +858,7 @@ kbd { display: inline-block; min-width: 22px; padding: 1px 6px; border: 1px soli
 .mm-grid thead tr:first-child th { top: 0; height: 26px; }
 .mm-grid thead tr:nth-child(2) th { top: 26px; }
 .mm-month { text-align: left; color: var(--navy); }
-.mm-week { min-width: 46px; text-align: center; font-weight: 600; color: var(--ink-2); font-size: 11.5px; }
+.mm-week { min-width: var(--mm-col); text-align: center; font-weight: 600; color: var(--ink-2); font-size: 11.5px; }
 .mm-sticky { position: sticky; background: var(--paper); z-index: 1; }
 .mm-grid thead .mm-sticky { z-index: 3; background: var(--canvas); }
 .mm-c0 { left: 0; min-width: var(--mm-w0); max-width: var(--mm-w0); overflow: hidden; text-overflow: ellipsis; }
@@ -882,7 +882,7 @@ tr:hover .mm-mini, .mm-mini:focus-visible { opacity: 1; }
 .mm-namebtn { border: 0; background: transparent; padding: 0; font: inherit; color: inherit; cursor: pointer; }
 .mm-namebtn:hover { color: var(--navy); text-decoration: underline; }
 .mm-toggle:disabled { cursor: default; opacity: 1; }
-.mm-cell { text-align: center; cursor: cell; min-width: 46px; position: relative; }
+.mm-cell { text-align: center; cursor: cell; min-width: var(--mm-col); position: relative; }
 .mm-cell.mm-ro { cursor: default; }
 .mm-cell, .mm-psum, .mm-grid .mm-week, .mm-total td { background-image: var(--sel-ov, none), var(--ev-ln, none); }
 .mm-cell { --sel-tint: rgba(11, 42, 91, .2); }
@@ -1101,7 +1101,7 @@ tr:hover .mm-mini, .mm-mini:focus-visible { opacity: 1; }
 .ev-filter { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 4px 0 12px; }
 .ev-kindfilter { display: flex; flex-wrap: wrap; gap: 6px; }
 .ev-search { width: 220px; height: 34px; margin-left: auto; }
-@media (max-width: 760px) { .ev-search { width: 100%; margin-left: 0; } .ev-table th:nth-child(3), .ev-table td:nth-child(3) { display: none; } }
+@media (max-width: 760px) { .ev-search { width: 100%; margin-left: 0; } .ev-table th:nth-child(2), .ev-table td:nth-child(2) { display: none; } }
 .ev-card { padding: 8px 14px 14px; }
 .ev-view { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 8px 12px; margin: 0; }
 .ev-view dt { color: var(--muted); font-size: 13px; }
@@ -1114,7 +1114,7 @@ tr:hover .mm-mini, .mm-mini:focus-visible { opacity: 1; }
 /* 대비: 보조 글자색을 진하게(흰 바탕 4.5:1 이상) */
 /* 주 칸은 너비 고정 — 큰 값이 들어와도 열이 넓어져 머리·막대가 밀리지 않게(넘치면 … 와 툴팁) */
 .mm-grid td.mm-cell, .mm-grid td.mm-psum, .mm-grid th.mm-week, .mm-grid .mm-total td:not(.mm-sticky) {
-  width: 46px; min-width: 46px; max-width: 46px; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+  width: var(--mm-col); min-width: var(--mm-col); max-width: var(--mm-col); overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
 .mm-grid tbody th { font-weight: 400; text-align: left; }
 .mm-grid .mm-project th { font-weight: 700; }
 .mm-grid .mm-total th { font-weight: 700; text-align: left; }
@@ -1192,7 +1192,7 @@ tr:hover .mm-mini, .mm-mini:focus-visible { opacity: 1; }
 .ev-shared { margin: -4px 0 10px; }
 .ev-title { min-width: 9em; word-break: keep-all; }
 .ev-date { width: 1%; }
-@media (max-width: 760px) { .ev-table th:nth-child(3), .ev-table td:nth-child(3) { display: none; } }
+@media (max-width: 760px) { .ev-table th:nth-child(2), .ev-table td:nth-child(2) { display: none; } }
 /* 작은 단추들: 늘 보이게, 터치에서는 진하게 */
 .mm-mini { opacity: .75; }
 @media (hover: none) { .mm-mini { opacity: 1; } }
@@ -1428,3 +1428,7 @@ body { word-break: keep-all; overflow-wrap: anywhere; }
 .mm-editor-preview > summary { font-size: 14px; }
 @media (max-width: 640px) { .mm-editor-preview { margin: 12px 18px; } }
 @media (max-width: 760px) { .help__nav { position: static; } }
+/* 공수 칸 안 표시(메모 네모·이벤트 점·선택 테두리·채우기 손잡이)가 가로로 밀 때 왼쪽 고정 열 위로 겹쳐 지나가지 않게:
+   칸마다 쌓임 층을 만들어(z-index 0) 고정 열(z-index 1) 아래에 두고, 손잡이는 칸 안쪽 모서리에 */
+.mm-grid td.mm-cell, .mm-grid td.mm-psum { z-index: 0; }
+.mm-handle { right: 0; bottom: 0; }

@@ -1,0 +1,49 @@
+/* 디자인 검수 후속 — admin 영역 (에이전트 작성, 나중에 global.css 로 합칠 수 있음) */
+
+/* /admin/audit 필터: 칸 폭 고정(사용자 선택칸이 남는 폭을 다 먹지 않게) */
+.audit-filter { grid-template-columns: 140px 240px 160px 160px auto; justify-content: start; }
+@media (max-width: 860px) {
+  .audit-filter { grid-template-columns: 1fr 1fr; justify-content: stretch; }
+}
+
+/* /admin/categories: 이름 열은 내용 폭, 발행 글 90px 오른쪽 정렬, 작업 열이 남는 폭 */
+.cat-admin th:first-child, .cat-admin td:first-child { white-space: nowrap; }
+.cat-admin th:last-child, .cat-admin td:last-child { width: 100%; }
+.cat-admin .cat-admin__count { width: 90px; min-width: 90px; text-align: right; white-space: nowrap; }
+/* ↑↓ 단추는 마우스를 올린 줄(또는 키보드 포커스)에서만 */
+.cat-admin__move { opacity: 0; transition: opacity .12s; }
+.cat-admin tr:hover .cat-admin__move, .cat-admin tr:focus-within .cat-admin__move { opacity: 1; }
+@media (hover: none) { .cat-admin__move { opacity: 1; } }
+
+/* 사이드바: '카테고리' 제목과 [관리] 한 줄 정렬, [관리]는 작은 회색 글씨 */
+.side-section__head { align-items: baseline; margin-bottom: 8px; }
+.side-section__head h4 { margin-bottom: 0; }
+.side-section__link, .side-section__link:visited { color: var(--muted); font-weight: 400; }
+.side-section__link:hover { color: var(--ink-2); text-decoration: underline; text-underline-offset: 3px; }
+/* '전체 보기' 줄에는 ⋯ 단추(24px + 간격 2px)가 없으니 그만큼 비워 글 수 열을 맞춘다 */
+.cat-tree__row--all .cat-tree__link { margin-right: 26px; }
+
+/* /mm, /mm/events 머리: 단추는 오른쪽 위. 좁은 화면에선 설명을 한 줄 다 쓰고 단추는 아래 오른쪽 */
+.page-head.mm-listhead { align-items: flex-start; }
+@media (max-width: 640px) {
+  .page-head.mm-listhead > div:first-child { flex-basis: 100%; }
+  .page-head.mm-listhead > :last-child { margin-left: auto; }
+}
+.ev-card { max-width: 980px; }
+
+/* 이벤트 보기 창: 날짜 앞 이벤트 색 점 */
+.ev-view__dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; vertical-align: middle; position: relative; top: -1px; }
+
+/* 앨범형 카드: 메타 한 줄, 긴 카테고리 경로는 말줄임 */
+.album-card__meta { flex-wrap: nowrap; min-width: 0; }
+.album-card__meta .cat-path { display: block; flex: 0 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.album-card__meta > :not(.cat-path) { flex: none; white-space: nowrap; }
+
+/* 목록형 카드: 통계는 작성자 줄 오른쪽 끝, 썸네일 없으면 오른쪽 열 없음 */
+.post-card__foot { justify-content: flex-start; }
+.post-card__foot .post-card__stats { margin-left: auto; }
+.post-card--nothumb { grid-template-columns: minmax(0, 1fr); }
+.post-card__side .post-card__thumb { margin-bottom: 0; }
+
+/* /admin/data 기록: 더 보기 */
+.dm-history__more { display: flex; justify-content: center; padding: 10px; border-top: 1px solid var(--line); }

@@ -34,7 +34,7 @@ export default function ManMonthListPage() {
 
   return (
     <div className="shell shell--wide">
-      <div className="page-head row row--between row--wrap">
+      <div className="page-head row row--between row--wrap mm-listhead">
         <div>
           <h2>업무산정 <span className="muted" style={{ fontWeight: 500, fontSize: 16 }}>공수 표 · 이벤트</span></h2>
           <p>가로는 주(월요일 시작), 세로는 프로젝트별 인원. 칸에는 그 주 값(보통 투입률 0~1.0, 아무 숫자)과 할 일 메모를 적습니다. 보기는 모두, 수정은 표마다 지정한 편집자.

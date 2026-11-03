@@ -102,11 +102,11 @@ export default function AdminStatusPage() {
             <div className="card__head"><h3>메모리 · 디스크</h3></div>
             <div className="card__body stack">
               <div>
-                <div className="row row--between small"><span>JVM 메모리</span><span className="muted">{formatFileSize(status.memory.usedBytes)} / {formatFileSize(status.memory.maxBytes)} ({memPct}%)</span></div>
+                <div className="row row--between small"><span className="nowrap">JVM 메모리</span><span className="muted">{formatFileSize(status.memory.usedBytes)} / {formatFileSize(status.memory.maxBytes)} ({memPct}%)</span></div>
                 <Meter value={memPct} warn={hasCode('MEMORY_HIGH')} label="JVM 메모리 사용률" />
               </div>
               <div>
-                <div className="row row--between small"><span>첨부 저장소 디스크</span><span className="muted">여유 {formatFileSize(status.disk.freeBytes)} / 전체 {formatFileSize(status.disk.totalBytes)} ({diskFreePct.toFixed(1)}% 여유)</span></div>
+                <div className="row row--between small"><span className="nowrap">첨부 저장소 디스크</span><span className="muted">여유 {formatFileSize(status.disk.freeBytes)} / 전체 {formatFileSize(status.disk.totalBytes)} ({diskFreePct.toFixed(1)}% 여유)</span></div>
                 <Meter value={diskUsedPct} warn={hasCode('DISK_LOW')} label="디스크 사용률" />
                 <div className="small muted"><code>{status.disk.path}</code></div>
               </div>

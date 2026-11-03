@@ -68,7 +68,7 @@ export default function AdminUsersPage() {
 
       <div className="card">
         <div className="card__head">
-          <input className="input" style={{ maxWidth: 320, height: 36 }} value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="이름, 아이디, 부서로 찾기" aria-label="사용자 검색" />
+          <input className="input" style={{ maxWidth: 320 }} value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="이름, 아이디, 부서로 찾기" aria-label="사용자 검색" />
           <span className="small muted">전체 {users.length}명 · 활성 {users.filter((u) => u.active).length}명</span>
         </div>
         <div className="table-wrap">
@@ -78,7 +78,7 @@ export default function AdminUsersPage() {
               {shown.map((u) => (
                 <tr key={u.id} style={{ opacity: u.active ? 1 : .55 }}>
                   <td><span className="row"><Avatar name={u.displayName} size="xs" />{u.displayName}{u.id === me?.id && <span className="small muted">(나)</span>}</span></td>
-                  <td><code>{u.username}</code></td>
+                  <td className="small muted">{u.username}</td>
                   <td>{u.department ?? <span className="muted">–</span>}{u.position && <span className="small muted"> · {u.position}</span>}</td>
                   <td>{u.email ?? <span className="muted">–</span>}</td>
                   <td>{u.role === 'ADMIN' ? <span className="chip">관리자</span> : <span className="chip chip--neutral">구성원</span>}</td>

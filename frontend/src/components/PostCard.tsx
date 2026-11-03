@@ -60,7 +60,7 @@ export default function PostCard({ post, q, view = 'list' }: { post: PostSummary
   }
 
   return (
-    <article className={`post-card${post.pinned ? ' post-card--pinned' : ''}`}>
+    <article className={`post-card${post.pinned ? ' post-card--pinned' : ''}${post.thumbnailUrl ? '' : ' post-card--nothumb'}`}>
       <div className="grow">
         <div className="post-card__meta">
           {badges}
@@ -83,16 +83,19 @@ export default function PostCard({ post, q, view = 'list' }: { post: PostSummary
               {post.tags.length > 4 && <span className="chip chip--neutral">+{post.tags.length - 4}</span>}
             </div>
           )}
+          {/* 통계는 썸네일 유무와 상관없이 늘 작성자 줄 오른쪽 끝 */}
+          <span className="post-card__stats">
+            <span className={post.likedByMe ? 'is-liked' : undefined}>공감 {post.likeCount}</span>
+            <span>댓글 {post.commentCount}</span>
+            <span>조회 {post.viewCount}</span>
+          </span>
         </div>
       </div>
-      <div className="post-card__side">
-        {post.thumbnailUrl && <Link to={`/posts/${post.id}`} className="post-card__thumb" tabIndex={-1} aria-hidden="true"><img src={post.thumbnailUrl} alt="" loading="lazy" /></Link>}
-        <span className="post-card__stats">
-          <span className={post.likedByMe ? 'is-liked' : undefined}>공감 {post.likeCount}</span>
-          <span>댓글 {post.commentCount}</span>
-              <span>조회 {post.viewCount}</span>
-        </span>
-      </div>
+      {post.thumbnailUrl && (
+        <div className="post-card__side">
+          <Link to={`/posts/${post.id}`} className="post-card__thumb" tabIndex={-1} aria-hidden="true"><img src={post.thumbnailUrl} alt="" loading="lazy" /></Link>
+        </div>
+      )}
     </article>
   )
 }

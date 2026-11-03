@@ -20,6 +20,17 @@ export const IcRule = ({ size = 16, ...p }: P) => <svg {...base(size)} {...p}><p
 export const IcUndo = ({ size = 16, ...p }: P) => <svg {...base(size)} {...p}><path d="M9 14 4 9l5-5" /><path d="M4 9h10a6 6 0 0 1 0 12h-3" /></svg>
 export const IcRedo = ({ size = 16, ...p }: P) => <svg {...base(size)} {...p}><path d="m15 14 5-5-5-5" /><path d="M20 9H10a6 6 0 0 0 0 12h3" /></svg>
 export const IcEraser = ({ size = 16, ...p }: P) => <svg {...base(size)} {...p}><path d="m7 21 11.5-11.5a2 2 0 0 0 0-2.8l-3.2-3.2a2 2 0 0 0-2.8 0L3 13l6 6" /><path d="M5.5 14.5 12 21M11 21h9" /></svg>
+/* 에디터 문단 서식(정렬·들여쓰기·목록·인용·코드) — 2026-11-03 글꼴 기호(≡ ☰ ▤ ⇤ ⇥ •≡ 1.≡ ❝) 대체 */
+export const IcAlignLeft = ({ size = 16, ...p }: P) => <svg {...base(size)} {...p}><path d="M4 6h16M4 10h10M4 14h16M4 18h10" /></svg>
+export const IcAlignCenter = ({ size = 16, ...p }: P) => <svg {...base(size)} {...p}><path d="M4 6h16M7 10h10M4 14h16M7 18h10" /></svg>
+export const IcAlignRight = ({ size = 16, ...p }: P) => <svg {...base(size)} {...p}><path d="M4 6h16M10 10h10M4 14h16M10 18h10" /></svg>
+export const IcAlignJustify = ({ size = 16, ...p }: P) => <svg {...base(size)} {...p}><path d="M4 6h16M4 10h16M4 14h16M4 18h16" /></svg>
+export const IcOutdent = ({ size = 16, ...p }: P) => <svg {...base(size)} {...p}><path d="M4 5h16M11 10h9M11 14h9M4 19h16" /><path d="M7.5 9 4.5 12l3 3" /></svg>
+export const IcIndent = ({ size = 16, ...p }: P) => <svg {...base(size)} {...p}><path d="M4 5h16M11 10h9M11 14h9M4 19h16" /><path d="m4.5 9 3 3-3 3" /></svg>
+export const IcListBullet = ({ size = 16, ...p }: P) => <svg {...base(size)} {...p}><path d="M10 6h10M10 12h10M10 18h10" /><circle cx="5" cy="6" r="1.2" fill="currentColor" /><circle cx="5" cy="12" r="1.2" fill="currentColor" /><circle cx="5" cy="18" r="1.2" fill="currentColor" /></svg>
+export const IcListOrdered = ({ size = 16, ...p }: P) => <svg {...base(size)} {...p}><path d="M11 6h9M11 12h9M11 18h9" /><path d="M4 4.5h1.5V9M4 9h3M4 14.2a1.6 1.6 0 0 1 3 .4c0 1.2-3 2.2-3 4.4h3" strokeWidth={1.5} /></svg>
+export const IcQuote = ({ size = 16, ...p }: P) => <svg {...base(size)} {...p}><path d="M10 7H5v5h5v1a4 4 0 0 1-4 4M20 7h-5v5h5v1a4 4 0 0 1-4 4" /></svg>
+export const IcCode = ({ size = 16, ...p }: P) => <svg {...base(size)} {...p}><path d="m8 8-4 4 4 4M16 8l4 4-4 4M13.5 5.5l-3 13" /></svg>
 export const IcBell = ({ size = 16, ...p }: P) => <svg {...base(size)} {...p}><path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 1.5h-15z" /><path d="M10 20.5a2.2 2.2 0 0 0 4 0" /></svg>
 export const IcEye = ({ size = 16, ...p }: P) => <svg {...base(size)} {...p}><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" /><circle cx="12" cy="12" r="2.8" /></svg>
 

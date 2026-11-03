@@ -29,7 +29,7 @@ export default function MmEventsPage() {
 
   return (
     <div className="shell shell--wide">
-      <div className="page-head row row--between row--wrap">
+      <div className="page-head row row--between row--wrap mm-listhead">
         <div>
           <p className="small muted"><Link to="/mm">업무산정</Link> ›</p>
           <h2>이벤트</h2>

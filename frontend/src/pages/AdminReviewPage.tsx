@@ -31,7 +31,7 @@ export default function AdminReviewPage() {
       </div>
       {err && <div className="alert alert--error">{err}</div>}
       <div className="card">
-        <div className="card__head"><span className="small muted">{data ? `재검토 대상 ${data.totalElements.toLocaleString()}건 · 오래된 순` : '불러오는 중…'}</span></div>
+        <div className="card__head"><h3>재검토 대상</h3><span className="small muted">{data ? `${data.totalElements.toLocaleString()}건 · 오래된 순` : '불러오는 중…'}</span></div>
         <div className="table-wrap">
           <table className="table">
             <thead><tr><th>제목</th><th>카테고리</th><th>작성자</th><th>마지막 수정</th><th>내용 확인</th><th style={{ textAlign: 'right' }}>경과</th><th style={{ textAlign: 'right' }}>조회</th><th></th></tr></thead>

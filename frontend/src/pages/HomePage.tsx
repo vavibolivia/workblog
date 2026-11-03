@@ -149,7 +149,8 @@ export default function HomePage() {
           <div className="card__head"><h3>최근 활동</h3><Link to="/history" className="small" style={{ color: 'var(--sky)', fontWeight: 600 }}>전체 이력</Link></div>
           <div className="card__body" style={{ padding: '6px 18px 10px' }}>
             {activity.length === 0 && <p className="small muted" style={{ padding: '8px 0' }}>아직 활동이 없습니다.</p>}
-            {activity.map((a) => (
+            {/* 같은 글이 연달아 나오면(예: 저장 두 번) 가장 최근 것 하나만 */}
+            {activity.filter((a, i) => i === 0 || activity[i - 1].postId !== a.postId).map((a) => (
               <div key={a.revisionId} style={{ padding: '8px 0', borderBottom: '1px solid var(--line)' }}>
                 <div className="small muted">{a.editedBy.displayName} · {changeTypeLabel[a.changeType]} · {relativeTime(a.createdAt)}</div>
                 <Link to={`/posts/${a.postId}`} className="small ellipsis" style={{ display: 'block', fontWeight: 600 }}>{a.postTitle}</Link>

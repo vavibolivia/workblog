@@ -23,11 +23,15 @@ function bytes(n: number): string {
 const transferLabel = (t: TransferRow) =>
   t.direction === 'EXPORT' ? '내보내기' : t.action === 'APPLY' ? '가져오기 적용' : '가져오기 미리 보기'
 
+/** 기록 표에 처음 보이는 줄 수 */
+const HISTORY_FIRST = 10
+
 /** 관리자: 다른 망으로 옮기기 — 덤프 내보내기(전체·업데이트)와 가져오기(미리 보기 → 적용). */
 export default function AdminDataPage() {
   const [info, setInfo] = useState<DataMoveInfo | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [full, setFull] = useState(false)
+  const [allHistory, setAllHistory] = useState(false)
   const [since, setSince] = useState('')
   const [markBaseline, setMarkBaseline] = useState(true)
   const [exporting, setExporting] = useState(false)
@@ -190,12 +194,12 @@ export default function AdminDataPage() {
         </div>
 
         <div className="card card--full">
-          <div className="card__head"><h3>기록</h3></div>
+          <div className="card__head"><h3>기록</h3>{info && <span className="small muted">전체 {info.history.length.toLocaleString()}건</span>}</div>
           <div className="table-wrap">
             <table className="table">
               <thead><tr><th>시각</th><th>작업</th><th>덤프</th><th>한 사람</th><th>상태</th><th>요약</th></tr></thead>
               <tbody>
-                {info?.history.map((t) => (
+                {info?.history.slice(0, allHistory ? undefined : HISTORY_FIRST).map((t) => (
                   <tr key={t.id}>
                     <td className="small nowrap">{formatDate(t.startedAt, true)}</td>
                     <td className="nowrap">{transferLabel(t)}{t.direction === 'EXPORT' && t.baseline && <span className="small muted"> · 기준</span>}</td>
@@ -209,6 +213,13 @@ export default function AdminDataPage() {
               </tbody>
             </table>
           </div>
+          {info && info.history.length > HISTORY_FIRST && (
+            <div className="dm-history__more">
+              <button type="button" className="btn btn--sm" onClick={() => setAllHistory((v) => !v)}>
+                {allHistory ? '접기' : `더 보기 (${(info.history.length - HISTORY_FIRST).toLocaleString()}건)`}
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

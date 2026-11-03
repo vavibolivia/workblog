@@ -59,9 +59,9 @@ export default function Sidebar() {
         </div>
 
         <div className="side-section">
-          <div className="row row--between"><h4>카테고리</h4>{user?.role === 'ADMIN' && <Link to="/admin/categories" className="small" style={{ color: 'var(--sky)', fontWeight: 600 }}>관리</Link>}</div>
+          <div className="row row--between side-section__head"><h4>카테고리</h4>{user?.role === 'ADMIN' && <Link to="/admin/categories" className="small muted side-section__link">관리</Link>}</div>
           <ul className="cat-tree">
-            <li><div className={`cat-tree__row cat-tree__row--d1${isAll ? ' active' : ''}`}><span className="cat-tree__toggle" aria-hidden>·</span><Link to="/" className="cat-tree__link"><span>전체 보기</span><span className="cat-tree__count">{total}</span></Link></div></li>
+            <li><div className={`cat-tree__row cat-tree__row--d1 cat-tree__row--all${isAll ? ' active' : ''}`}><span className="cat-tree__toggle" aria-hidden>·</span><Link to="/" className="cat-tree__link"><span>전체 보기</span><span className="cat-tree__count">{total}</span></Link></div></li>
           </ul>
           <CategoryTree nodes={tree} activeId={activeId} activePathIds={pathIds} onChanged={reloadTree} />
           {tree.length === 0 && <p className="small muted" style={{ padding: '6px 0' }}>카테고리가 없습니다.</p>}
@@ -79,10 +79,6 @@ export default function Sidebar() {
             </div>
           </div>
         )}
-
-        <div className="side-write">
-          <Link to="/write" className="btn btn--sky btn--block">새 글 쓰기</Link>
-        </div>
       </div>
     </aside>
   )

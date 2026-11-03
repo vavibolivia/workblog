@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api, errorMessage, type StatsNameCount, type StatsPostRow, type StatsResponse } from '../lib/api'
 
@@ -85,7 +85,19 @@ function Tile({ label, value }: { label: string; value: number }) {
 /** 일별 새 글 SVG 막대 차트(라이브러리 없음). 날짜 수에 따라 가로 눈금 간격을 조절한다. */
 function BarChart({ data }: { data: StatsResponse }) {
   const [hover, setHover] = useState<number | null>(null)
-  const W = 920, H = 220, padL = 36, padR = 8, padT = 10, padB = 28
+  // viewBox 폭 = 실제 화면 폭. 고정 폭을 늘려 그리면 눈금 글자도 같이 커지므로 폭을 재서 쓴다.
+  const boxRef = useRef<HTMLDivElement>(null)
+  const [W, setW] = useState(920)
+  useEffect(() => {
+    const el = boxRef.current
+    if (!el) return
+    const update = () => { const w = Math.round(el.clientWidth); if (w > 0) setW(w) }
+    update()
+    const ro = new ResizeObserver(update)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  const H = 220, padL = 36, padR = 8, padT = 10, padB = 28
   const d = data.daily
   // 눈금은 정수 간격(1·2·5·10…처럼 고르게), 막대 높이 기준은 맨 위 눈금
   const dataMax = Math.max(1, ...d.map((x) => x.count))
@@ -99,7 +111,7 @@ function BarChart({ data }: { data: StatsResponse }) {
   const fmt = (iso: string, short = true) => { const [, m, day] = iso.split('-'); return short ? `${Number(m)}/${Number(day)}` : `${Number(m)}월 ${Number(day)}일` }
 
   return (
-    <div className="bar-chart">
+    <div className="bar-chart" ref={boxRef}>
       <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="일별 새 글 수 막대 차트" onMouseLeave={() => setHover(null)}>
         {ticks.map((v) => {
           const y = padT + innerH - (v / max) * innerH

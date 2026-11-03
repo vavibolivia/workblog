@@ -19,7 +19,7 @@ export default function WorkPlanMenu({ insert, Button }: { insert: (html: string
     <>
       <Button onClick={() => setMenu((v) => !v)} />
       {menu && (
-        <div className="rte__menu wp-menu" style={{ left: 'auto' }} onMouseDown={(e) => e.preventDefault()}>
+        <div className="rte__menu wp-menu" onMouseDown={(e) => e.preventDefault()}>
           <button type="button" onClick={() => { setDlg('new'); setMenu(false) }}><strong>새 업무산정 표</strong><span className="small muted">주별 인원 투입 · 할 일 메모 · 이벤트</span></button>
           <button type="button" onClick={() => { setDlg('pick'); setMenu(false) }}><strong>만들어 둔 표 넣기</strong><span className="small muted">공수 표 목록에서 고르기</span></button>
           <button type="button" onClick={() => { insert('<p><a href="/mm/events">이벤트 표</a></p><p></p>'); setMenu(false) }}><strong>이벤트 표 넣기</strong><span className="small muted">릴리스·회의 등 날짜별 일정(공용)</span></button>

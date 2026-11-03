@@ -1,0 +1,41 @@
+/* 디자인 검수 후속 — content 영역 (에이전트 작성, 나중에 global.css 로 합칠 수 있음) */
+
+/* 이력 비교: 짝지은 지운 줄/추가 줄 안에서 바뀐 낱말만 진하게 */
+.diff .diff__word { font-weight: 700; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+/* 분할 단추(.segmented): 비활성 단추 흐리게 */
+.segmented button:disabled { opacity: .5; cursor: not-allowed; }
+.segmented button:disabled:hover { background: transparent; }
+
+/* /history: 전체 이력 링크는 머리 줄 끝 작은 회색, 변경 메모 한 줄 */
+.tl-item { padding-top: 4px; padding-bottom: 4px; }
+.tl-item::before { top: 15px; }
+.tl-item__who { font-weight: 600; color: var(--ink); }
+.tl-item__all { margin-left: auto; font-size: 12px; color: var(--muted); }
+.tl-item__all:hover { color: var(--ink-2); text-decoration: underline; text-underline-offset: 2px; }
+.tl-item__title { margin-top: 0; line-height: 1.45; }
+.tl-item__note { display: block; max-width: 100%; line-height: 1.45; }
+
+/* /stats 일별 차트: 막대는 남색 하나(마우스 올림은 살짝 흐리게) */
+.bar-chart__bar, .bar-chart__bar.is-hover { fill: var(--sky); }
+.bar-chart__bar.is-hover { opacity: .75; }
+
+/* 글 상세: 단추 줄은 글마다 같은 자리(작성자 줄 아래) */
+.post__byline { flex-direction: column; align-items: flex-start; }
+
+/* 글 상세 첨부: 본문 사진은 한 줄로 접음 */
+.attach-photos > summary { cursor: pointer; padding: 4px 2px; color: var(--ink-2); font-weight: 600; }
+.attach-photos > summary:hover { color: var(--ink); }
+.attach-photos[open] > summary { margin-bottom: 4px; }
+
+/* 알림 패널 '모두 읽음': 활성 남색, 비활성 흐리게 */
+.notif__link { color: var(--navy); font-weight: 600; }
+.notif__link:disabled { color: var(--navy); opacity: .5; }
+
+/* /me 토큰 발급 줄: 단추를 입력 높이(40px)에 맞춤 */
+.token-form > .btn { height: 40px; }
+
+@media screen {
+  :root[data-theme="dark"] .bar-chart__bar,
+  :root[data-theme="dark"] .bar-chart__bar.is-hover { fill: var(--btn-fill); }
+}

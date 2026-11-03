@@ -76,11 +76,11 @@ export default function AdminCategoriesPage() {
           {n.depth === CATEGORY_MAX_DEPTH && <span className="chip chip--draft" style={{ height: 20, fontSize: 11 }}>마지막 단계</span>}
         </div>
       </td>
-      <td className="small muted">{n.postCount}</td>
+      <td className="small muted cat-admin__count">{n.postCount}</td>
       <td>
         <div className="row" style={{ gap: 4, justifyContent: 'flex-end' }}>
-          <button type="button" className="btn btn--sm btn--ghost" disabled={i === 0} onClick={() => move(n, -1)} aria-label="위로">↑</button>
-          <button type="button" className="btn btn--sm btn--ghost" disabled={i === nodes.length - 1} onClick={() => move(n, 1)} aria-label="아래로">↓</button>
+          <button type="button" className="btn btn--sm btn--ghost cat-admin__move" disabled={i === 0} onClick={() => move(n, -1)} aria-label="위로">↑</button>
+          <button type="button" className="btn btn--sm btn--ghost cat-admin__move" disabled={i === nodes.length - 1} onClick={() => move(n, 1)} aria-label="아래로">↓</button>
           <button type="button" className="btn btn--sm" disabled={n.depth >= CATEGORY_MAX_DEPTH} title={n.depth >= CATEGORY_MAX_DEPTH ? `최대 ${CATEGORY_MAX_DEPTH}단계` : undefined} onClick={() => openNew(n)}>하위 추가</button>
           <button type="button" className="btn btn--sm" onClick={() => openEdit(n)}>편집</button>
           <button type="button" className="btn btn--sm btn--danger" onClick={() => setConfirmDelete(n)}>삭제</button>
@@ -103,19 +103,22 @@ export default function AdminCategoriesPage() {
       <div className="page-head row row--between row--wrap">
         <div>
           <h2>카테고리 관리</h2>
-          <p>최대 {CATEGORY_MAX_DEPTH}단계까지 만들고 연결할 수 있습니다. 상위 카테고리를 고르면 하위 글까지 함께 보입니다. 전체 {total}개</p>
+          <p>최대 {CATEGORY_MAX_DEPTH}단계까지 만들고 연결할 수 있습니다. 상위 카테고리를 고르면 하위 글까지 함께 보입니다.</p>
         </div>
         <button type="button" className="btn btn--primary" onClick={() => openNew(null)}>최상위 카테고리 추가</button>
       </div>
 
-      <div className="card table-wrap">
-        <table className="table">
-          <thead><tr><th>이름</th><th>발행 글</th><th style={{ textAlign: 'right' }}>작업</th></tr></thead>
+      <div className="card">
+        <div className="card__head"><h3>카테고리</h3><span className="small muted">전체 {total}개</span></div>
+        <div className="table-wrap">
+        <table className="table cat-admin">
+          <thead><tr><th>이름</th><th className="cat-admin__count">발행 글</th><th style={{ textAlign: 'right' }}>작업</th></tr></thead>
           <tbody>
             {renderRows(tree)}
             {tree.length === 0 && <tr><td colSpan={3} className="empty">카테고리가 없습니다. 최상위 카테고리를 먼저 만드세요.</td></tr>}
           </tbody>
         </table>
+        </div>
       </div>
 
       {dialog && (

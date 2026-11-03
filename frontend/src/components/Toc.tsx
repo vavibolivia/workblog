@@ -9,7 +9,7 @@ import { useEffect, useState, type RefObject } from 'react'
  */
 interface Heading { id: string; text: string; level: number }
 
-export default function Toc({ bodyRef, deps }: { bodyRef: RefObject<HTMLElement | null>; deps: unknown }) {
+export default function Toc({ bodyRef, deps, title }: { bodyRef: RefObject<HTMLElement | null>; deps: unknown; title?: string }) {
   const [items, setItems] = useState<Heading[]>([])
   const [active, setActive] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
@@ -21,9 +21,13 @@ export default function Toc({ bodyRef, deps }: { bodyRef: RefObject<HTMLElement 
     const read = () => {
       const hs = Array.from(root.querySelectorAll<HTMLElement>('h1, h2, h3'))
       const list: Heading[] = []
+      const norm = (x: string) => x.replace(/\s+/g, ' ').trim()
+      const skip = title ? norm(title) : null
       hs.forEach((h, i) => {
         const text = (h.textContent ?? '').trim()
         if (!text) return
+        // 본문 첫머리에 글 제목을 그대로 다시 쓴 경우 목차에서 뺀다
+        if (skip && norm(text) === skip) return
         if (!h.id) h.id = `h-${i + 1}`
         list.push({ id: h.id, text, level: Number(h.tagName.slice(1)) })
       })
@@ -33,7 +37,7 @@ export default function Toc({ bodyRef, deps }: { bodyRef: RefObject<HTMLElement 
     // 렌더 직후 한 번 더(dangerouslySetInnerHTML 과 마크다운 렌더 타이밍 차이 대비)
     const t = window.setTimeout(read, 50)
     return () => window.clearTimeout(t)
-  }, [bodyRef, deps])
+  }, [bodyRef, deps, title])
 
   useEffect(() => {
     if (items.length === 0) return
@@ -77,6 +81,8 @@ export default function Toc({ bodyRef, deps }: { bodyRef: RefObject<HTMLElement 
   }
 
   const minLevel = Math.min(...items.map((i) => i.level))
+  // 아직 스크롤 관찰 결과가 없으면 첫 항목을 강조
+  const cur = active && items.some((i) => i.id === active) ? active : items[0].id
 
   return (
     <nav className={`toc${open ? ' toc--open' : ''}`} aria-label="목차">
@@ -87,8 +93,8 @@ export default function Toc({ bodyRef, deps }: { bodyRef: RefObject<HTMLElement 
       <div className="toc__head" aria-hidden>목차</div>
       <ol className="toc__list">
         {items.map((it) => (
-          <li key={it.id} className={`toc__item toc__item--l${it.level - minLevel + 1}${active === it.id ? ' is-active' : ''}`}>
-            <a href={`#${it.id}`} onClick={go(it.id)} aria-current={active === it.id ? 'location' : undefined}>{it.text}</a>
+          <li key={it.id} className={`toc__item toc__item--l${it.level - minLevel + 1}${cur === it.id ? ' is-active' : ''}`}>
+            <a href={`#${it.id}`} onClick={go(it.id)} aria-current={cur === it.id ? 'location' : undefined}>{it.text}</a>
           </li>
         ))}
       </ol>

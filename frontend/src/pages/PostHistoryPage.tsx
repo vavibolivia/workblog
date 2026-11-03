@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api, changeTypeLabel, errorMessage, formatDate, type PostDetail, type RevisionDetail, type RevisionSummary } from '../lib/api'
-import { collapse, diffLines } from '../lib/diff'
+import { collapse, diffLines, diffWords, type DiffLine, type WordPart } from '../lib/diff'
 import { useToast } from '../lib/toast'
 import RichContent from '../components/RichContent'
 import { contentToText } from '../lib/html'
@@ -40,7 +40,22 @@ export default function PostHistoryPage() {
     if (!post || !detail) return []
     const a = `# ${detail.title}\n\n${contentToText(detail.content, detail.contentFormat)}`
     const b = `# ${post.title}\n\n${contentToText(post.content, post.contentFormat)}`
-    return collapse(diffLines(a, b))
+    // 빈 문맥 줄은 그리지 않는다. 연속한 지운 줄·추가 줄은 순서대로 짝지어 낱말 단위로 강조.
+    const rows: ((DiffLine & { parts?: WordPart[] }) | { kind: 'gap'; count: number })[] =
+      collapse(diffLines(a, b)).filter((l) => !(l.kind === 'ctx' && !l.text.trim()))
+    for (let i = 0; i < rows.length; i++) {
+      if (rows[i].kind !== 'del') continue
+      let d = i; while (d < rows.length && rows[d].kind === 'del') d++
+      let e = d; while (e < rows.length && rows[e].kind === 'add') e++
+      for (let k = 0; k < Math.min(d - i, e - d); k++) {
+        const del = rows[i + k] as DiffLine & { parts?: WordPart[] }, add = rows[d + k] as DiffLine & { parts?: WordPart[] }
+        const w = diffWords(del.text, add.text)
+        // 같은 낱말이 하나도 없으면 줄 전체가 바뀐 것이라 굳이 강조하지 않는다
+        if (w.del.some((p) => !p.changed && p.text.trim())) { del.parts = w.del; add.parts = w.add }
+      }
+      i = e - 1
+    }
+    return rows
   }, [post, detail])
 
   const restore = async () => {
@@ -91,9 +106,9 @@ export default function PostHistoryPage() {
           <div className="card__head">
             <h3>{detail ? `v${detail.version} · ${detail.title}` : '버전을 선택하세요'}</h3>
             <div className="row">
-              <div className="seg" role="group" aria-label="보기">
-                <button type="button" aria-pressed={mode === 'diff'} onClick={() => setMode('diff')} disabled={isCurrent}>현재와 비교</button>
-                <button type="button" aria-pressed={mode === 'content'} onClick={() => setMode('content')}>내용 보기</button>
+              <div className="segmented" role="group" aria-label="보기">
+                <button type="button" className={mode === 'diff' && !isCurrent ? 'is-on' : undefined} aria-pressed={mode === 'diff' && !isCurrent} onClick={() => setMode('diff')} disabled={isCurrent}>현재와 비교</button>
+                <button type="button" className={mode === 'content' || isCurrent ? 'is-on' : undefined} aria-pressed={mode === 'content' || isCurrent} onClick={() => setMode('content')}>내용 보기</button>
               </div>
               {post.editable && !isCurrent && detail && <button type="button" className="btn btn--sm btn--sky" onClick={() => setConfirm(true)}>이 버전으로 복원</button>}
             </div>
@@ -112,7 +127,9 @@ export default function PostHistoryPage() {
                 : <div className="diff" aria-label={`v${detail.version}와 현재 버전의 차이`}>
                     {diff.map((l, i) => l.kind === 'gap'
                       ? <div key={i} className="gap">… {l.count}줄 동일 …</div>
-                      : <div key={i} className={l.kind}>{l.kind === 'add' ? '+ ' : l.kind === 'del' ? '- ' : '  '}{l.text || ' '}</div>)}
+                      : <div key={i} className={l.kind}>{l.kind === 'add' ? '+ ' : l.kind === 'del' ? '- ' : '  '}{l.parts
+                          ? l.parts.map((p, k) => p.changed ? <strong key={k} className="diff__word">{p.text}</strong> : p.text)
+                          : (l.text || ' ')}</div>)}
                   </div>
             )}
           </div>

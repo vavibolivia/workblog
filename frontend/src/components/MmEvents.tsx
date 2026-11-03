@@ -59,7 +59,7 @@ export function EventDialog({ event, initialDate, initialRelated, canEdit, proje
     return (
       <Modal title={event.title} onClose={onClose} footer={<button type="button" className="btn btn--primary" onClick={onClose}>닫기</button>}>
         <dl className="ev-view">
-          <dt>날짜</dt><dd>{eventPeriod(event)}</dd>
+          <dt>날짜</dt><dd><span className="ev-view__dot" style={{ background: evColor(event) }} aria-hidden />{eventPeriod(event)}</dd>
           {event.related && <><dt>관련</dt><dd>{event.related}</dd></>}
           {event.note && <><dt>설명</dt><dd className="ev-note">{event.note}</dd></>}
           {event.createdBy && <><dt>등록</dt><dd className="muted">{event.createdBy}</dd></>}
@@ -136,7 +136,7 @@ export function EventsTable({ events, canEdit, empty, onOpen }:
   if (!events.length) return <p className="muted small ev-empty">{empty ?? '이벤트가 없습니다.'}</p>
   return (
     <table className="ev-table">
-      <thead><tr><th style={{ width: 170 }}>날짜</th><th>제목</th><th style={{ width: 130 }}>관련</th></tr></thead>
+      <thead><tr><th style={{ width: 170 }}>날짜</th><th style={{ width: 130 }}>관련</th><th>제목</th></tr></thead>
       {months.map(([m, list]) => (
         <tbody key={m}>
           <tr className="ev-month"><th colSpan={3}>{m.replace('-', '년 ')}월 <span className="muted">· {list.length}건</span></th></tr>
@@ -148,8 +148,8 @@ export function EventsTable({ events, canEdit, empty, onOpen }:
                   onClick={() => onOpen(e)} tabIndex={0} onKeyDown={(k) => { if (k.key === 'Enter') onOpen(e) }}
                   title={canEdit ? '눌러서 고치기' : '눌러서 자세히'}>
                 <td className="ev-date">{cont && <span className="ev-cont">이어짐 · </span>}{eventPeriod(e)}{!cont && e.id === nextId && <span className="ev-next">다음</span>}{!cont && now && <span className="ev-next ev-next--now">진행 중</span>}</td>
-                <td className="ev-title">{e.title}{e.note && <span className="ev-hasnote" title={e.note}> <IcNote /></span>}</td>
                 <td className="muted">{e.related ?? ''}</td>
+                <td className="ev-title">{e.title}{e.note && <span className="ev-hasnote" title={e.note}> <IcNote /></span>}</td>
               </tr>
             )
           })}

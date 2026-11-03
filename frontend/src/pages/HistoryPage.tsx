@@ -38,15 +38,15 @@ export default function HistoryPage() {
                 {items.map((a) => (
                   <div key={a.revisionId} className={`tl-item tl-item--${a.changeType}`}>
                     <div className="tl-item__head">
-                      <span style={{ fontWeight: 600, color: 'var(--ink)' }}>{a.editedBy.displayName}</span>
+                      <span className="tl-item__who">{a.editedBy.displayName}</span>
                       {a.editedBy.department && <span>{a.editedBy.department}</span>}
                       <span className={`chip ${a.changeType === 'DELETE' ? 'chip--danger' : a.changeType === 'RESTORE' || a.changeType === 'UNDELETE' ? 'chip--success' : 'chip--neutral'}`} style={{ height: 20, fontSize: 11 }}>{changeTypeLabel[a.changeType]}</span>
                       <span>v{a.version}</span>
                       <span>{formatDate(a.createdAt, true).slice(11)}</span>
+                      <Link to={`/posts/${a.postId}/history`} className="tl-item__all">전체 이력</Link>
                     </div>
                     <div className="tl-item__title"><Link to={`/posts/${a.postId}`}>{a.postTitle}</Link></div>
-                    {a.changeNote && <div className="small muted">{a.changeNote}</div>}
-                    <div className="small" style={{ marginTop: 2 }}><Link to={`/posts/${a.postId}/history`} style={{ color: 'var(--sky)', fontWeight: 600 }}>이 글의 전체 이력</Link></div>
+                    {a.changeNote && <div className="small muted ellipsis tl-item__note" title={a.changeNote}>{a.changeNote}</div>}
                   </div>
                 ))}
               </div>

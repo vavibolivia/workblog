@@ -2,7 +2,8 @@
 .rte { display: flex; flex-direction: column; min-height: 560px; }
 /* .editor 의 overflow:hidden 은 sticky 를 막는다. clip 은 모서리만 자르고 스크롤 컨테이너를 만들지 않는다. */
 .editor:has(.rte__toolbar) { overflow: clip; }
-.rte__toolbar { position: sticky; top: var(--gnb-h); z-index: 20; display: flex; flex-direction: column; gap: 6px; padding: 8px 14px; background: #fbfcfe; border-bottom: 1px solid var(--line); }
+/* 좌우 20px + 단추 안쪽 8px = 28px: 제목·본문 글자(.editor__title·.rich--edit 의 28px)와 첫 아이콘의 시작선을 맞춘다 */
+.rte__toolbar { position: sticky; top: var(--gnb-h); z-index: 20; display: flex; flex-direction: column; gap: 6px; padding: 8px 20px; background: #fbfcfe; border-bottom: 1px solid var(--line); }
 .rte__row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
 .rte__row--insert { padding-bottom: 6px; border-bottom: 1px solid var(--line); }
 .rte__group { display: flex; align-items: center; gap: 2px; }
@@ -13,7 +14,7 @@
 .rte__btn:hover { background: var(--canvas); }
 .rte__btn[aria-pressed="true"] { background: var(--sky-50); color: var(--navy); border-color: var(--sky-100); }
 .rte__btn:disabled { opacity: .35; }
-.rte__select { height: 32px; padding: 0 6px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--paper); font-size: 13px; max-width: 130px; }
+.rte__select { height: 32px; padding: 0 6px 0 7px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--paper); font-size: 13px; max-width: 130px; }
 .rte__select--sm { max-width: 76px; }
 .rte__swatch { display: inline-block; width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(0,0,0,.15); }
 .rte__palette { position: absolute; top: 100%; left: 0; margin-top: 4px; display: grid; grid-template-columns: repeat(7, 26px); gap: 4px; padding: 8px; background: var(--paper); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 8px 24px rgba(11,42,91,.14); z-index: 30; }
@@ -85,7 +86,7 @@
 .drawio__frame { flex: 1; border: 0; width: 100%; background: #fff; }
 .drawio__fail { flex: 1; display: grid; place-items: center; text-align: center; padding: 24px; }
 
-.rte__btn svg { vertical-align: -3px; margin-right: 2px; }
+.rte__btn svg { vertical-align: -3px; flex: none; }
 /* 원본 width/height 속성이 남은 사진(HTML 가져오기)도 비율 유지: 가로만 줄고 세로가 늘어나던 문제 */
 .rich img { max-width: 100%; height: auto; }
 
@@ -102,19 +103,42 @@
 
 /* X3 모바일: 툴바 그룹을 줄바꿈하고 구분선은 없앤다. 펼침 메뉴는 화면 폭 안에서 */
 @media (max-width: 640px) {
-  .rte__toolbar { padding: 6px 8px; }
+  /* 모바일: 툴바가 여러 줄(≈265px)이라 sticky 면 본문을 늘 가린다 → 흐름대로 두고, 시작선은 제목·본문(18px)에 맞춘다 */
+  .rte__toolbar { position: static; padding: 6px 10px; }
   .rte__group { flex-wrap: wrap; }
   .rte__group + .rte__group { padding-left: 0; border-left: 0; }
   .rte__group--end { margin-left: 0; }
   .rte__menu, .rte__palette { max-width: calc(100vw - 32px); }
+  .rte__menu { max-height: min(70vh, calc(100dvh - 120px)); overflow-y: auto; }
 }
 
 /* 글쓰기 중 업무산정·이벤트 링크 줄: 저장하면 살아 있는 표가 되는 자리 */
 .ProseMirror p > a[href^="/mm/"]:only-child { display: inline-flex; align-items: center; gap: 8px; padding: 10px 14px; border: 1px dashed var(--line-strong); border-radius: var(--radius-s); background: var(--canvas); color: var(--navy); font-weight: 700; text-decoration: none; }
-.ProseMirror p > a[href^="/mm/"]:only-child::before { content: '📊'; }
+/* 이모지 대신 IcChart 와 같은 선 아이콘(색은 글자색을 따름) */
+.ProseMirror p > a[href^="/mm/"]:only-child::before { content: ''; flex: none; width: 16px; height: 16px; background: currentColor; -webkit-mask: var(--ic-chart) center / 16px no-repeat; mask: var(--ic-chart) center / 16px no-repeat; }
+.ProseMirror { --ic-chart: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 20h16'/%3E%3Crect x='6' y='11' width='3' height='7' rx='.8'/%3E%3Crect x='11' y='6' width='3' height='12' rx='.8'/%3E%3Crect x='16' y='9' width='3' height='9' rx='.8'/%3E%3C/svg%3E"); }
 .ProseMirror p > a[href^="/mm/"]:only-child::after { content: '— 글을 저장하면 이 자리에 표가 보입니다'; font-weight: 400; font-size: 12.5px; color: var(--muted); }
 .wp-menu { min-width: 260px; }
 .wp-menu button { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
 
 /* 다크: 글자색 견본·팔레트 칸 테두리 */
 :root[data-theme="dark"] .rte__color, :root[data-theme="dark"] .rte__swatch { border-color: rgba(255, 255, 255, .28); }
+/* 검정·먹색·남색처럼 바탕과 비슷한 칸은 .28 테두리로 부족 → 밝은 테두리 + 안쪽 어두운 링 */
+:root[data-theme="dark"] .rte__palette .rte__color { border-color: rgba(255, 255, 255, .5); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .35); }
+:root[data-theme="dark"] .rte__palette .rte__color:hover { outline: 2px solid var(--sky); outline-offset: 1px; }
+
+/* 글자색·배경색 단추: 같은 크기의 '가' 한 글자 (글자색은 밑줄 색, 배경색은 형광 바탕) */
+.rte__glyph { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 3px; font-size: 14px; font-weight: 700; line-height: 1; }
+.rte__glyph--bg { color: #1b2430; }
+:root[data-theme="dark"] .rte__glyph--bg { color: #1b2430; }
+
+/* 펼침 메뉴 기준: 누른 단추 밑. 모바일은 그룹 왼쪽 기준(좁은 화면에서 오른쪽으로 잘리지 않게) */
+.rte__anchor { position: relative; display: inline-flex; }
+@media (max-width: 640px) { .rte__anchor { position: static; } }
+
+/* 자리표시 글씨 통일(제목·본문·태그 입력 = 입력칸과 같은 회색) */
+.editor input.editor__title::placeholder, .editor .tag-input input::placeholder, .rich.rich--edit p.is-editor-empty:first-child::before { color: #8592a5; }
+:root[data-theme="dark"] .editor input.editor__title::placeholder, :root[data-theme="dark"] .editor .tag-input input::placeholder, :root[data-theme="dark"] .rich.rich--edit p.is-editor-empty:first-child::before { color: #7d8898; }
+
+/* 머리 줄 높이: 새 글(템플릿 단추 32px)과 수정(글자만)을 같게 */
+.editor__bar > .row { min-height: 32px; }

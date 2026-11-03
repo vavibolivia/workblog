@@ -12,7 +12,7 @@ import { CELL_COLORS, StyledTableCell, StyledTableHeader } from './TableCellStyl
 import { FigureImage } from './FigureImage'
 import DrawioDialog from './DrawioDialog'
 import WorkPlanMenu from './WorkPlanMenu'
-import { IcDiagram, IcDocument, IcEraser, IcExcel, IcImage, IcLink, IcPaperclip, IcRedo, IcRule, IcTable, IcUndo } from '../components/Icons'
+import { IcAlignCenter, IcAlignJustify, IcAlignLeft, IcAlignRight, IcChart, IcCode, IcDiagram, IcDocument, IcEraser, IcExcel, IcImage, IcIndent, IcLink, IcListBullet, IcListOrdered, IcOutdent, IcPaperclip, IcQuote, IcRedo, IcRule, IcTable, IcUndo } from '../components/Icons'
 import { dataUriToFile, IMPORT_ACCEPT, toDataUri, type ConvertResponse } from '../lib/editorApi'
 import './editor.css'
 
@@ -228,6 +228,7 @@ function Toolbar({ editor, onImage, onExcel, onFile, onDocument, onDiagram, onDi
   const [tableMenu, setTableMenu] = useState(false)
   const [diagramMenu, setDiagramMenu] = useState(false)
   const c = () => editor.chain().focus()
+  const inTable = editor.isActive('table')
   const attrs = editor.getAttributes('textStyle') as { fontFamily?: string; fontSize?: string; lineHeight?: string; color?: string; backgroundColor?: string }
   const block = editor.isActive('heading', { level: 1 }) ? 'h1' : editor.isActive('heading', { level: 2 }) ? 'h2' : editor.isActive('heading', { level: 3 }) ? 'h3' : editor.isActive('blockquote') ? 'quote' : editor.isActive('codeBlock') ? 'code' : 'p'
   const setBlock = (v: string) => {
@@ -249,57 +250,69 @@ function Toolbar({ editor, onImage, onExcel, onFile, onDocument, onDiagram, onDi
       <div className="rte__row rte__row--insert">
         <div className="rte__group rte__group--rel">
           <B cmd={onImage} title="사진 넣기 (끌어다 놓기·붙여넣기도 가능)"><IcImage /> 사진</B>
-          <B cmd={() => setTableMenu((v) => !v)} active={editor.isActive('table')} title="표"><IcTable /> 표</B>
+          {/* 펼침 메뉴는 누른 단추 밑에서 열리도록 단추와 함께 rte__anchor 로 감싼다 */}
+          <div className="rte__anchor">
+          <B cmd={() => setTableMenu((v) => !v)} active={inTable} title="표"><IcTable /> 표</B>
           {tableMenu && (
             <div className="rte__menu" onMouseDown={(e) => e.preventDefault()}>
               <button type="button" onClick={() => { c().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(); setTableMenu(false) }}>표 삽입 (3×3)</button>
               <button type="button" onClick={() => { const r = Number(window.prompt('행 수', '3')), col = Number(window.prompt('열 수', '3')); if (r > 0 && col > 0) c().insertTable({ rows: r, cols: col, withHeaderRow: true }).run(); setTableMenu(false) }}>표 삽입 (크기 지정)</button>
+              {/* 표 편집 항목은 커서가 표 안에 있을 때만 보인다(밖에서는 쓸 수 없는 항목이 메뉴를 길게 늘이지 않게) */}
+              {inTable ? (<>
               <hr />
-              <button type="button" disabled={!editor.isActive('table')} onClick={() => c().addRowBefore().run()}>위에 행 추가</button>
-              <button type="button" disabled={!editor.isActive('table')} onClick={() => c().addRowAfter().run()}>아래에 행 추가</button>
-              <button type="button" disabled={!editor.isActive('table')} onClick={() => c().addColumnBefore().run()}>왼쪽에 열 추가</button>
-              <button type="button" disabled={!editor.isActive('table')} onClick={() => c().addColumnAfter().run()}>오른쪽에 열 추가</button>
-              <button type="button" disabled={!editor.isActive('table')} onClick={() => c().deleteRow().run()}>행 삭제</button>
-              <button type="button" disabled={!editor.isActive('table')} onClick={() => c().deleteColumn().run()}>열 삭제</button>
+              <button type="button" onClick={() => c().addRowBefore().run()}>위에 행 추가</button>
+              <button type="button" onClick={() => c().addRowAfter().run()}>아래에 행 추가</button>
+              <button type="button" onClick={() => c().addColumnBefore().run()}>왼쪽에 열 추가</button>
+              <button type="button" onClick={() => c().addColumnAfter().run()}>오른쪽에 열 추가</button>
+              <button type="button" onClick={() => c().deleteRow().run()}>행 삭제</button>
+              <button type="button" onClick={() => c().deleteColumn().run()}>열 삭제</button>
               <hr />
-              <button type="button" disabled={!editor.isActive('table')} onClick={() => c().toggleHeaderRow().run()}>머리글 행 전환</button>
-              <button type="button" disabled={!editor.isActive('table')} onClick={() => c().toggleHeaderColumn().run()}>머리글 열 전환</button>
+              <button type="button" onClick={() => c().toggleHeaderRow().run()}>머리글 행 전환</button>
+              <button type="button" onClick={() => c().toggleHeaderColumn().run()}>머리글 열 전환</button>
               <button type="button" disabled={!editor.can().mergeCells() && !editor.can().splitCell()} onClick={() => c().mergeOrSplit().run()}>셀 병합/분할</button>
               <hr />
               <span className="rte__menu-label">셀 배경색</span>
               <div className="rte__cellcolors">
                 {CELL_COLORS.map(([name, hex]) => (
                   <button key={hex} type="button" className="rte__color" title={name} aria-label={`셀 배경 ${name}`} style={{ background: hex }}
-                          disabled={!editor.isActive('table')} onClick={() => c().setCellAttribute('backgroundColor', hex).run()} />
+                          onClick={() => c().setCellAttribute('backgroundColor', hex).run()} />
                 ))}
                 <button type="button" className="rte__color rte__color--none" title="없음" aria-label="셀 배경 없음"
-                        disabled={!editor.isActive('table')} onClick={() => c().setCellAttribute('backgroundColor', null).run()}>×</button>
+                        onClick={() => c().setCellAttribute('backgroundColor', null).run()}>×</button>
               </div>
               <span className="rte__menu-label">셀 정렬</span>
               <div className="rte__cellalign">
                 {([['left', '왼쪽'], ['center', '가운데'], ['right', '오른쪽']] as const).map(([v, label]) => (
-                  <button key={v} type="button" disabled={!editor.isActive('table')}
+                  <button key={v} type="button"
                           aria-pressed={editor.isActive('tableCell', { cellAlign: v }) || editor.isActive('tableHeader', { cellAlign: v })}
                           onClick={() => c().setCellAttribute('cellAlign', v).run()}>{label}</button>
                 ))}
               </div>
               <hr />
-              <button type="button" disabled={!editor.isActive('table')} className="danger" onClick={() => { c().deleteTable().run(); setTableMenu(false) }}>표 삭제</button>
+              <button type="button" className="danger" onClick={() => { c().deleteTable().run(); setTableMenu(false) }}>표 삭제</button>
+              </>) : (
+                <span className="rte__menu-label">표 안을 누르면 행·열·셀 편집 항목이 나옵니다.</span>
+              )}
             </div>
           )}
+          </div>
           <B cmd={onExcel} title="엑셀 파일을 표로 넣고 원본을 첨부"><IcExcel /> 엑셀</B>
-          <WorkPlanMenu insert={(h) => editor.chain().focus().insertContent(h).run()}
-                        Button={({ onClick }) => <B cmd={onClick} title="업무산정 — 공수 표(주별 인원·할 일 메모)와 이벤트를 글에 넣기">업무산정</B>} />
+          <div className="rte__anchor">
+            <WorkPlanMenu insert={(h) => editor.chain().focus().insertContent(h).run()}
+                          Button={({ onClick }) => <B cmd={onClick} title="업무산정 — 공수 표(주별 인원·할 일 메모)와 이벤트를 글에 넣기"><IcChart /> 업무산정</B>} />
+          </div>
           {onDocument && <B cmd={onDocument} title="문서 파일(HTML·Word·Excel·CSV·Markdown·텍스트)을 본문으로 가져오기"><IcDocument /> 문서</B>}
+          <div className="rte__anchor">
           <B cmd={() => setDiagramMenu((v) => !v)} title="draw.io 다이어그램"><IcDiagram /> 다이어그램</B>
           {diagramMenu && (
-            <div className="rte__menu" style={{ left: 'auto' }} onMouseDown={(e) => e.preventDefault()}>
+            <div className="rte__menu" onMouseDown={(e) => e.preventDefault()}>
               <button type="button" onClick={() => { onDiagram(); setDiagramMenu(false) }}>새 다이어그램 그리기</button>
               <button type="button" onClick={() => { onDiagramFile(); setDiagramMenu(false) }}>.drawio 파일 열어서 넣기</button>
               <hr />
               <span className="small muted" style={{ padding: '4px 10px' }}>넣은 다이어그램을 선택하면 '다이어그램 편집'으로 다시 고칠 수 있습니다.</span>
             </div>
           )}
+          </div>
           <B cmd={onFile} title="파일 첨부"><IcPaperclip /> 파일</B>
         </div>
         <div className="rte__group">
@@ -335,11 +348,12 @@ function Toolbar({ editor, onImage, onExcel, onFile, onDocument, onDiagram, onDi
         <B cmd={() => c().toggleStrike().run()} active={editor.isActive('strike')} title="취소선"><s>S</s></B>
         <B cmd={() => c().toggleSuperscript().run()} active={editor.isActive('superscript')} title="위첨자">x²</B>
         <B cmd={() => c().toggleSubscript().run()} active={editor.isActive('subscript')} title="아래첨자">x₂</B>
-        <B cmd={() => c().toggleCode().run()} active={editor.isActive('code')} title="인라인 코드">{'</>'}</B>
+        <B cmd={() => c().toggleCode().run()} active={editor.isActive('code')} title="인라인 코드"><IcCode /></B>
       </div>
       <div className="rte__group rte__group--rel">
-        <B cmd={() => setPalette(palette === 'color' ? null : 'color')} title="글자색"><span className="rte__swatch" style={{ background: attrs.color ?? 'var(--ink)' }} />가</B>
-        <B cmd={() => setPalette(palette === 'bg' ? null : 'bg')} title="배경색(강조)"><span className="rte__swatch" style={{ background: attrs.backgroundColor ?? '#fff2a8' }} />▣</B>
+        {/* 글자색 = 밑줄 색 '가', 배경색 = 형광 바탕 '가' (짝) */}
+        <B cmd={() => setPalette(palette === 'color' ? null : 'color')} title="글자색"><span className="rte__glyph" style={{ boxShadow: `inset 0 -3px 0 ${attrs.color ?? 'var(--ink)'}` }}>가</span></B>
+        <B cmd={() => setPalette(palette === 'bg' ? null : 'bg')} title="배경색(형광펜)"><span className="rte__glyph rte__glyph--bg" style={{ background: attrs.backgroundColor ?? '#fff2a8' }}>가</span></B>
         {palette && (
           <div className="rte__palette" onMouseDown={(e) => e.preventDefault()}>
             {(palette === 'color' ? COLORS : HIGHLIGHTS).map((col) => (
@@ -353,17 +367,17 @@ function Toolbar({ editor, onImage, onExcel, onFile, onDocument, onDiagram, onDi
         )}
       </div>
       <div className="rte__group">
-        <B cmd={() => c().setTextAlign('left').run()} active={editor.isActive({ textAlign: 'left' })} title="왼쪽 정렬">≡</B>
-        <B cmd={() => c().setTextAlign('center').run()} active={editor.isActive({ textAlign: 'center' })} title="가운데 정렬">☰</B>
-        <B cmd={() => c().setTextAlign('right').run()} active={editor.isActive({ textAlign: 'right' })} title="오른쪽 정렬">≡</B>
-        <B cmd={() => c().setTextAlign('justify').run()} active={editor.isActive({ textAlign: 'justify' })} title="양쪽 정렬">▤</B>
-        <B cmd={() => c().outdent().run()} title="내어쓰기 (Shift+Tab)">⇤</B>
-        <B cmd={() => c().indent().run()} title="들여쓰기 (Tab)">⇥</B>
+        <B cmd={() => c().setTextAlign('left').run()} active={editor.isActive({ textAlign: 'left' })} title="왼쪽 정렬"><IcAlignLeft /></B>
+        <B cmd={() => c().setTextAlign('center').run()} active={editor.isActive({ textAlign: 'center' })} title="가운데 정렬"><IcAlignCenter /></B>
+        <B cmd={() => c().setTextAlign('right').run()} active={editor.isActive({ textAlign: 'right' })} title="오른쪽 정렬"><IcAlignRight /></B>
+        <B cmd={() => c().setTextAlign('justify').run()} active={editor.isActive({ textAlign: 'justify' })} title="양쪽 정렬"><IcAlignJustify /></B>
+        <B cmd={() => c().outdent().run()} title="내어쓰기 (Shift+Tab)"><IcOutdent /></B>
+        <B cmd={() => c().indent().run()} title="들여쓰기 (Tab)"><IcIndent /></B>
       </div>
       <div className="rte__group">
-        <B cmd={() => toggleList('bulletList')} active={editor.isActive('bulletList')} title="글머리 기호">•≡</B>
-        <B cmd={() => toggleList('orderedList')} active={editor.isActive('orderedList')} title="번호 매기기">1.≡</B>
-        <B cmd={() => c().toggleBlockquote().run()} active={editor.isActive('blockquote')} title="인용구">❝</B>
+        <B cmd={() => toggleList('bulletList')} active={editor.isActive('bulletList')} title="글머리 기호"><IcListBullet /></B>
+        <B cmd={() => toggleList('orderedList')} active={editor.isActive('orderedList')} title="번호 매기기"><IcListOrdered /></B>
+        <B cmd={() => c().toggleBlockquote().run()} active={editor.isActive('blockquote')} title="인용구"><IcQuote /></B>
       </div>
       </div>
     </div>

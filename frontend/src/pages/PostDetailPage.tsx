@@ -66,7 +66,7 @@ export default function PostDetailPage() {
         {!post && !err && <div className="empty"><div className="spinner" style={{ margin: '0 auto' }} /></div>}
         {post && (
           <div className="post-wrap">
-          <Toc bodyRef={bodyRef} deps={post.content} />
+          <Toc bodyRef={bodyRef} deps={post.content} title={post.title} />
           <article className="post">
             <header className="post__head">
               {post.deletedAt && <div className="alert alert--warn" style={{ marginBottom: 14 }}>이 글은 {formatDate(post.deletedAt, true)}에 삭제되었습니다. 작성자와 관리자만 볼 수 있습니다.</div>}
@@ -110,20 +110,32 @@ export default function PostDetailPage() {
               {post.summary && <p className="post__summary">{post.summary}</p>}
             </header>
             <div className="post__body" ref={bodyRef}><RichContent content={post.content} format={post.contentFormat} /></div>
-            {post.attachments.length > 0 && (
-              <div className="post__attach">
-                <strong className="small">첨부파일 {post.attachments.length}</strong>
-                <ul className="attach-list">
-                  {post.attachments.map((a) => (
-                    <li key={a.id}>
-                      <span className="attach-kind">{a.kind === 'IMAGE' ? '사진' : a.kind === 'EXCEL' ? '엑셀' : '파일'}</span>
-                      <a href={`${a.url}?download=true`} className="ellipsis grow">{a.name}</a>
-                      <span className="small muted">{formatFileSize(a.size)}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
+            {post.attachments.length > 0 && (() => {
+              // 본문에 이미 보이는 사진은 한 줄로 접고, 나머지 파일만 펼친다. 이름은 숫자를 숫자로 비교해 정렬.
+              const byName = (x: { name: string }, y: { name: string }) => x.name.localeCompare(y.name, 'ko', { numeric: true })
+              const inBody = (a: typeof post.attachments[number]) => a.kind === 'IMAGE' && post.content.includes(a.url)
+              const photos = post.attachments.filter(inBody).sort(byName)
+              const files = post.attachments.filter((a) => !inBody(a)).sort(byName)
+              const item = (a: typeof post.attachments[number]) => (
+                <li key={a.id}>
+                  <span className="attach-kind">{a.kind === 'IMAGE' ? '사진' : a.kind === 'EXCEL' ? '엑셀' : '파일'}</span>
+                  <a href={`${a.url}?download=true`} className="ellipsis grow">{a.name}</a>
+                  <span className="small muted">{formatFileSize(a.size)}</span>
+                </li>
+              )
+              return (
+                <div className="post__attach">
+                  <strong className="small">첨부파일 {post.attachments.length}</strong>
+                  {files.length > 0 && <ul className="attach-list">{files.map(item)}</ul>}
+                  {photos.length > 0 && (
+                    <details className="attach-photos">
+                      <summary className="small">사진 {photos.length}개</summary>
+                      <ul className="attach-list">{photos.map(item)}</ul>
+                    </details>
+                  )}
+                </div>
+              )
+            })()}
             {post.tags.length > 0 && (
               <div className="post__tags">{post.tags.map((t) => <Link key={t} to={`/?tag=${encodeURIComponent(t)}`} className="chip">#{t}</Link>)}</div>
             )}
