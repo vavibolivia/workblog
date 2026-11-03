@@ -52,11 +52,11 @@ const kOf = (p: Pos) => `${p.rowId}:${p.week}`
 const mod = (a: number, n: number) => ((a % n) + n) % n
 const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 const coarse = () => typeof window !== 'undefined' && !!window.matchMedia?.('(pointer: coarse)').matches
-/** 칸 색: 값이 클수록 진하게(1 이상은 가장 진하게). 사람별 합 1.0 초과는 빨강(over) */
+/** 칸 색: 값이 클수록 진하게(1 이상은 가장 진하게, 그래도 글씨가 잘 보이도록 옅은 편). 사람별 합 1.0 초과는 빨강(over) */
 function cellBg(v: number | undefined, over = false): string | undefined {
   if (!v || v < 0) return undefined
   if (over) return 'var(--mm-over)'
-  return `color-mix(in srgb, var(--mm-on) ${Math.round(18 + Math.min(v, 1) * 62)}%, transparent)`
+  return `color-mix(in srgb, var(--mm-on) ${Math.round(14 + Math.min(v, 1) * 46)}%, transparent)`
 }
 /** 이벤트 줄 자리 잡기 순서: 릴리스·마일스톤이 먼저 위쪽 줄을 차지 */
 const KIND_RANK: Record<string, number> = { RELEASE: 0, MILESTONE: 1, REVIEW: 2, MEETING: 3, HOLIDAY: 4, LEAVE: 5, ETC: 6 }
@@ -635,8 +635,8 @@ export default function ManMonthGrid(props: Props) {
                 <button key={it.e.id} type="button" className={`mm-ev2${it.e.endDate ? '' : ' is-day'}${it.cut0 ? ' cut0' : ''}${it.cut1 ? ' cut1' : ''}`}
                         style={{ ['--ev' as string]: k.color, ['--bar' as string]: `${it.barPx}px`, left: it.px0 }}
                         onClick={() => props.onEventOpen?.(it.e)} onDoubleClick={(e) => e.stopPropagation()}
-                        aria-label={`${k.label} ${eventPeriod(it.e)} ${it.e.title}`}
-                        title={`${k.sym} ${k.label} · ${eventPeriod(it.e)}\n${it.e.title}${it.e.related ? `\n관련: ${it.e.related}` : ''}${it.e.note ? `\n${it.e.note}` : ''}`}>
+                        aria-label={`이벤트 ${eventPeriod(it.e)} ${it.e.title}`}
+                        title={`${eventPeriod(it.e)}\n${it.e.title}${it.e.related ? `\n관련: ${it.e.related}` : ''}${it.e.note ? `\n${it.e.note}` : ''}`}>
                   <span className="mm-ev2__bar" aria-hidden />
                   <span className="mm-ev2__txt"><b aria-hidden>{it.cut0 ? '◀ ' : ''}{k.sym}</b>{it.label}{it.cut1 ? ' ▶' : ''}</span>
                 </button>
@@ -708,8 +708,8 @@ export default function ManMonthGrid(props: Props) {
                 title={[s ? String(s) : '', ...agg.notes[i].map((t) => `메모 ${t}`)].filter(Boolean).join('\n') || undefined}>
               {re && <button type="button" className="mm-diamond" style={{ ['--ev' as string]: EVENT_KINDS[re[0].kind].color }}
                              onClick={() => (re.length > 1 ? props.onWeekEvents?.(`${g.p.name} · ${weeks[i].label} 주`, re) : props.onEventOpen?.(re[0]))}
-                             title={re.map((e) => `${EVENT_KINDS[e.kind].sym} ${EVENT_KINDS[e.kind].label} ${eventPeriod(e)} ${e.title}`).join('\n')}
-                             aria-label={re.map((e) => `${EVENT_KINDS[e.kind].label} ${e.title}`).join(', ')}>{EVENT_KINDS[re[0].kind].sym}</button>}
+                             title={re.map((e) => `${eventPeriod(e)} ${e.title}`).join('\n')}
+                             aria-label={re.map((e) => `이벤트 ${e.title}`).join(', ')}>{EVENT_KINDS[re[0].kind].sym}</button>}
               {s ? s : ''}
             </td>
           )

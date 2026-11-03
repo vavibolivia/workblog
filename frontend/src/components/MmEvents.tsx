@@ -10,16 +10,7 @@ import { relatedMatch } from './ManMonthGrid'
 /** 모든 공수 표의 프로젝트 이름(가나다순, 중복 없음) */
 const mmProjectNames = () => http.get<string[]>('/mm/assignments/projects').then((r) => r.data).catch(() => [] as string[])
 
-const KIND_ORDER: MmEventKind[] = ['RELEASE', 'MILESTONE', 'REVIEW', 'MEETING', 'HOLIDAY', 'LEAVE', 'ETC']
-const KIND_KEY = 'workblog.mm.eventKind'
-const lastKind = (): MmEventKind => { try { const k = localStorage.getItem(KIND_KEY) as MmEventKind | null; return k && k in EVENT_KINDS ? k : 'RELEASE' } catch { return 'RELEASE' } }
 const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
-
-/** 종류 표시(색 점 + 이름) */
-export function KindBadge({ kind }: { kind: MmEventKind }) {
-  const k = EVENT_KINDS[kind]
-  return <span className="ev-kind" style={{ ['--ev' as string]: k.color }}><b aria-hidden>{k.sym}</b>{k.label}</span>
-}
 
 /** 이벤트 추가·고치기. event 가 없으면 새로(initialDate·related 로 미리 채움). 고칠 수 없는 사람에게는 보기만. */
 export function EventDialog({ event, initialDate, initialRelated, canEdit, projectNames: given, onClose }:
@@ -27,7 +18,7 @@ export function EventDialog({ event, initialDate, initialRelated, canEdit, proje
   const toast = useToast()
   const [f, setF] = useState<MmEventRequest>(() => event
     ? { startDate: event.startDate, endDate: event.endDate, kind: event.kind, title: event.title, related: event.related ?? '', note: event.note ?? '' }
-    : { startDate: initialDate ?? today(), endDate: null, kind: lastKind(), title: '', related: initialRelated ?? '', note: '' })
+    : { startDate: initialDate ?? today(), endDate: null, kind: 'ETC' as MmEventKind, title: '', related: initialRelated ?? '', note: '' })
   const [multi, setMulti] = useState(!!event?.endDate)
   const [busy, setBusy] = useState(false)
   const [confirmDel, setConfirmDel] = useState(false)
@@ -46,7 +37,6 @@ export function EventDialog({ event, initialDate, initialRelated, canEdit, proje
     try {
       const body = { ...f, title: f.title.trim(), endDate: multi && f.endDate ? f.endDate : null }
       if (event) await mmEventApi.update(event.id, body); else await mmEventApi.create(body)
-      try { localStorage.setItem(KIND_KEY, f.kind) } catch { /* 저장소 없음 */ }
       notifyEventsChanged()
       toast(event ? '이벤트를 고쳤습니다.' : `넣었습니다: ${body.title} — 기간이 걸친 모든 공수 표에 보입니다.`, 'success')
       // '계속 넣기': 창을 닫지 않고 제목·날짜만 비워 다음 것을 바로(공휴일 여러 개 등)
@@ -66,7 +56,6 @@ export function EventDialog({ event, initialDate, initialRelated, canEdit, proje
       <Modal title={event.title} onClose={onClose} footer={<button type="button" className="btn btn--primary" onClick={onClose}>닫기</button>}>
         <dl className="ev-view">
           <dt>날짜</dt><dd>{eventPeriod(event)}</dd>
-          <dt>종류</dt><dd><KindBadge kind={event.kind} /></dd>
           {event.related && <><dt>관련</dt><dd>{event.related}</dd></>}
           {event.note && <><dt>설명</dt><dd className="ev-note">{event.note}</dd></>}
           {event.createdBy && <><dt>등록</dt><dd className="muted">{event.createdBy}</dd></>}
@@ -89,14 +78,6 @@ export function EventDialog({ event, initialDate, initialRelated, canEdit, proje
       <div className="field"><label htmlFor="ev-title">제목</label>
         <input id="ev-title" className="input" value={f.title} onChange={(e) => set('title', e.target.value)} maxLength={200} autoFocus
                placeholder="예) AirDeck 2단계 릴리스" onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) save() }} />
-      </div>
-      <div className="field"><span className="field__label">종류</span>
-        <div className="ev-kinds" role="radiogroup" aria-label="종류">
-          {KIND_ORDER.map((k) => (
-            <button key={k} type="button" role="radio" aria-checked={f.kind === k} className={f.kind === k ? 'is-on' : undefined}
-                    style={{ ['--ev' as string]: EVENT_KINDS[k].color }} onClick={() => set('kind', k)}><b aria-hidden>{EVENT_KINDS[k].sym}</b>{EVENT_KINDS[k].label}</button>
-          ))}
-        </div>
       </div>
       <div className="row row--wrap" style={{ gap: 10, alignItems: 'flex-end' }}>
         <div className="field" style={{ minWidth: 170 }}><label htmlFor="ev-start">{multi ? '시작' : '날짜'}</label>
@@ -143,10 +124,10 @@ export function EventsTable({ events, canEdit, empty, onOpen }:
   if (!events.length) return <p className="muted small ev-empty">{empty ?? '이벤트가 없습니다.'}</p>
   return (
     <table className="ev-table">
-      <thead><tr><th style={{ width: 150 }}>날짜</th><th style={{ width: 120 }}>종류</th><th>제목</th><th style={{ width: 130 }}>관련</th></tr></thead>
+      <thead><tr><th style={{ width: 170 }}>날짜</th><th>제목</th><th style={{ width: 130 }}>관련</th></tr></thead>
       {months.map(([m, list]) => (
         <tbody key={m}>
-          <tr className="ev-month"><th colSpan={4}>{m.replace('-', '년 ')}월 <span className="muted">· {list.length}건</span></th></tr>
+          <tr className="ev-month"><th colSpan={3}>{m.replace('-', '년 ')}월 <span className="muted">· {list.length}건</span></th></tr>
           {list.map(({ e, cont }) => {
             const past = (e.endDate ?? e.startDate) < t
             const now = e.startDate <= t && (e.endDate ?? e.startDate) >= t
@@ -155,7 +136,6 @@ export function EventsTable({ events, canEdit, empty, onOpen }:
                   onClick={() => onOpen(e)} tabIndex={0} onKeyDown={(k) => { if (k.key === 'Enter') onOpen(e) }}
                   title={canEdit ? '눌러서 고치기' : '눌러서 자세히'}>
                 <td className="ev-date">{cont && <span className="ev-cont">이어짐 · </span>}{eventPeriod(e)}{!cont && e.id === nextId && <span className="ev-next">다음</span>}{!cont && now && <span className="ev-next ev-next--now">진행 중</span>}</td>
-                <td><KindBadge kind={e.kind} /></td>
                 <td className="ev-title">{e.title}{e.note && <span className="ev-hasnote" title={e.note}> 📝</span>}</td>
                 <td className="muted">{e.related ?? ''}</td>
               </tr>

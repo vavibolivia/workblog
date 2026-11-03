@@ -17,15 +17,11 @@ export type MmEventKind = 'MILESTONE' | 'MEETING' | 'RELEASE' | 'REVIEW' | 'HOLI
 export interface MmEvent { id: number; startDate: string; endDate: string | null; kind: MmEventKind; title: string; related: string | null; note: string | null; createdBy: string | null; updatedAt: string; /** 이 사람이 고치거나 삭제할 수 있는지(만든 사람·관리자) */ canEdit: boolean }
 export interface MmEventRequest { startDate: string; endDate?: string | null; kind: MmEventKind; title: string; related?: string; note?: string }
 /** 이벤트 종류: 이름 · 색 · 모양(색약·흑백에서도 갈리게 색과 함께 씀) */
+/** 이벤트 종류는 쓰지 않는다(사용자 지시) — 모든 이벤트가 같은 색·같은 표시. kind 값은 DB 에 남아 있어도 화면에서 구분하지 않음 */
+export const EVENT_COLOR = '#7048e8'
+const ONE = { label: '이벤트', color: EVENT_COLOR, sym: '●' }
 export const EVENT_KINDS: Record<MmEventKind, { label: string; color: string; sym: string }> = {
-  // 종류는 색 동그라미 하나로 구분(모양을 섞지 않음). 표·막대·대화상자·목록이 모두 이 색을 쓴다
-  RELEASE: { label: '릴리스·배포', color: '#e8590c', sym: '●' },
-  MILESTONE: { label: '마일스톤', color: '#7048e8', sym: '●' },
-  REVIEW: { label: '검토·감리', color: '#1864ab', sym: '●' },
-  MEETING: { label: '회의·보고', color: '#0b7285', sym: '●' },
-  HOLIDAY: { label: '공휴일', color: '#c2255c', sym: '●' },
-  LEAVE: { label: '휴가·교육', color: '#2b8a3e', sym: '●' },
-  ETC: { label: '기타', color: '#868e96', sym: '●' },
+  RELEASE: ONE, MILESTONE: ONE, REVIEW: ONE, MEETING: ONE, HOLIDAY: ONE, LEAVE: ONE, ETC: ONE,
 }
 export interface MmImportResult { applied: boolean; projectsCreated: number; rowsCreated: number; cellsSet: number; cellsCleared: number; warnings: string[] }
 export interface MmRowRequest { projectId?: number; userId?: number | null; personName?: string; department?: string; role?: string }

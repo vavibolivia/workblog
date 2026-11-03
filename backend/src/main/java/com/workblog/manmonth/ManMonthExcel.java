@@ -32,8 +32,6 @@ public class ManMonthExcel {
     static final String TOTAL_LABEL = "주별 합계";
     /** 프로젝트 소계 줄: A 칸 = "<프로젝트> 소계", 이름 칸은 비움(가져오기에서 건너뜀). */
     static final String SUBTOTAL_SUFFIX = " 소계";
-    static final Map<EventKind, String> KIND_LABEL = Map.of(EventKind.RELEASE, "릴리스·배포", EventKind.MILESTONE, "마일스톤",
-            EventKind.REVIEW, "검토·감리", EventKind.MEETING, "회의·보고", EventKind.HOLIDAY, "공휴일", EventKind.LEAVE, "휴가·교육", EventKind.ETC, "기타");
     /** 한 번에 가져오는 데이터 행 수 상한(업로드 크기 한도와 별도로 처리량을 묶는다). */
     static final int MAX_IMPORT_ROWS = 3000;
 
@@ -211,10 +209,10 @@ public class ManMonthExcel {
                     LocalDate eEnd = e.endDate() == null ? e.startDate() : e.endDate();
                     if (eEnd.isBefore(d.startDate()) || e.startDate().isAfter(end)) continue;
                     evRows.add(new String[]{e.startDate().toString(), e.endDate() == null ? "" : e.endDate().toString(),
-                            KIND_LABEL.getOrDefault(e.kind(), String.valueOf(e.kind())), e.title(), nz(e.related()), nz(e.note())});
+                            e.title(), nz(e.related()), nz(e.note())});
                 }
                 evRows.sort(Comparator.comparing((String[] a) -> a[0]));
-                listSheet(wb, "이벤트", head, text, new String[]{"시작", "끝", "종류", "제목", "관련", "설명"}, new int[]{12, 12, 12, 30, 14, 50}, evRows);
+                listSheet(wb, "이벤트", head, text, new String[]{"시작", "끝", "제목", "관련", "설명"}, new int[]{12, 12, 30, 14, 50}, evRows);
             }
             wb.write(out);
             return out.toByteArray();

@@ -52,8 +52,8 @@ class ManMonthExcelExportTest {
 
             Sheet ev = wb.getSheet("이벤트");
             assertThat(ev.getLastRowNum()).isEqualTo(1);
-            assertThat(f.formatCellValue(ev.getRow(1).getCell(3))).isEqualTo("1차 배포");
-            assertThat(f.formatCellValue(ev.getRow(1).getCell(2))).isEqualTo("릴리스·배포");
+            assertThat(f.formatCellValue(ev.getRow(1).getCell(2))).isEqualTo("1차 배포");
+            assertThat(f.formatCellValue(ev.getRow(0).getCell(2))).isEqualTo("제목");   // 종류 열 없음
         }
     }
 
