@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { errorMessage, http } from '../lib/api'
 import { useAuth } from '../lib/auth'
-import { EVENT_KINDS, MM_EVENTS_CHANGED, eventPeriod, mmEventApi, notifyEventsChanged, type MmEvent, type MmEventKind, type MmEventRequest } from '../lib/manMonthApi'
+import { EVENT_COLORS, MM_EVENTS_CHANGED, evColor, eventPeriod, mmEventApi, notifyEventsChanged, type MmEvent, type MmEventKind, type MmEventRequest } from '../lib/manMonthApi'
 import { useToast } from '../lib/toast'
 import Modal from './Modal'
 import { relatedMatch } from './ManMonthGrid'
@@ -10,6 +10,8 @@ import { relatedMatch } from './ManMonthGrid'
 /** 모든 공수 표의 프로젝트 이름(가나다순, 중복 없음) */
 const mmProjectNames = () => http.get<string[]>('/mm/assignments/projects').then((r) => r.data).catch(() => [] as string[])
 
+const COLOR_KEY = 'workblog.mm.eventColor'
+const lastColor = () => { try { const c = localStorage.getItem(COLOR_KEY); return c && EVENT_COLORS.includes(c) ? c : EVENT_COLORS[0] } catch { return EVENT_COLORS[0] } }
 const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
 
 /** 이벤트 추가·고치기. event 가 없으면 새로(initialDate·related 로 미리 채움). 고칠 수 없는 사람에게는 보기만. */
@@ -17,8 +19,8 @@ export function EventDialog({ event, initialDate, initialRelated, canEdit, proje
   { event?: MmEvent; initialDate?: string; initialRelated?: string; canEdit: boolean; projectNames?: string[]; onClose: () => void }) {
   const toast = useToast()
   const [f, setF] = useState<MmEventRequest>(() => event
-    ? { startDate: event.startDate, endDate: event.endDate, kind: event.kind, title: event.title, related: event.related ?? '', note: event.note ?? '' }
-    : { startDate: initialDate ?? today(), endDate: null, kind: 'ETC' as MmEventKind, title: '', related: initialRelated ?? '', note: '' })
+    ? { startDate: event.startDate, endDate: event.endDate, kind: event.kind, title: event.title, related: event.related ?? '', note: event.note ?? '', color: evColor(event) }
+    : { startDate: initialDate ?? today(), endDate: null, kind: 'ETC' as MmEventKind, title: '', related: initialRelated ?? '', note: '', color: lastColor() })
   const [multi, setMulti] = useState(!!event?.endDate)
   const [busy, setBusy] = useState(false)
   const [confirmDel, setConfirmDel] = useState(false)
@@ -37,6 +39,7 @@ export function EventDialog({ event, initialDate, initialRelated, canEdit, proje
     try {
       const body = { ...f, title: f.title.trim(), endDate: multi && f.endDate ? f.endDate : null }
       if (event) await mmEventApi.update(event.id, body); else await mmEventApi.create(body)
+      try { if (f.color) localStorage.setItem(COLOR_KEY, f.color) } catch { /* 저장소 없음 */ }
       notifyEventsChanged()
       toast(event ? '이벤트를 고쳤습니다.' : `넣었습니다: ${body.title} — 기간이 걸친 모든 공수 표에 보입니다.`, 'success')
       // '계속 넣기': 창을 닫지 않고 제목·날짜만 비워 다음 것을 바로(공휴일 여러 개 등)
@@ -78,6 +81,14 @@ export function EventDialog({ event, initialDate, initialRelated, canEdit, proje
       <div className="field"><label htmlFor="ev-title">제목</label>
         <input id="ev-title" className="input" value={f.title} onChange={(e) => set('title', e.target.value)} maxLength={200} autoFocus
                placeholder="예) AirDeck 2단계 릴리스" onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) save() }} />
+      </div>
+      <div className="field"><span className="field__label">색</span>
+        <div className="ev-colors" role="radiogroup" aria-label="색">
+          {EVENT_COLORS.map((c) => (
+            <button key={c} type="button" role="radio" aria-checked={f.color === c} aria-label={c} className={f.color === c ? 'is-on' : undefined}
+                    style={{ background: c }} onClick={() => set('color', c)} />
+          ))}
+        </div>
       </div>
       <div className="row row--wrap" style={{ gap: 10, alignItems: 'flex-end' }}>
         <div className="field" style={{ minWidth: 170 }}><label htmlFor="ev-start">{multi ? '시작' : '날짜'}</label>
@@ -132,7 +143,7 @@ export function EventsTable({ events, canEdit, empty, onOpen }:
             const past = (e.endDate ?? e.startDate) < t
             const now = e.startDate <= t && (e.endDate ?? e.startDate) >= t
             return (
-              <tr key={`${e.id}${cont ? 'c' : ''}`} className={`ev-row${past ? ' is-past' : ''}${now ? ' is-now' : ''}${cont ? ' is-cont' : ''}`} style={{ ['--ev' as string]: EVENT_KINDS[e.kind].color }}
+              <tr key={`${e.id}${cont ? 'c' : ''}`} className={`ev-row${past ? ' is-past' : ''}${now ? ' is-now' : ''}${cont ? ' is-cont' : ''}`} style={{ ['--ev' as string]: evColor(e) }}
                   onClick={() => onOpen(e)} tabIndex={0} onKeyDown={(k) => { if (k.key === 'Enter') onOpen(e) }}
                   title={canEdit ? '눌러서 고치기' : '눌러서 자세히'}>
                 <td className="ev-date">{cont && <span className="ev-cont">이어짐 · </span>}{eventPeriod(e)}{!cont && e.id === nextId && <span className="ev-next">다음</span>}{!cont && now && <span className="ev-next ev-next--now">진행 중</span>}</td>

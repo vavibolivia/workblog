@@ -61,6 +61,8 @@ s, r = call("GET", f"/api/mm/sheets/{MM}", tok=A); check("EV shown in sheet peri
 s, r = call("GET", "/api/mm/events?from=2027-06-01&to=2027-06-30", tok=MO); check("EV range filter excludes", s == 200 and all(e["id"] != EV["id"] for e in r["events"]) and r["canEdit"] is True, s)
 s, r = call("PUT", f"/api/mm/events/{EV['id']}", {"startDate": "2026-11-20", "endDate": "2026-11-18", "title": "x"}, A); check("EV end before start 400", s == 400, s)
 s, r = call("PUT", f"/api/mm/events/{EV['id']}", {"startDate": "2026-11-20", "kind": "MILESTONE", "title": "스모크 마일스톤"}, A); check("EV update", s == 200 and r["kind"] == "MILESTONE" and r["endDate"] is None, (s, r))
+s, r = call("PUT", f"/api/mm/events/{EV['id']}", {"startDate": "2026-11-20", "title": "스모크 마일스톤", "color": "#E8590C"}, A); check("EV color saved (lowercase)", s == 200 and r.get("color") == "#e8590c", (s, r))
+s, r = call("PUT", f"/api/mm/events/{EV['id']}", {"startDate": "2026-11-20", "title": "스모크 마일스톤", "color": "red"}, A); check("EV bad color 400", s == 400, s)
 # 대문(글만): 지금 목록을 기억해 두고, 이 표를 담은 임시 글을 맨 뒤에 올렸다가 원래대로 되돌린다(실제 대문을 건드리지 않음)
 s, _front0 = call("GET", "/api/front", tok=A); check("FRONT list 200", s == 200 and isinstance(_front0, list), s)
 _front_keep = [{"kind": i["kind"], "refId": i["refId"]} for i in _front0]

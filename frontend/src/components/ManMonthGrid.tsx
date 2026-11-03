@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ClipboardEvent, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
-import { EVENT_KINDS, eventPeriod, eventWeeks, fmtVal, monthSpans, parseVal, personKey, shortDate, totalMm, weeksOf,
+import { EVENT_KINDS, evColor, eventPeriod, eventWeeks, fmtVal, monthSpans, parseVal, personKey, shortDate, totalMm, weeksOf,
   type MmCellChange, type MmEvent, type MmNoteChange, type MmProject, type MmRow, type MmSheet, type MmWeek } from '../lib/manMonthApi'
 import { IcNote, IcRedo, IcUndo } from './Icons'
 import Modal from './Modal'
@@ -56,10 +56,9 @@ const coarse = () => typeof window !== 'undefined' && !!window.matchMedia?.('(po
 function cellBg(v: number | undefined, over = false): string | undefined {
   if (!v || v < 0) return undefined
   if (over) return 'var(--mm-over)'
-  return `color-mix(in srgb, var(--mm-on) ${Math.round(14 + Math.min(v, 1) * 46)}%, transparent)`
+  // 회청색 단계(값이 클수록 진하게) — 글씨는 흰색(CSS)
+  return `color-mix(in srgb, var(--mm-on) ${Math.round(35 + Math.min(v, 1) * 65)}%, var(--mm-off))`
 }
-/** 이벤트 줄 자리 잡기 순서: 릴리스·마일스톤이 먼저 위쪽 줄을 차지 */
-const KIND_RANK: Record<string, number> = { RELEASE: 0, MILESTONE: 1, REVIEW: 2, MEETING: 3, HOLIDAY: 4, LEAVE: 5, ETC: 6 }
 /** 이름이 관련 이름과 같거나 "관련 이름 + 띄어쓰기" 로 시작할 때만 표시 (AirDeck → "AirDeck 2단계" O, "AirDeckX" X) */
 export function relatedMatch(projectName: string, related: string | null): boolean {
   if (!related?.trim()) return false
@@ -80,6 +79,8 @@ export default function ManMonthGrid(props: Props) {
   const [fillTo, setFillTo] = useState<Pos | null>(null)
   const [noteFor, setNoteFor] = useState<Pos[] | null>(null)
   const [live, setLive] = useState('')
+  /** 메모가 있는 칸에 마우스를 올리면 바로 보이는 메모 */
+  const [hoverNote, setHoverNote] = useState<{ text: string; x: number; y: number } | null>(null)
   /** 사람별 부하: 1.0 넘는 주가 있는 사람만 / 정렬(이름 · 가장 바쁜 주 · 기간 MM) */
   const [overOnly, setOverOnly] = useState(false)
   const [pSort, setPSort] = useState<'name' | 'peak' | 'mm'>('name')
@@ -151,7 +152,7 @@ export default function ManMonthGrid(props: Props) {
         const room = total * COL / 7 - px0
         return { e, ws, label, px0, barPx, endPx: px0 + Math.min(room, Math.max(barPx, textPx)), cut0: r0 < 0, cut1: r1 > total - 1 }
       })
-      .sort((a, b) => KIND_RANK[a.e.kind] - KIND_RANK[b.e.kind] || a.px0 - b.px0)
+      .sort((a, b) => a.px0 - b.px0)
     const lanes: typeof placed[] = []
     const hidden: typeof placed = []
     for (const p of placed) {
@@ -165,7 +166,7 @@ export default function ManMonthGrid(props: Props) {
     const hiddenByWeek = new Map<number, MmEvent[]>()
     for (const { e, ws } of hidden) for (const w of ws) hiddenByWeek.set(w, [...(hiddenByWeek.get(w) ?? []), e])
     const mark = new Map<number, string>()
-    for (const [w, list] of byWeek) mark.set(w, EVENT_KINDS[[...list].sort((x, y) => KIND_RANK[x.kind] - KIND_RANK[y.kind])[0].kind].color)
+    for (const [w, list] of byWeek) mark.set(w, evColor(list[0]))
     return { lanes, byWeek, hiddenByWeek, mark }
   }, [sheet.events, sheet.startDate, sheet.weeks, weeks])
   const relatedEvents = useCallback((name: string) => {
@@ -633,7 +634,7 @@ export default function ManMonthGrid(props: Props) {
               const k = EVENT_KINDS[it.e.kind]
               return (
                 <button key={it.e.id} type="button" className={`mm-ev2${it.e.endDate ? '' : ' is-day'}${it.cut0 ? ' cut0' : ''}${it.cut1 ? ' cut1' : ''}`}
-                        style={{ ['--ev' as string]: k.color, ['--bar' as string]: `${it.barPx}px`, left: it.px0 }}
+                        style={{ ['--ev' as string]: evColor(it.e), ['--bar' as string]: `${it.barPx}px`, left: it.px0 }}
                         onClick={() => props.onEventOpen?.(it.e)} onDoubleClick={(e) => e.stopPropagation()}
                         aria-label={`이벤트 ${eventPeriod(it.e)} ${it.e.title}`}
                         title={`${eventPeriod(it.e)}\n${it.e.title}${it.e.related ? `\n관련: ${it.e.related}` : ''}${it.e.note ? `\n${it.e.note}` : ''}`}>
@@ -705,8 +706,8 @@ export default function ManMonthGrid(props: Props) {
           const re = rel.get(i)
           return (
             <td key={i} className={`mm-psum${i === thisWeek ? ' is-now' : ''}${agg.notes[i].length ? ' has-note' : ''}`}
-                title={[s ? String(s) : '', ...agg.notes[i].map((t) => `메모 ${t}`)].filter(Boolean).join('\n') || undefined}>
-              {re && <button type="button" className="mm-diamond" style={{ ['--ev' as string]: EVENT_KINDS[re[0].kind].color }}
+                title={s ? String(s) : undefined} data-note={agg.notes[i].length ? agg.notes[i].join('\n') : undefined}>
+              {re && <button type="button" className="mm-diamond" style={{ ['--ev' as string]: evColor(re[0]) }}
                              onClick={() => (re.length > 1 ? props.onWeekEvents?.(`${g.p.name} · ${weeks[i].label} 주`, re) : props.onEventOpen?.(re[0]))}
                              title={re.map((e) => `${eventPeriod(e)} ${e.title}`).join('\n')}
                              aria-label={re.map((e) => `이벤트 ${e.title}`).join(', ')}>{EVENT_KINDS[re[0].kind].sym}</button>}
@@ -729,7 +730,7 @@ export default function ManMonthGrid(props: Props) {
         const notes = a.notes[String(w.index)]
         return <td key={w.index} className={`mm-cell mm-ro${over ? ' is-over' : ''}${w.index === thisWeek ? ' is-now' : ''}${notes ? ' has-note' : ''}`}
                    style={{ backgroundColor: cellBg(v, over) }}
-                   title={[parts ? `${over ? '1.0 초과 — ' : ''}${parts.join(' + ')}` : '', ...(notes ?? []).map((t) => `메모 ${t}`)].filter(Boolean).join('\n') || undefined}>{fmtVal(v)}</td>
+                   title={parts ? `${over ? '1.0 초과 — ' : ''}${parts.join(' + ')}` : undefined} data-note={notes ? notes.join('\n') : undefined}>{fmtVal(v)}</td>
       })}
     </tr>
   ))
@@ -802,6 +803,14 @@ export default function ManMonthGrid(props: Props) {
         </div>
       )}
       <div className={`mm-wrap${compact ? ' mm-wrap--compact' : ''}`} ref={wrap} tabIndex={0} onKeyDown={onKey} onPaste={onPaste} onCopy={onCopy}
+           onMouseOver={(e) => {
+             const td = (e.target as HTMLElement).closest<HTMLElement>('td[data-note]')
+             if (!td || dragging.current || ctx) { if (hoverNote) setHoverNote(null); return }
+             const r = td.getBoundingClientRect()
+             if (hoverNote?.x === r.right && hoverNote.y === r.top) return
+             setHoverNote({ text: td.dataset.note ?? '', x: r.right, y: r.top })
+           }}
+           onMouseLeave={() => setHoverNote(null)} onScroll={() => { if (hoverNote) setHoverNote(null) }}
            onFocus={(e) => { if (e.target === e.currentTarget && !focus && mode === 'project' && !compact) setLive('공수 표 — 방향키를 누르면 이번 주 첫 칸부터 고릅니다.') }}
            style={{ scrollPaddingTop: laneTop(lanes.length) }} role="region" aria-label="공수 표 — 방향키로 이동, 숫자로 입력, Shift+F2 메모">
         <table className="mm-grid">
@@ -828,6 +837,11 @@ export default function ManMonthGrid(props: Props) {
                         onClose={() => { setCtx(null); wrap.current?.focus() }}
                         onSave={async (text) => { const ok = await props.onNotes?.(cells.map((p) => ({ ...p, text }))); if (ok) { setCtx(null); wrap.current?.focus(); onInfo(text ? `메모 저장${cells.length > 1 ? ` (${cells.length}칸)` : ''}` : '메모 지움') } }} />
       })()}
+      {hoverNote && !ctx && (
+        <div className="mm-hovernote" role="tooltip" style={{ left: Math.min(hoverNote.x + 4, window.innerWidth - 300), top: Math.max(8, hoverNote.y - 4) }}>
+          <span className="mm-hovernote__tag">메모</span>{hoverNote.text}
+        </div>
+      )}
       {noteFor && <NoteDialog cells={noteFor} rows={sheet.rows} projects={projectName} weeks={weeks} onClose={() => { setNoteFor(null); wrap.current?.focus() }}
                               onSave={async (text) => { const ok = await props.onNotes?.(noteFor.map((p) => ({ ...p, text }))); if (ok) { setNoteFor(null); wrap.current?.focus() } }} />}
     </>
@@ -971,9 +985,9 @@ const PersonRow = memo(function PersonRow({ r, cells, weeks, thisWeek, selFrom, 
       + (w.index === thisWeek ? ' is-now' : '') + (p !== undefined ? (p ? ' is-failed' : ' is-pending') : '') + (o ? ' is-overp' : '') + (note ? ' has-note' : '')
       + (v !== undefined && Math.abs(v) >= 100 ? ' is-wide' : '')
     const edges = inSel ? `${w.index === selFrom ? ' l' : ''}${w.index === selTo ? ' r' : ''}${edgeTop ? ' t' : ''}${edgeBottom ? ' b' : ''}` : ''
-    const tip = [v !== undefined && Math.abs(v) >= 100 ? `값 ${fmtVal(v)}` : '', p ? '저장 안 됨 — 표 위 [다시 시도]' : '', o ? `이 사람 이 주 합계 ${o} — 1.0 초과` : '', note ? `메모: ${note}` : ''].filter(Boolean).join('\n')
+    const tip = [v !== undefined && Math.abs(v) >= 100 ? `값 ${fmtVal(v)}` : '', p ? '저장 안 됨 — 표 위 [다시 시도]' : '', o ? `이 사람 이 주 합계 ${o} — 1.0 초과` : ''].filter(Boolean).join('\n')
     nodes.push(
-      <td key={w.index} data-k={`${r.id}:${w.index}`} className={cls} style={{ backgroundColor: cellBg(v) }} title={tip || undefined}
+      <td key={w.index} data-k={`${r.id}:${w.index}`} data-note={note || undefined} className={cls} style={{ backgroundColor: cellBg(v) }} title={tip || undefined}
           aria-selected={inSel || extras.has(w.index) || undefined}
           onMouseDown={(e) => { if (isFocus && edit) return; e.preventDefault(); onDown({ rowId: r.id, week: w.index }, e.shiftKey, e.ctrlKey || e.metaKey) }}
           onMouseEnter={() => onEnter({ rowId: r.id, week: w.index })}
@@ -1002,7 +1016,9 @@ const PersonRow = memo(function PersonRow({ r, cells, weeks, thisWeek, selFrom, 
         {onMenu && editable && <button type="button" className="mm-mini" onClick={() => onMenu(r)} aria-label={`${r.personName} 행 편집`}>⋯</button>}
       </th>
       <td className="mm-sticky mm-c1 mm-dim">{r.department ?? ''}</td>
-      <td className="mm-sticky mm-c2 mm-dim">{r.role ?? ''}</td>
+      <td className="mm-sticky mm-c2 mm-dim mm-rowmm" title={`${r.role ? `${r.role} · ` : ''}이 표 기간 ${totalMm(cells, weeks)} MM`}>
+        <span className="mm-rowmm__role">{r.role ?? ''}</span>{totalMm(cells, weeks) > 0 && <b>{totalMm(cells, weeks)}</b>}
+      </td>
       {nodes}
     </tr>
   )

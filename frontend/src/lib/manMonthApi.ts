@@ -14,11 +14,15 @@ export interface MmSheet {
 export interface MmCellChange { rowId: number; week: number; value: number | null }
 export interface MmNoteChange { rowId: number; week: number; text: string }
 export type MmEventKind = 'MILESTONE' | 'MEETING' | 'RELEASE' | 'REVIEW' | 'HOLIDAY' | 'LEAVE' | 'ETC'
-export interface MmEvent { id: number; startDate: string; endDate: string | null; kind: MmEventKind; title: string; related: string | null; note: string | null; createdBy: string | null; updatedAt: string; /** 이 사람이 고치거나 삭제할 수 있는지(만든 사람·관리자) */ canEdit: boolean }
-export interface MmEventRequest { startDate: string; endDate?: string | null; kind: MmEventKind; title: string; related?: string; note?: string }
+export interface MmEvent { id: number; startDate: string; endDate: string | null; kind: MmEventKind; title: string; related: string | null; note: string | null; createdBy: string | null; updatedAt: string; /** 이 사람이 고치거나 삭제할 수 있는지(만든 사람·관리자) */ canEdit: boolean; /** 고른 색(#rrggbb). 없으면 기본 색 */ color: string | null }
+export interface MmEventRequest { startDate: string; endDate?: string | null; kind: MmEventKind; title: string; related?: string; note?: string; color?: string | null }
 /** 이벤트 종류: 이름 · 색 · 모양(색약·흑백에서도 갈리게 색과 함께 씀) */
 /** 이벤트 종류는 쓰지 않는다(사용자 지시) — 모든 이벤트가 같은 색·같은 표시. kind 값은 DB 에 남아 있어도 화면에서 구분하지 않음 */
-export const EVENT_COLOR = '#7048e8'
+export const EVENT_COLOR = '#5b6577'
+/** 이벤트 색 고르기 목록 */
+export const EVENT_COLORS = ['#5b6577', '#2f4a7a', '#3e6e6a', '#5d7a48', '#9a7434', '#9c5442', '#7d4f6b']
+/** 이 이벤트의 색(고른 색, 없으면 기본) */
+export const evColor = (e: { color?: string | null }) => e.color || EVENT_COLOR
 const ONE = { label: '이벤트', color: EVENT_COLOR, sym: '●' }
 export const EVENT_KINDS: Record<MmEventKind, { label: string; color: string; sym: string }> = {
   RELEASE: ONE, MILESTONE: ONE, REVIEW: ONE, MEETING: ONE, HOLIDAY: ONE, LEAVE: ONE, ETC: ONE,

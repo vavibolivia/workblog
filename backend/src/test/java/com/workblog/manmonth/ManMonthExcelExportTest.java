@@ -28,8 +28,8 @@ class ManMonthExcelExportTest {
                 new RowDto(11L, 1L, null, "이", null, null, 1, Map.of(0, new BigDecimal("0.25")), Map.of()),
                 new RowDto(12L, 2L, null, "박", null, null, 0, Map.of(2, BigDecimal.ONE), Map.of()));
         List<EventDto> events = List.of(
-                new EventDto(1L, LocalDate.of(2026, 11, 10), null, EventKind.RELEASE, "1차 배포", "AirDeck", null, "a", Instant.now(), true),
-                new EventDto(2L, LocalDate.of(2027, 5, 1), null, EventKind.ETC, "기간 밖", null, null, "a", Instant.now(), true));
+                new EventDto(1L, LocalDate.of(2026, 11, 10), null, EventKind.RELEASE, "1차 배포", "AirDeck", null, "a", Instant.now(), true, null),
+                new EventDto(2L, LocalDate.of(2027, 5, 1), null, EventKind.ETC, "기간 밖", null, null, "a", Instant.now(), true, null));
         SheetDetail d = new SheetDetail(1L, "시험", null, start, 4, false, 1L, "a", Instant.now(), true, true,
                 List.of(), projects, rows, List.of(), events);
 

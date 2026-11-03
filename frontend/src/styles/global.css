@@ -925,7 +925,7 @@ tr:hover .mm-mini, .mm-mini:focus-visible { opacity: 1; }
 .mm-ctx__item kbd { font-size: 11px; color: var(--muted); font-family: inherit; }
 .mm-ctx hr { border: 0; border-top: 1px solid var(--line); margin: 4px 0; }
 .mm-ctx__note { padding: 2px 8px 6px; }
-.mm-extras--one { grid-template-columns: minmax(0, 1fr); }
+.mm-extras.mm-extras--one { grid-template-columns: minmax(0, 1fr); }
 .mm-pick__pos { font-size: 12px; font-weight: 600; color: var(--navy); }
 .mm-pick__none { margin: 0; padding: 10px; }
 .mm-editors { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 4px 12px; margin-top: 10px; max-height: 360px; overflow: auto; }
@@ -1282,3 +1282,68 @@ tr:hover .mm-mini, .mm-mini:focus-visible { opacity: 1; }
 /* 프로젝트 합계 칸의 관련 이벤트 표시(●): 왼쪽 아래 구석에 작게 — 숫자를 밀어내지 않게 */
 .mm-grid td.mm-psum { position: relative; }
 .mm-grid .mm-diamond { position: absolute; left: 1px; bottom: 1px; font-size: 8px; line-height: 1; padding: 1px; }
+/* 이벤트 색 고르기 */
+.ev-colors { display: flex; flex-wrap: wrap; gap: 8px; }
+.ev-colors button { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--paper); box-shadow: 0 0 0 1px var(--line-strong); cursor: pointer; padding: 0; }
+.ev-colors button.is-on { box-shadow: 0 0 0 2px var(--ink); }
+/* 메모: 마우스를 올리면 바로 */
+.mm-hovernote { position: fixed; z-index: 70; max-width: 290px; padding: 6px 9px; background: #fffbe0; color: #1b2430; border: 1px solid #d8c84a; border-radius: 6px; box-shadow: 0 6px 18px rgba(0, 0, 0, .16); font-size: 12.5px; line-height: 1.45; white-space: pre-wrap; pointer-events: none; }
+.mm-hovernote__tag { display: inline-block; margin-right: 6px; font-size: 11px; font-weight: 700; color: #8a7400; }
+/* 인원 줄: 역할 옆에 이 표 기간 MM */
+.mm-grid td.mm-rowmm { display: table-cell; }
+.mm-rowmm__role { display: inline-block; max-width: 48px; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; }
+.mm-grid td.mm-rowmm b { float: right; color: var(--ink); font-weight: 700; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+/* 인원 칸 숫자: 더 크게·굵게 */
+.mm-grid tr.mm-person td.mm-cell { font-size: 14px; font-weight: 700; }
+
+/* ===== 공수 표 디자인 정리: 색은 최소(회색 톤 + 남색 하나), 정보는 글씨와 선으로 ===== */
+:root { --mm-on: #0b2a5b; --mm-over: transparent; --mm-now: rgba(15, 23, 42, .035); --mm-line: #e6e9ee; --mm-head: #fafbfc; --mm-band: #f6f7f9; }
+:root[data-theme="dark"] { --mm-on: #9fb7e0; --mm-now: rgba(255, 255, 255, .04); --mm-line: #2a3240; --mm-head: #161c25; --mm-band: #1a212c; }
+.mm-wrap { border-color: var(--mm-line); border-radius: 8px; }
+.mm-grid th, .mm-grid td { border-right-color: var(--mm-line); border-bottom-color: var(--mm-line); }
+.mm-grid td.mm-cell, .mm-grid td.mm-psum, .mm-grid th.mm-week, .mm-grid .mm-total td:not(.mm-sticky) { border-right-color: transparent; }
+.mm-grid thead th { background: var(--mm-head); color: var(--ink-2); font-weight: 600; }
+.mm-grid .mm-month { color: var(--ink); font-weight: 700; font-size: 12px; border-left: 1px solid var(--mm-line); }
+.mm-grid .mm-week { color: var(--muted); font-weight: 500; font-size: 11px; }
+.mm-grid thead th.mm-week.is-now { color: var(--navy); font-weight: 800; box-shadow: inset 0 -2px 0 var(--navy), inset 0 0 0 9999px var(--mm-now); }
+:root[data-theme="dark"] .mm-grid thead th.mm-week.is-now { color: #fff; box-shadow: inset 0 -2px 0 #fff, inset 0 0 0 9999px var(--mm-now); }
+.mm-grid thead th.mm-week.has-ev { box-shadow: none; }
+.mm-grid thead th.mm-week.has-ev.is-now { box-shadow: inset 0 -2px 0 var(--navy), inset 0 0 0 9999px var(--mm-now); }
+/* 프로젝트 줄 · 합계 줄: 옅은 회색 띠 */
+.mm-grid .mm-project td, .mm-grid .mm-project .mm-sticky { background: var(--mm-band); }
+.mm-grid .mm-project th { color: var(--ink); }
+.mm-grid .mm-psum { color: var(--ink); font-weight: 700; }
+.mm-grid .mm-total td, .mm-grid .mm-total th { background: var(--mm-band); border-top: 1px solid var(--line-strong); color: var(--ink); }
+/* 인원 칸: 진한 글씨, 배경은 아주 옅은 남색 농도 */
+.mm-grid tr.mm-person td.mm-cell { color: var(--ink); font-size: 13.5px; font-weight: 600; }
+.mm-grid td.mm-cell.is-over, .mm-grid td.mm-cell.is-overp { color: var(--danger); font-weight: 800; text-decoration: none; }
+.mm-cell.is-overp::after { content: none; }
+:root[data-theme="dark"] .mm-grid td.mm-cell.is-over, :root[data-theme="dark"] .mm-grid td.mm-cell.is-overp { color: #ff8a95; }
+.mm-ext { background: transparent; border: 1px solid var(--mm-line); color: var(--muted); }
+.mm-overtag { border-color: transparent; background: transparent; }
+/* 이벤트: 가는 막대 + 회색 글씨(색은 막대에만, 옅게) */
+.mm-grid thead .mm-evrow th, .mm-grid thead th.mm-evlabel { background: var(--paper); }
+.mm-ev2__bar { top: 3px; bottom: 3px; height: auto; border-radius: 3px; background: color-mix(in srgb, var(--ev) 13%, transparent); box-shadow: inset 2px 0 0 color-mix(in srgb, var(--ev) 70%, transparent); }
+.mm-ev2.is-day .mm-ev2__bar { width: 7px; height: 7px; top: 7px; bottom: auto; background: var(--ev); }
+.mm-ev2__txt { font-weight: 600; font-size: 11.5px; color: var(--ink-2); padding-left: 10px; }
+.mm-ev2:not(.is-day) .mm-ev2__txt { padding-left: 7px; }
+.mm-ev2__txt b { display: none; }
+:root[data-theme="dark"] .mm-ev2__txt { color: var(--ink-2); }
+.mm-grid .mm-diamond { color: var(--ev); opacity: .8; }
+/* 표 위 요약·도구: 회색 한 톤 */
+.mm-summary { color: var(--ink-2); }
+.mm-summary b { font-size: 10px; vertical-align: 1px; }
+.mm-status--ok { color: var(--muted); }
+/* 이벤트 표: 줄 왼쪽 색 띠 대신 작은 점, 진행 중은 회색 */
+.ev-row.is-now td { background: var(--mm-band); }
+.ev-row td.ev-title::before { content: ''; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--ev); margin-right: 8px; vertical-align: 1px; }
+.ev-next { background: transparent; color: var(--navy); border: 1px solid var(--line-strong); }
+.ev-colors button { width: 24px; height: 24px; }
+/* 공수 칸: 회청색 바탕 + 흰 글씨(값이 클수록 진하게), 1.0 초과는 빨강 바탕 */
+:root, :root[data-theme="dark"] { --mm-on: #2c3a4f; --mm-off: #8e9aad; --mm-over: #b42318; }
+.mm-grid tr.mm-person td.mm-cell, .mm-grid td.mm-cell.mm-ro { color: #fff; font-weight: 700; }
+.mm-grid td.mm-cell.is-over, .mm-grid td.mm-cell.is-overp, :root[data-theme="dark"] .mm-grid td.mm-cell.is-over, :root[data-theme="dark"] .mm-grid td.mm-cell.is-overp { color: #fff; }
+.mm-grid td.mm-cell.is-overp { background-color: var(--mm-over) !important; }
+.mm-grid td.mm-cell .mm-input { color: var(--ink); background: var(--paper); }
+/* 선택: 흰 글씨 위에서도 보이게 바깥선만 진하게 */
+.mm-cell { --sel-tint: rgba(255, 255, 255, .22); }

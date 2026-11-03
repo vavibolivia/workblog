@@ -17,7 +17,7 @@ import java.util.List;
  */
 @Service
 public class MmEventService {
-    private static final String COLS = "id, start_date, end_date, kind, title, related, note, created_by, updated_at, created_by_id";
+    private static final String COLS = "id, start_date, end_date, kind, title, related, note, created_by, updated_at, created_by_id, color";
     private final JdbcTemplate jdbc;
 
     public MmEventService(JdbcTemplate jdbc) {
@@ -44,21 +44,21 @@ public class MmEventService {
         boolean mine = !rs.wasNull() && viewer != null && owner == viewer.getId();
         return new EventDto(rs.getLong(1), rs.getDate(2).toLocalDate(), end == null ? null : end.toLocalDate(),
                 EventKind.valueOf(rs.getString(4)), rs.getString(5), rs.getString(6), rs.getString(7), rs.getString(8),
-                rs.getTimestamp(9).toInstant(), viewer != null && (viewer.isAdmin() || mine));
+                rs.getTimestamp(9).toInstant(), viewer != null && (viewer.isAdmin() || mine), rs.getString(11));
     }
 
     public EventDto create(EventRequest req, User actor) {
         check(req);
-        Long id = jdbc.queryForObject("INSERT INTO mm_events (start_date, end_date, kind, title, related, note, created_by, created_by_id) VALUES (?,?,?,?,?,?,?,?) RETURNING id",
-                Long.class, Date.valueOf(req.startDate()), end(req), kind(req), req.title().trim(), blank(req.related()), blank(req.note()), actor.getDisplayName(), actor.getId());
+        Long id = jdbc.queryForObject("INSERT INTO mm_events (start_date, end_date, kind, title, related, note, created_by, created_by_id, color) VALUES (?,?,?,?,?,?,?,?,?) RETURNING id",
+                Long.class, Date.valueOf(req.startDate()), end(req), kind(req), req.title().trim(), blank(req.related()), blank(req.note()), actor.getDisplayName(), actor.getId(), color(req));
         return get(id, actor);
     }
 
     public EventDto update(long id, EventRequest req, User actor) {
         requireOwner(id, actor);
         check(req);
-        int n = jdbc.update("UPDATE mm_events SET start_date = ?, end_date = ?, kind = ?, title = ?, related = ?, note = ?, updated_at = now() WHERE id = ?",
-                Date.valueOf(req.startDate()), end(req), kind(req), req.title().trim(), blank(req.related()), blank(req.note()), id);
+        int n = jdbc.update("UPDATE mm_events SET start_date = ?, end_date = ?, kind = ?, title = ?, related = ?, note = ?, color = ?, updated_at = now() WHERE id = ?",
+                Date.valueOf(req.startDate()), end(req), kind(req), req.title().trim(), blank(req.related()), blank(req.note()), color(req), id);
         if (n == 0) throw ApiException.notFound("이벤트를 찾을 수 없습니다.");
         return get(id, actor);
     }
@@ -94,6 +94,10 @@ public class MmEventService {
 
     private static String kind(EventRequest req) {
         return (req.kind() == null ? EventKind.ETC : req.kind()).name();
+    }
+
+    private static String color(EventRequest req) {
+        return req.color() == null || req.color().isBlank() ? null : req.color().toLowerCase(java.util.Locale.ROOT);
     }
 
     private static String blank(String s) {

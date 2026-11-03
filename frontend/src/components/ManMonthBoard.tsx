@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { relativeTime } from '../lib/api'
 import { useAuth } from '../lib/auth'
-import { EVENT_KINDS, eventPeriod, personKey, weeksOf, type MmEvent, type MmProject, type MmRow } from '../lib/manMonthApi'
+import { evColor, eventPeriod, personKey, weeksOf, type MmEvent, type MmProject, type MmRow } from '../lib/manMonthApi'
 import { EventDialog, EventsTable } from './MmEvents'
 import { type MmSheetState } from '../lib/useMmSheet'
 import { useToast } from '../lib/toast'
@@ -129,7 +129,7 @@ function Summary({ state }: { state: MmSheetState }) {
   if (!s.next && !s.inSheet) return null
   return (
     <div className="mm-summary">
-      {s.next && <span><span className="muted">다음 일정</span> <b style={{ color: EVENT_KINDS[s.next.kind].color }}>{EVENT_KINDS[s.next.kind].sym}</b> <strong>{eventPeriod(s.next)}</strong> {s.next.title}</span>}
+      {s.next && <span><span className="muted">다음 일정</span> <b style={{ color: evColor(s.next) }}>●</b> <strong>{eventPeriod(s.next)}</strong> {s.next.title}</span>}
       {s.inSheet && <span><span className="muted">이번 주 1.0 초과</span> {s.over.length
         ? s.over.slice(0, 4).map((o, i) => <span key={i} className="mm-summary__over">{o.name} {o.sum}</span>)
         : <strong>없음</strong>}{s.over.length > 4 && <span className="muted"> 외 {s.over.length - 4}명</span>}</span>}
