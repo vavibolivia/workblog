@@ -263,7 +263,8 @@ code, pre, kbd { font-family: var(--mono); }
 .cat-tree__row--d1 .cat-tree__link { font-weight: 600; color: var(--ink); }
 .cat-tree__count { font-size: 12px; color: var(--muted); flex: none; }
 /* R21 (2026-10-27 지시): 카테고리를 고르면 루트부터 그 단계까지의 경로를 depth 별 색으로 — 1 네이비, 2 하늘, 3 청록, 4 보라, 5 주황 */
-:root { --path-1: #0B2A5B; --path-2: #2F9BE3; --path-3: #0f9d8a; --path-4: #7c3aed; --path-5: #e07b00; }
+/* 카테고리 경로: 색 최소 — 모든 단계 남색 하나(2026-11-03 사용자 확인) */
+:root { --path-1: var(--navy); --path-2: var(--navy); --path-3: var(--navy); --path-4: var(--navy); --path-5: var(--navy); }
 .cat-tree li[data-depth="1"] { --path: var(--path-1); } .cat-tree li[data-depth="2"] { --path: var(--path-2); } .cat-tree li[data-depth="3"] { --path: var(--path-3); }
 .cat-tree li[data-depth="4"] { --path: var(--path-4); } .cat-tree li[data-depth="5"] { --path: var(--path-5); }
 /* 왼쪽 면 색칠 금지: 띠·선 없이 글자색과 토글 점 색으로만 경로를 표시한다(2026-10-27 지적) */
@@ -670,7 +671,7 @@ kbd { display: inline-block; min-width: 22px; padding: 1px 6px; border: 1px soli
     --success: #4ade80; --success-50: #13301f;
     --warn: #f0a243; --warn-50: #3a2a12;
     --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 4px 16px rgba(0, 0, 0, .3);
-    --path-1: #8ab8f0; --path-2: #5db3ec; --path-3: #2fc2ac; --path-4: #a78bfa; --path-5: #f5a142;
+    --path-1: #8ab8f0; --path-2: #8ab8f0; --path-3: #8ab8f0; --path-4: #8ab8f0; --path-5: #8ab8f0;
     --btn-fill: #2f6fc8; --btn-fill-hover: #3b7dd8;
   }
   /* 네이비 바탕 + 흰 글자 요소: 다크에서는 --navy 가 밝은 글자색이라 채움색을 따로 둔다 */
