@@ -530,7 +530,7 @@ export default function ManMonthGrid(props: Props) {
     if (!latest.current.editable) { onReadOnlyRef.current?.(); return }
     setAnchor(p); setFocus(p); setExtra(new Set()); setRangeOn(true); setEdit({ init: fmtVal(v), typed: false })
   }, [])
-  // 칸 오른쪽 클릭: 고른 칸 밖이면 그 칸을 고르고, 그 자리에 메뉴(값·직접 입력·메모·이벤트)
+  // 칸 오른쪽 클릭: 고른 칸 밖이면 그 칸을 고르고, 그 자리에 메모 입력 칸
   const [ctx, setCtx] = useState<{ p: Pos; v: number | undefined; x: number; y: number } | null>(null)
   const onCellCtx = useCallback((p: Pos, v: number | undefined, x: number, y: number) => {
     const l = latest.current
@@ -790,9 +790,9 @@ export default function ManMonthGrid(props: Props) {
             )}
             {focusNote
               ? <><span className="mm-notebar__tag"><IcNote /> 메모</span><span className="mm-notebar__text">{focusNote}</span>{editable && <button type="button" className="btn btn--sm btn--ghost" onClick={openNotes}>고치기</button>}</>
-              : <span className="muted">메모 없음{editable ? ' — 칸을 오른쪽 클릭해 [메모 적기]' : ''}</span>}
+              : <span className="muted">메모 없음{editable ? ' — 칸을 오른쪽 클릭해 바로 적기' : ''}</span>}
           </> : <span className="muted">{editable
-            ? (coarse() ? '칸을 누르고 다시 누르면 입력' : '숫자 입력 후 Enter · 칸을 오른쪽 클릭하면 값·직접 입력·메모·이벤트 메뉴 · 끌거나 Shift 로 범위 · Ctrl+클릭으로 여러 칸 · Delete 비움 · Ctrl+Z 되돌리기 · 바로 저장됨')
+            ? (coarse() ? '칸을 누르고 다시 누르면 입력' : '숫자 입력 후 Enter · 칸을 오른쪽 클릭하면 바로 메모 · 끌거나 Shift 로 범위 · Ctrl+클릭으로 여러 칸 · Delete 비움 · Ctrl+Z 되돌리기 · 바로 저장됨')
             : '칸을 누르면 그 주 합계와 메모가 여기에 보입니다.'}</span>}
         </div>
       )}
@@ -815,31 +815,54 @@ export default function ManMonthGrid(props: Props) {
         </table>
       </div>
       {ctx && (() => {
+        // 오른쪽 클릭 = 메모만(그 자리에서 쓰고 Enter)
         const row = rowById.get(ctx.p.rowId)
-        const note = noteOf(ctx.p.rowId, ctx.p.week)
-        const n = count
-        const go = (f: () => void) => { setCtx(null); f(); wrap.current?.focus() }
-        const left = Math.max(8, Math.min(ctx.x, window.innerWidth - 232)), top = Math.max(8, Math.min(ctx.y, window.innerHeight - 330))
-        return (
-          <div className="mm-ctx" role="menu" aria-label="칸 메뉴" style={{ left, top }} onContextMenu={(e) => e.preventDefault()}>
-            <div className="mm-ctx__head">{row?.personName} · {weeks[ctx.p.week]?.label} 주{n > 1 ? ` 외 — ${n}칸` : ''}</div>
-            {editable ? <>
-              <div className="mm-ctx__vals" role="group" aria-label="값 넣기">
-                {QUICK.map((v) => <button key={v} type="button" role="menuitem" onClick={() => go(() => fill(v))}>{v}</button>)}
-                <button type="button" role="menuitem" onClick={() => go(() => fill(null))}>비움</button>
-              </div>
-              <button type="button" role="menuitem" className="mm-ctx__item" onClick={() => go(() => onCellDbl(ctx.p, ctx.v))}>직접 입력…<kbd>F2</kbd></button>
-              <hr />
-              <button type="button" role="menuitem" className="mm-ctx__item" onClick={() => go(openNotes)}>{note ? '메모 고치기…' : '메모 적기…'}<kbd>Shift+F2</kbd></button>
-              {note && <button type="button" role="menuitem" className="mm-ctx__item" onClick={() => go(() => { void props.onNotes?.(selected().map((p) => ({ ...p, text: '' }))) })}>메모 지우기</button>}
-            </> : <div className="mm-ctx__note muted small">보기 전용 표 — 값·메모는 편집자만</div>}
-            {props.onEventAdd && <><hr /><button type="button" role="menuitem" className="mm-ctx__item" onClick={() => go(() => props.onEventAdd?.(weekDate(ctx.p.week)))}>이 주에 이벤트 넣기…</button></>}
-          </div>
-        )
+        const cells = selected()
+        return <MemoPop key={`${ctx.p.rowId}:${ctx.p.week}`} x={ctx.x} y={ctx.y} cells={cells} rows={sheet.rows} editable={editable}
+                        title={`${row?.personName ?? ''} · ${weeks[ctx.p.week]?.label} 주${cells.length > 1 ? ` 외 — ${cells.length}칸` : ''}`}
+                        onClose={() => { setCtx(null); wrap.current?.focus() }}
+                        onSave={async (text) => { const ok = await props.onNotes?.(cells.map((p) => ({ ...p, text }))); if (ok) { setCtx(null); wrap.current?.focus(); onInfo(text ? `메모 저장${cells.length > 1 ? ` (${cells.length}칸)` : ''}` : '메모 지움') } }} />
       })()}
       {noteFor && <NoteDialog cells={noteFor} rows={sheet.rows} projects={projectName} weeks={weeks} onClose={() => { setNoteFor(null); wrap.current?.focus() }}
                               onSave={async (text) => { const ok = await props.onNotes?.(noteFor.map((p) => ({ ...p, text }))); if (ok) { setNoteFor(null); wrap.current?.focus() } }} />}
     </>
+  )
+}
+
+/** 오른쪽 클릭 메모: 누른 자리에 작은 입력 칸. Enter 저장 · Shift+Enter 줄바꿈 · Esc 닫기 */
+function MemoPop({ x, y, cells, rows, title, editable, onSave, onClose }:
+  { x: number; y: number; cells: Pos[]; rows: MmRow[]; title: string; editable: boolean; onSave: (text: string) => Promise<void>; onClose: () => void }) {
+  const byId = new Map(rows.map((r) => [r.id, r]))
+  const texts = cells.map((p) => byId.get(p.rowId)?.notes?.[String(p.week)] ?? '')
+  const distinct = [...new Set(texts.filter(Boolean))]
+  const filled = texts.filter(Boolean).length
+  // 모든 칸이 같은 메모일 때만 미리 채운다(일부 칸 메모를 다른 칸에 퍼뜨리지 않게)
+  const original = distinct.length === 1 && filled === cells.length ? distinct[0] : ''
+  const [text, setText] = useState(original)
+  const [busy, setBusy] = useState(false)
+  const save = async (t: string) => { if (busy) return; setBusy(true); try { await onSave(t) } finally { setBusy(false) } }
+  const left = Math.max(8, Math.min(x, window.innerWidth - 300)), top = Math.max(8, Math.min(y, window.innerHeight - 230))
+  return (
+    <div className="mm-ctx mm-memo" role="dialog" aria-label="메모" style={{ left, top }} onContextMenu={(e) => e.preventDefault()}>
+      <div className="mm-ctx__head">{title}</div>
+      {editable ? <>
+        <textarea className="textarea mm-memo__text" rows={3} value={text} maxLength={2000} autoFocus disabled={busy}
+                  placeholder="이 주에 할 일 (Enter 저장 · Shift+Enter 줄바꿈)" aria-label="메모"
+                  onFocus={(e) => e.currentTarget.setSelectionRange(e.currentTarget.value.length, e.currentTarget.value.length)}
+                  onChange={(e) => setText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); if (text.trim() && text !== original) void save(text.trim()); else if (text === original) onClose() }
+                  }} />
+        {filled > 0 && cells.length > 1 && !original && <p className="small mm-memo__warn">메모가 있는 {filled}칸도 이 메모로 바뀝니다.</p>}
+        <div className="mm-memo__bar">
+          {distinct.length > 0 && <button type="button" className="btn btn--sm btn--ghost" disabled={busy} onClick={() => save('')}>지우기</button>}
+          <button type="button" className="btn btn--sm btn--primary" disabled={busy || !text.trim() || text === original} onClick={() => save(text.trim())}>저장</button>
+        </div>
+      </> : <>
+        <p className="mm-memo__view">{distinct.length ? distinct.join(' / ') : <span className="muted">메모 없음</span>}</p>
+        <p className="small muted">보기 전용 표 — 메모는 편집자만</p>
+      </>}
+    </div>
   )
 }
 
@@ -917,7 +940,7 @@ interface RowProps {
   onDbl: (p: Pos, v: number | undefined) => void
   onBlur: () => void
   onFillStart: () => void
-  /** 칸 오른쪽 클릭 메뉴 */
+  /** 칸 오른쪽 클릭 — 메모 입력 칸 */
   onCtx: (p: Pos, v: number | undefined, x: number, y: number) => void
   onMenu?: (r: MmRow) => void
 }

@@ -1238,3 +1238,9 @@ tr:hover .mm-mini, .mm-mini:focus-visible { opacity: 1; }
 .mm-editor-preview { margin: 12px 0; }
 .mm-editor-preview > summary { cursor: pointer; font-weight: 600; padding: 4px 0; }
 .mm-editor-preview .mm-embed { margin-top: 10px; }
+/* 오른쪽 클릭 메모 */
+.mm-memo { width: 280px; padding: 8px; }
+.mm-memo__text { width: 100%; min-height: 64px; resize: vertical; font-size: 13px; margin: 6px 0; box-sizing: border-box; }
+.mm-memo__warn { color: var(--warn); margin: 0 0 6px; }
+.mm-memo__bar { display: flex; align-items: center; gap: 6px; justify-content: flex-end; }
+.mm-memo__view { margin: 6px 0; white-space: pre-wrap; font-size: 13px; }
