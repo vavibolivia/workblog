@@ -57,6 +57,13 @@ public class ManMonthController {
         return service.update(id, req, user);
     }
 
+    /** 표 복사(다음 분기 등). 볼 수 있는 사람이면 누구나 — 새 표의 주인이 된다. */
+    @PostMapping("/{id}/copy")
+    @ResponseStatus(HttpStatus.CREATED)
+    public SheetDetail copy(@PathVariable long id, @Valid @RequestBody CopySheetRequest req, @CurrentUser User user) {
+        return service.copy(id, req, user);
+    }
+
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable long id, @CurrentUser User user) {

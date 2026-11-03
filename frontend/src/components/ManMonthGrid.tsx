@@ -80,6 +80,11 @@ export default function ManMonthGrid(props: Props) {
   const [fillTo, setFillTo] = useState<Pos | null>(null)
   const [noteFor, setNoteFor] = useState<Pos[] | null>(null)
   const [live, setLive] = useState('')
+  /** 사람별 부하: 1.0 넘는 주가 있는 사람만 / 정렬(이름 · 가장 바쁜 주 · 기간 MM) */
+  const [overOnly, setOverOnly] = useState(false)
+  const [pSort, setPSort] = useState<'name' | 'peak' | 'mm'>('name')
+  /** 터치 화면: 켜 두면 다음에 누르는 칸까지 범위로 고른다(Shift+클릭 대신) */
+  const [touchRange, setTouchRange] = useState(false)
   const inputRef = useRef<HTMLInputElement | null>(null)
   const wrap = useRef<HTMLDivElement>(null)
   const dragging = useRef<'select' | 'fill' | null>(null)
@@ -215,9 +220,12 @@ export default function ManMonthGrid(props: Props) {
       }
       m.set(k, a)
     }
+    const peak = (a: PersonAgg) => Math.max(0, ...Object.values(a.cells))
+    const mmOf = (a: PersonAgg) => totalMm(a.cells, weeks)
     return [...m.values()].filter((a) => !q || a.name.toLowerCase().includes(q) || (a.department ?? '').toLowerCase().includes(q) || a.projects.some((p) => p.toLowerCase().includes(q)))
-      .sort((a, b) => a.name.localeCompare(b.name, 'ko'))
-  }, [mode, sheet.rows, rowCells, q, projectName])
+      .filter((a) => !overOnly || peak(a) > 1.0001)
+      .sort((a, b) => (pSort === 'peak' ? peak(b) - peak(a) : pSort === 'mm' ? mmOf(b) - mmOf(a) : 0) || a.name.localeCompare(b.name, 'ko'))
+  }, [mode, sheet.rows, rowCells, q, projectName, overOnly, pSort, weeks])
 
   const foot = useMemo(() => {
     const keys = new Set(people.map((a) => a.key))
@@ -485,8 +493,8 @@ export default function ManMonthGrid(props: Props) {
   }
 
   // ---------- 마우스 ----------
-  const latest = useRef({ edit, commitEdit, select, editable, range, fillRect, tile, focus, anchor, rangeOn, cellsOfRect, extra })
-  useLayoutEffect(() => { latest.current = { edit, commitEdit, select, editable, range, fillRect, tile, focus, anchor, rangeOn, cellsOfRect, extra } })
+  const latest = useRef({ edit, commitEdit, select, editable, range, fillRect, tile, focus, anchor, rangeOn, cellsOfRect, extra, touchRange })
+  useLayoutEffect(() => { latest.current = { edit, commitEdit, select, editable, range, fillRect, tile, focus, anchor, rangeOn, cellsOfRect, extra, touchRange } })
   const onReadOnlyRef = useRef(props.onReadOnly)
   useLayoutEffect(() => { onReadOnlyRef.current = props.onReadOnly })
   const onCellDown = useCallback((p: Pos, shift: boolean, ctrl: boolean) => {
@@ -505,6 +513,8 @@ export default function ManMonthGrid(props: Props) {
       setRangeOn(false); setFocus(p); setAnchor(p)
       return
     }
+    // 터치 '범위 고르기': 처음 고른 칸부터 누른 칸까지 범위로 (한 번 고르면 꺼짐)
+    if (l.touchRange && coarse() && l.anchor) { l.select(p, true, false); setTouchRange(false); return }
     // 터치에서는 이미 고른 칸을 다시 누르면 바로 입력
     if (coarse() && l.editable && !shift && l.focus && l.focus.rowId === p.rowId && l.focus.week === p.week && l.anchor && l.anchor.rowId === p.rowId && l.anchor.week === p.week) {
       setEdit({ init: '', typed: false }); return
@@ -734,6 +744,25 @@ export default function ManMonthGrid(props: Props) {
       {!compact && (
         <div className="mm-tools">
           <span className="mm-tools__sel">{mode === 'person' ? <span className="muted">사람별 부하 — 보기 전용 · 1.0 초과는 빨강·물결 밑줄</span> : selInfo}</span>
+          {mode === 'person' && (
+            <span className="mm-tools__grp">
+              <label className="mm-chk"><input type="checkbox" checked={overOnly} onChange={(e) => setOverOnly(e.target.checked)} /> 1.0 초과인 사람만</label>
+              <label className="mm-chk">정렬{' '}
+                <select value={pSort} onChange={(e) => setPSort(e.target.value as typeof pSort)} aria-label="사람 정렬">
+                  <option value="name">이름</option>
+                  <option value="peak">가장 바쁜 주(큰 순)</option>
+                  <option value="mm">기간 MM(큰 순)</option>
+                </select>
+              </label>
+              <span className="muted small">{people.length}명</span>
+            </span>
+          )}
+          {mode === 'project' && coarse() && (
+            <span className="mm-tools__grp">
+              <button type="button" className="btn btn--sm" aria-pressed={touchRange} disabled={!focus} onClick={() => setTouchRange((v) => !v)}
+                      title="켠 뒤 끝 칸을 누르면 지금 칸부터 그 칸까지 범위로 고릅니다">{touchRange ? '끝 칸을 누르세요' : '범위 고르기'}</button>
+            </span>
+          )}
           {mode === 'project' && editable && (
             <>
               <span className="mm-tools__grp" role="group" aria-label="빠른 값">
@@ -774,7 +803,7 @@ export default function ManMonthGrid(props: Props) {
           {head}
           <tbody>
             {body}
-            {empty && <tr><td className="mm-sticky mm-c0 mm-empty" colSpan={3}>{q ? '찾는 프로젝트·인원이 없습니다.' : '아직 프로젝트·인원이 없습니다.'}</td><td colSpan={weeks.length} /></tr>}
+            {empty && <tr><td className="mm-sticky mm-c0 mm-empty" colSpan={3}>{q ? '찾는 프로젝트·인원이 없습니다.' : mode === 'person' && overOnly ? '1.0 을 넘는 사람이 없습니다.' : '아직 프로젝트·인원이 없습니다.'}</td><td colSpan={weeks.length} /></tr>}
           </tbody>
           <tfoot>
             <tr className="mm-total">

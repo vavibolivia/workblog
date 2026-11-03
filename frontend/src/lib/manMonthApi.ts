@@ -35,6 +35,7 @@ export const mmApi = {
   list: () => http.get<MmSheetSummary[]>(base).then((r) => r.data),
   get: (id: number) => http.get<MmSheet>(`${base}/${id}`).then((r) => r.data),
   create: (body: { title: string; description?: string; startDate: string; weeks: number }) => http.post<MmSheet>(base, body).then((r) => r.data),
+  copy: (id: number, body: { title: string; startDate: string; weeks: number; withValues: boolean }) => http.post<MmSheet>(`${base}/${id}/copy`, body).then((r) => r.data),
   update: (id: number, body: { title?: string; description?: string; startDate?: string; weeks?: number }) =>
     http.patch<MmSheet>(`${base}/${id}`, body).then((r) => r.data),
   remove: (id: number) => http.delete(`${base}/${id}`),

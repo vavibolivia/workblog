@@ -73,6 +73,14 @@ s, r = call("PUT", "/api/front", {"items": _front_keep + [{"kind": "POST", "refI
 s, r = call("GET", "/api/front", tok=MO); check("FRONT visible to all", s == 200 and any(i["refId"] == FP and i["kind"] == "POST" for i in r), (s, r))
 s, r = call("PUT", "/api/front", {"items": _front_keep + [{"kind": "POST", "refId": 999999999}]}, A); check("FRONT unknown item 400", s == 400, s)
 s, r = call("PUT", "/api/front", {"items": _front_keep}, A); check("FRONT restored", s == 200 and [{"kind": i["kind"], "refId": i["refId"]} for i in r] == _front_keep, (s, r))
+# 글 내보내기에 표 요약(월별 MM), 표 화면의 '이 표를 담은 글'(글 검색으로 찾음)
+if FP:
+    import io as _io0, zipfile as _zf0
+    s, dx = _mm_raw("GET", f"/api/posts/{FP}/export?format=docx", tok=MO)
+    _docxml = _zf0.ZipFile(_io0.BytesIO(dx)).read("word/document.xml").decode("utf-8") if s == 200 else ""
+    check("EXPORT docx includes MM summary table", s == 200 and "합계 MM" in _docxml and "프로젝트 가" in _docxml, s)
+    s, hx = _mm_raw("GET", f"/api/posts/{FP}/export?format=html", tok=MO); check("EXPORT html includes MM table", s == 200 and b"data-mm-export" in hx, s)
+    s, r = call("GET", f'/api/posts?size=10&q=/mm/{MM}"', tok=MO); check("MM backlink search finds post", s == 200 and any(x["id"] == FP for x in r["content"]), (s, r))
 if FP: call("DELETE", f"/api/posts/{FP}", tok=A); s, _ = call("DELETE", f"/api/posts/{FP}?purge=true", tok=A); check("FRONT temp post purged", s == 204, s)
 # 시작을 1주 늦추면 값은 날짜 기준으로 한 칸 당겨짐(첫 주 값은 기간 밖 → 지워짐)
 s, r = call("PATCH", f"/api/mm/sheets/{MM}", {"startDate": "2026-11-09"}, A)
@@ -105,6 +113,21 @@ call("PUT", f"/api/mm/sheets/{MM}/editors", {"userIds": []}, A)   # 편집자에
 s, rb = _mm_raw("POST", f"/api/mm/sheets/{MM}/excel?dryRun=true", tbody, MO, f"multipart/form-data; boundary={bd}")
 check("MM excel dry run needs editor", s == 403, s)
 call("PUT", f"/api/mm/sheets/{MM}/editors", {"userIds": [me_o["id"]]}, A)
+# 엑셀 내려받기에 메모·이벤트 시트, 소계 줄(올리기에서 건너뜀 — 위 재가져오기 안정성으로 확인)
+import io as _io, zipfile as _zf
+_wbxml = _zf.ZipFile(_io.BytesIO(xbytes)).read("xl/workbook.xml").decode("utf-8")
+check("MM excel has memo/event sheets", 'name="메모"' in _wbxml and 'name="이벤트"' in _wbxml, _wbxml[:300])
+# 표 복사: 보기만 되는 사람도 복사 가능(새 표의 주인). 값까지 옮기면 날짜 기준(1주 뒤 시작 → 한 칸 당겨짐)
+s, cp = call("POST", f"/api/mm/sheets/{MM}/copy", {"title": "스모크 복사", "startDate": "2026-11-16", "weeks": 4, "withValues": True}, MU)
+crow = next((x for x in cp.get("rows", []) if x["personName"] == me_u["displayName"]), {}) if s == 201 else {}
+check("MM copy by viewer 201 + owner", s == 201 and cp["canManage"] and len(cp["rows"]) == 2 and len(cp["projects"]) == 1, (s, cp))
+check("MM copy moves values/notes by date", crow.get("cells") == {"1": 0.5} and crow.get("notes") == {"1": "통합 시험"} and crow.get("role") == "개발", crow)
+check("MM copy keeps editors", s == 201 and [e["id"] for e in cp["editors"]] == [me_o["id"]], cp.get("editors"))
+s2, cp2 = call("POST", f"/api/mm/sheets/{MM}/copy", {"title": "스모크 복사2", "startDate": "2027-01-04", "weeks": 4, "withValues": False}, MU)
+check("MM copy without values", s2 == 201 and all(not x["cells"] and not x["notes"] for x in cp2["rows"]), (s2, cp2))
+s, orig = call("GET", f"/api/mm/sheets/{MM}", tok=A); check("MM copy leaves source unchanged", s == 200 and orig["title"] != "스모크 복사" and len(orig["rows"]) == 2, s)
+for _c in (cp, cp2):
+    if isinstance(_c, dict) and _c.get("id"): s, _ = call("DELETE", f"/api/mm/sheets/{_c['id']}", tok=MU); check("MM copy deleted by its owner", s == 204, s)
 # 화면 주소를 바로 열거나 새로 고침해도 앱이 떠야 함(SPA 경로)
 for _path in ("/mm", f"/mm/{MM}"):
     s, b = _mm_raw("GET", _path); check(f"MM page {_path} serves app", s == 200 and b"<div id=\"root\"" in b, (s, b[:80]))

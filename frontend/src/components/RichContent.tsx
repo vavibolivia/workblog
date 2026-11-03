@@ -9,6 +9,18 @@ import '../editor/editor.css'
 /** 본문에서 `/mm/번호`(업무산정 표) · `/mm/events`(이벤트 표) 링크 하나만 있는 문단 → 그 자리에 살아 있는 표 */
 const MM_LINK = /^\/mm\/(\d+|events)\/?$/
 
+/** 본문 HTML 에서 살아 있는 표로 바뀔 자리(글 화면과 같은 규칙) — 에디터 미리보기용 */
+export function mmEmbedIds(html: string): (number | 'events')[] {
+  if (!html.includes('/mm/')) return []
+  const out: (number | 'events')[] = []
+  new DOMParser().parseFromString(html, 'text/html').querySelectorAll('p > a[href]').forEach((a) => {
+    const m = MM_LINK.exec(a.getAttribute('href') ?? '')
+    const p = a.parentElement
+    if (m && p && (p.textContent ?? '').trim() === (a.textContent ?? '').trim()) out.push(m[1] === 'events' ? 'events' : Number(m[1]))
+  })
+  return out
+}
+
 /**
  * 글 본문 렌더러: HTML(리치 에디터)은 한 번 더 정화해서, MARKDOWN(예전 글)은 마크다운으로.
  * readOnlyEmbeds = 본문 속 공수 표를 보기 전용으로(대문·이력).

@@ -1230,3 +1230,11 @@ tr:hover .mm-mini, .mm-mini:focus-visible { opacity: 1; }
   .mm-tools, .mm-notebar, .mm-bar input, .mm-bar .btn, .mm-handle, .mm-mini { display: none !important; }
   .mm-sticky { position: static !important; }
 }
+
+/* 사람별 부하 필터·정렬 */
+.mm-chk { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; color: var(--ink-2); white-space: nowrap; }
+.mm-chk select { font: inherit; padding: 2px 4px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--paper); color: var(--ink); }
+.mm-tools .btn[aria-pressed="true"] { border-color: var(--sky); color: var(--sky); }
+.mm-editor-preview { margin: 12px 0; }
+.mm-editor-preview > summary { cursor: pointer; font-weight: 600; padding: 4px 0; }
+.mm-editor-preview .mm-embed { margin-top: 10px; }

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api, errorMessage, flattenCategories, formatFileSize, type AttachmentResponse, type CategoryNode, type PostRequest, type PostStatus, type Visibility } from '../lib/api'
 import { htmlToText, markdownToHtml } from '../lib/html'
@@ -10,6 +10,9 @@ import { editorApi } from '../lib/editorApi'
 import { useEditorShortcuts } from '../lib/shortcuts'
 import TemplatePicker from '../components/TemplatePicker'
 import Modal from '../components/Modal'
+import MmEmbed from '../components/MmEmbed'
+import { MmEventsEmbed } from '../components/MmEvents'
+import { mmEmbedIds } from '../components/RichContent'
 import axios from 'axios'
 import type { TemplateResponse } from '../lib/knowledgeApi'
 
@@ -194,6 +197,8 @@ export default function EditorPage() {
                       onSaveShortcut={saveDraftKey} onPublishShortcut={publishKey} />
         </Suspense>
 
+        <MmPreview content={content} />
+
         <div className="editor__attach">
           <div className="row row--between row--wrap">
             <strong className="small">첨부파일 {attachments.length > 0 && <span className="muted">({attachments.length})</span>}</strong>
@@ -242,5 +247,18 @@ export default function EditorPage() {
         </Modal>
       )}
     </div>
+  )
+}
+
+/** 본문에 넣은 공수 표·이벤트 표 미리보기 — 에디터 안에서는 링크 한 줄로 보이므로 */
+function MmPreview({ content }: { content: string }) {
+  const deferred = useDeferredValue(content)
+  const ids = useMemo(() => [...new Set(mmEmbedIds(deferred))], [deferred])
+  if (!ids.length) return null
+  return (
+    <details className="card mm-editor-preview" open>
+      <summary>본문에 담긴 업무산정 표 미리보기 ({ids.length}) <span className="small muted">— 글에서는 링크 줄 자리에 이 표가 보입니다</span></summary>
+      {ids.map((id) => (id === 'events' ? <MmEventsEmbed key="events" readOnly /> : <MmEmbed key={id} id={id} readOnly />))}
+    </details>
   )
 }

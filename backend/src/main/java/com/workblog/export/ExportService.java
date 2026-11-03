@@ -2,6 +2,8 @@ package com.workblog.export;
 
 import com.workblog.attachment.AttachmentDtos.AttachmentResponse;
 import com.workblog.attachment.AttachmentService;
+import com.workblog.manmonth.MmExportTables;
+import com.workblog.user.User;
 import com.workblog.post.Post;
 import com.workblog.post.PostDtos.PostDetail;
 import com.vladsch.flexmark.html2md.converter.FlexmarkHtmlConverter;
@@ -40,13 +42,16 @@ public class ExportService {
     private static final HttpClient HTTP = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).followRedirects(HttpClient.Redirect.NORMAL).build();
 
     private final AttachmentService attachments;
+    private final MmExportTables mmTables;
 
-    public ExportService(AttachmentService attachments) {
+    public ExportService(AttachmentService attachments, MmExportTables mmTables) {
         this.attachments = attachments;
+        this.mmTables = mmTables;
     }
 
-    public Exported export(PostDetail post, Format format, boolean includeAttachments, String baseUrl) throws IOException {
-        String html = post.contentFormat() == Post.ContentFormat.MARKDOWN ? markdownToHtml(post.content()) : post.content();
+    /** 본문의 공수 표 링크 문단 아래에 월별 MM 요약표를 넣는다(파일에는 살아 있는 표가 없으므로). */
+    public Exported export(PostDetail post, Format format, boolean includeAttachments, String baseUrl, User viewer) throws IOException {
+        String html = mmTables.expand(post.contentFormat() == Post.ContentFormat.MARKDOWN ? markdownToHtml(post.content()) : post.content(), viewer);
         String base = safeName(post.title());
         return switch (format) {
             case HTML -> new Exported(standaloneHtml(post, html, includeAttachments, baseUrl).getBytes(java.nio.charset.StandardCharsets.UTF_8), base + ".html", "text/html;charset=UTF-8");
@@ -134,7 +139,7 @@ public class ExportService {
         if (!p.tags().isEmpty()) sb.append("  \n> 태그: ").append(String.join(", ", p.tags().stream().map(t -> "#" + t).toList()));
         sb.append("\n\n");
         if (p.summary() != null && !p.summary().isBlank()) sb.append("**").append(p.summary().trim()).append("**\n\n");
-        String body = p.contentFormat() == Post.ContentFormat.MARKDOWN ? p.content()
+        String body = p.contentFormat() == Post.ContentFormat.MARKDOWN && !html.contains(MmExportTables.MARK) ? p.content()
                 : FlexmarkHtmlConverter.builder().build().convert(prepareForMarkdown(absolutize(html, baseUrl)));
         sb.append(body.strip()).append("\n");
         if (attach && !p.attachments().isEmpty()) {

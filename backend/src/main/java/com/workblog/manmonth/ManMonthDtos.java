@@ -46,6 +46,10 @@ public final class ManMonthDtos {
     /** 이벤트 목록 + 이 사람이 새로 넣을 수 있는지(로그인한 누구나). 이벤트마다 canEdit = 만든 사람·관리자. */
     public record EventList(List<EventDto> events, boolean canEdit) {}
 
+    /** 표 복사(다음 분기 등): 프로젝트·인원·편집자를 그대로. withValues=true 면 값·메모도 날짜 기준으로(새 기간 안만). */
+    public record CopySheetRequest(@NotBlank @Size(max = 200) String title, @NotNull LocalDate startDate, @Min(1) @Max(104) int weeks,
+                                   boolean withValues) {}
+
     public record CreateSheetRequest(@NotBlank @Size(max = 200) String title, @Size(max = 1000) String description,
                                      @NotNull LocalDate startDate, @Min(1) @Max(104) int weeks) {}
 

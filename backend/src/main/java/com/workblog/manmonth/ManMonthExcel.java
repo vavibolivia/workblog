@@ -30,6 +30,10 @@ public class ManMonthExcel {
     static final int LEFT = 4;           // A~D: 프로젝트 · 이름 · 소속 · 역할
     static final int HEAD_MONTH = 2, HEAD_WEEK = 3, FIRST_DATA = 4;
     static final String TOTAL_LABEL = "주별 합계";
+    /** 프로젝트 소계 줄: A 칸 = "<프로젝트> 소계", 이름 칸은 비움(가져오기에서 건너뜀). */
+    static final String SUBTOTAL_SUFFIX = " 소계";
+    static final Map<EventKind, String> KIND_LABEL = Map.of(EventKind.RELEASE, "릴리스·배포", EventKind.MILESTONE, "마일스톤",
+            EventKind.REVIEW, "검토·감리", EventKind.MEETING, "회의·보고", EventKind.HOLIDAY, "공휴일", EventKind.LEAVE, "휴가·교육", EventKind.ETC, "기타");
     /** 한 번에 가져오는 데이터 행 수 상한(업로드 크기 한도와 별도로 처리량을 묶는다). */
     static final int MAX_IMPORT_ROWS = 3000;
 
@@ -67,6 +71,13 @@ public class ManMonthExcel {
             CellStyle total = wb.createCellStyle();
             total.cloneStyleFrom(num);
             total.setFont(bold);
+            CellStyle sub = wb.createCellStyle();
+            sub.cloneStyleFrom(total);
+            sub.setFillForegroundColor(IndexedColors.LEMON_CHIFFON.getIndex());
+            sub.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+            CellStyle subText = wb.createCellStyle();
+            subText.cloneStyleFrom(sub);
+            subText.setAlignment(HorizontalAlignment.LEFT);
 
             Row r0 = sh.createRow(0);
             r0.createCell(0).setCellValue(d.title());
@@ -116,7 +127,11 @@ public class ManMonthExcel {
             // 주별 메모 → 엑셀 메모(칸 오른쪽 위 빨간 삼각형, 마우스를 올리면 보임)
             Drawing<?> drawing = withValues ? sh.createDrawingPatriarch() : null;
             CreationHelper helper = wb.getCreationHelper();
-            for (RowDto r : rows) {
+            double[] pSum = new double[d.weeks()];
+            double pMm = 0;
+            List<String[]> memoRows = new ArrayList<>();
+            for (int i = 0; i < rows.size(); i++) {
+                RowDto r = rows.get(i);
                 Row row = sh.createRow(ri++);
                 cell(row, 0, projects.getOrDefault(r.projectId(), ""), text);
                 cell(row, 1, r.personName(), text);
@@ -129,9 +144,11 @@ public class ManMonthExcel {
                     if (v != null) {
                         c.setCellValue(v.doubleValue());
                         weekSum[w] += v.doubleValue();
+                        pSum[w] += v.doubleValue();
                     }
                     String note = withValues && r.notes() != null ? r.notes().get(w) : null;
                     if (note != null) {
+                        memoRows.add(new String[]{projects.getOrDefault(r.projectId(), ""), r.personName(), d.startDate().plusWeeks(w).toString(), v == null ? "" : v.stripTrailingZeros().toPlainString(), note});
                         ClientAnchor an = helper.createClientAnchor();
                         an.setCol1(LEFT + w); an.setCol2(LEFT + w + 4); an.setRow1(row.getRowNum()); an.setRow2(row.getRowNum() + 4);
                         Comment cm = drawing.createCellComment(an);
@@ -145,6 +162,23 @@ public class ManMonthExcel {
                 double mm = withValues ? totalMm(d.startDate(), d.weeks(), r.cells()) : 0;
                 t.setCellValue(mm);
                 mmSum += mm;
+                pMm += mm;
+                // 프로젝트가 끝나면 소계 줄
+                if (i == rows.size() - 1 || !rows.get(i + 1).projectId().equals(r.projectId())) {
+                    Row sr = sh.createRow(ri++);
+                    cell(sr, 0, projects.getOrDefault(r.projectId(), "") + SUBTOTAL_SUFFIX, subText);
+                    for (int c = 1; c < LEFT; c++) cell(sr, c, "", subText);
+                    for (int w = 0; w < d.weeks(); w++) {
+                        Cell c = sr.createCell(LEFT + w);
+                        c.setCellStyle(sub);
+                        if (pSum[w] != 0) c.setCellValue(Math.round(pSum[w] * 100) / 100.0);
+                    }
+                    Cell sm = sr.createCell(totalCol);
+                    sm.setCellStyle(sub);
+                    sm.setCellValue(Math.round(pMm * 100) / 100.0);
+                    pSum = new double[d.weeks()];
+                    pMm = 0;
+                }
             }
             Row tr = sh.createRow(ri);
             cell(tr, 0, TOTAL_LABEL, head);
@@ -169,6 +203,19 @@ public class ManMonthExcel {
             sh.getPrintSetup().setFitWidth((short) 1);
             sh.getPrintSetup().setFitHeight((short) 0);
             sh.setRepeatingRows(new CellRangeAddress(HEAD_MONTH, HEAD_WEEK, -1, -1));
+            if (withValues) {
+                listSheet(wb, "메모", head, text, new String[]{"프로젝트", "이름", "주(월요일)", "값", "메모"}, new int[]{18, 12, 12, 7, 60}, memoRows);
+                List<String[]> evRows = new ArrayList<>();
+                LocalDate end = d.startDate().plusWeeks(d.weeks()).minusDays(1);
+                for (EventDto e : d.events() == null ? List.<EventDto>of() : d.events()) {
+                    LocalDate eEnd = e.endDate() == null ? e.startDate() : e.endDate();
+                    if (eEnd.isBefore(d.startDate()) || e.startDate().isAfter(end)) continue;
+                    evRows.add(new String[]{e.startDate().toString(), e.endDate() == null ? "" : e.endDate().toString(),
+                            KIND_LABEL.getOrDefault(e.kind(), String.valueOf(e.kind())), e.title(), nz(e.related()), nz(e.note())});
+                }
+                evRows.sort(Comparator.comparing((String[] a) -> a[0]));
+                listSheet(wb, "이벤트", head, text, new String[]{"시작", "끝", "종류", "제목", "관련", "설명"}, new int[]{12, 12, 12, 30, 14, 50}, evRows);
+            }
             wb.write(out);
             return out.toByteArray();
         } catch (IOException e) {
@@ -226,6 +273,7 @@ public class ManMonthExcel {
                 String project = fmt.formatCellValue(row.getCell(0)).trim();
                 String name = fmt.formatCellValue(row.getCell(1)).trim();
                 if (TOTAL_LABEL.equals(project)) break;
+                if (name.isEmpty() && project.endsWith(SUBTOTAL_SUFFIX)) continue;   // 프로젝트 소계 줄
                 if (project.isEmpty()) project = lastProject;          // 병합·빈 칸이면 위 프로젝트
                 if (name.isEmpty() || project == null) continue;
                 lastProject = project;
@@ -326,6 +374,23 @@ public class ManMonthExcel {
             if (pct) return v.movePointLeft(2);
         }
         return v;
+    }
+
+    /** 목록 시트(메모·이벤트): 머리 한 줄 + 행. 비어 있으면 '없음' 한 줄. */
+    private static void listSheet(Workbook wb, String name, CellStyle head, CellStyle text, String[] cols, int[] widths, List<String[]> rows) {
+        Sheet s = wb.createSheet(name);
+        Row h = s.createRow(0);
+        for (int c = 0; c < cols.length; c++) {
+            cell(h, c, cols[c], head);
+            s.setColumnWidth(c, widths[c] * 256);
+        }
+        int ri = 1;
+        if (rows.isEmpty()) cell(s.createRow(ri), 0, "(없음)", text);
+        for (String[] r : rows) {
+            Row row = s.createRow(ri++);
+            for (int c = 0; c < cols.length; c++) cell(row, c, c < r.length ? r[c] : "", text);
+        }
+        s.createFreezePane(0, 1);
     }
 
     private static void cell(Row r, int c, String v, CellStyle st) {

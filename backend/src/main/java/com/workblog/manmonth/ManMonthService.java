@@ -101,6 +101,52 @@ public class ManMonthService {
         return get(id, actor);
     }
 
+    /**
+     * 표 복사: 새 표(주인 = 복사한 사람)에 프로젝트·인원(순서·계정·소속·역할)·편집자를 옮긴다.
+     * withValues 면 값·메모를 날짜 기준으로 옮기고(원본 시작 → 새 시작 차이만큼 주 번호 이동), 새 기간 밖은 버린다.
+     */
+    @Transactional
+    public SheetDetail copy(long id, CopySheetRequest req, User actor) {
+        Sheet src = load(id);
+        SheetDetail made = create(new CreateSheetRequest(req.title(), src.description(), req.startDate(), req.weeks()), actor);
+        long nid = made.id();
+        int shift = (int) ChronoUnit.WEEKS.between(src.startDate(), made.startDate());
+        Map<Long, Long> pmap = new HashMap<>();
+        for (Map<String, Object> p : jdbc.queryForList("SELECT id, name, sort_order FROM mm_projects WHERE sheet_id = ? ORDER BY sort_order, id", id)) {
+            KeyHolder kh = new GeneratedKeyHolder();
+            jdbc.update(c -> {
+                PreparedStatement ps = c.prepareStatement("INSERT INTO mm_projects (sheet_id, name, sort_order) VALUES (?,?,?)", new String[]{"id"});
+                ps.setLong(1, nid); ps.setString(2, (String) p.get("name")); ps.setInt(3, ((Number) p.get("sort_order")).intValue());
+                return ps;
+            }, kh);
+            pmap.put(((Number) p.get("id")).longValue(), Objects.requireNonNull(kh.getKey()).longValue());
+        }
+        int rowsN = 0, cellsN = 0;
+        for (Map<String, Object> r : jdbc.queryForList("SELECT id, project_id, user_id, person_name, department, role, sort_order FROM mm_rows WHERE sheet_id = ? ORDER BY sort_order, id", id)) {
+            Long np = pmap.get(((Number) r.get("project_id")).longValue());
+            if (np == null) continue;
+            KeyHolder kh = new GeneratedKeyHolder();
+            jdbc.update(c -> {
+                PreparedStatement ps = c.prepareStatement("INSERT INTO mm_rows (sheet_id, project_id, user_id, person_name, department, role, sort_order) VALUES (?,?,?,?,?,?,?)", new String[]{"id"});
+                ps.setLong(1, nid); ps.setLong(2, np); if (r.get("user_id") == null) ps.setNull(3, java.sql.Types.BIGINT); else ps.setLong(3, ((Number) r.get("user_id")).longValue()); ps.setString(4, (String) r.get("person_name"));
+                ps.setString(5, (String) r.get("department")); ps.setString(6, (String) r.get("role")); ps.setInt(7, ((Number) r.get("sort_order")).intValue());
+                return ps;
+            }, kh);
+            long nr = Objects.requireNonNull(kh.getKey()).longValue();
+            rowsN++;
+            if (req.withValues()) {
+                long or = ((Number) r.get("id")).longValue();
+                cellsN += jdbc.update("INSERT INTO mm_cells (row_id, week, value) SELECT ?, week - ?, value FROM mm_cells WHERE row_id = ? AND week - ? >= 0 AND week - ? < ? AND week < ?",
+                        nr, shift, or, shift, shift, made.weeks(), src.weeks());
+                jdbc.update("INSERT INTO mm_notes (row_id, week, text, updated_by) SELECT ?, week - ?, text, updated_by FROM mm_notes WHERE row_id = ? AND week - ? >= 0 AND week - ? < ? AND week < ?",
+                        nr, shift, or, shift, shift, made.weeks(), src.weeks());
+            }
+        }
+        jdbc.update("INSERT INTO mm_sheet_editors (sheet_id, user_id) SELECT ?, user_id FROM mm_sheet_editors WHERE sheet_id = ?", nid, id);
+        log(nid, actor, "「" + src.title() + "」에서 복사: 프로젝트 " + pmap.size() + " · 인원 " + rowsN + (req.withValues() ? " · 값 " + cellsN + "칸" : " · 값 없이"));
+        return get(nid, actor);
+    }
+
     public SheetDetail update(long id, UpdateSheetRequest req, User actor) {
         Sheet s = load(id);
         requireManage(s, actor);

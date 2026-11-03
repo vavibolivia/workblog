@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { api, errorMessage, formatDate, http, type CategoryNode, type UserResponse } from '../lib/api'
+import { api, errorMessage, formatDate, http, type CategoryNode, type PostSummary, type UserResponse } from '../lib/api'
 import { mmApi, mondayOf, periodText, personKey, type MmImportResult, type MmProject, type MmRow, type MmSheet } from '../lib/manMonthApi'
 import { useToast } from '../lib/toast'
 import Modal from '../components/Modal'
@@ -14,6 +14,7 @@ type Dialog =
   | { kind: 'editors' }
   | { kind: 'settings' }
   | { kind: 'publish' }
+  | { kind: 'copy' }
   | { kind: 'import'; file: File; keepBlank: boolean; result: MmImportResult }
   | null
 
@@ -56,6 +57,13 @@ export default function ManMonthPage() {
   const toast = useToast()
   const file = useRef<HTMLInputElement>(null)
   const [titleEdit, setTitleEdit] = useState<string | null>(null)
+  /** 이 표를 담은 글(본문에 /mm/번호 링크). 글 검색을 그대로 써서 열람 제한이 지켜진다 */
+  const [posts, setPosts] = useState<PostSummary[]>([])
+  useEffect(() => {
+    let alive = true
+    api.posts.list({ q: `/mm/${id}"`, size: 10 }).then((r) => { if (alive) setPosts(r.content) }).catch(() => null)
+    return () => { alive = false }
+  }, [id])
 
   if (err) return <div className="shell"><div className="alert alert--error">{err}</div><Link to="/mm" className="btn">공수 표 목록</Link></div>
   if (!sheet) return <div className="shell"><div className="spinner" aria-label="불러오는 중" /></div>
@@ -109,6 +117,9 @@ export default function ManMonthPage() {
             <h2>{sheet.title}{sheet.canManage && <button type="button" className="btn btn--ghost btn--sm mm-title-btn" onClick={() => setTitleEdit(sheet.title)} title="제목 고치기 (표 주인·관리자)">✎ 제목 고치기</button>}</h2>
           )}
           {sheet.description && <p>{sheet.description}</p>}
+          {posts.length > 0 && (
+            <p className="small mm-backlinks">이 표를 담은 글: {posts.map((p, i) => <span key={p.id}>{i > 0 && ' · '}<Link to={`/posts/${p.id}`}>{p.title}</Link></span>)}</p>
+          )}
           <p className="small muted">주인 {sheet.ownerName ?? '—'} · 편집자 {sheet.editors.length ? sheet.editors.map((e) => e.displayName).join(', ') : '없음'} (관리자는 항상 편집 가능)</p>
         </div>
         <div className="row row--wrap" style={{ gap: 6 }}>
@@ -122,6 +133,7 @@ export default function ManMonthPage() {
               {sheet.canEdit && <button type="button" role="menuitem" disabled={busy} onClick={() => { close(); file.current?.click() }}><span className="grow">올리기…</span><span className="small muted">반영 전에 미리보기</span></button>}
             </>}
           </MenuButton>
+          <button type="button" className="btn" onClick={() => setDialog({ kind: 'copy' })} title="프로젝트·인원·편집자를 그대로 둔 새 표 (다음 분기 등)">표 복사</button>
           <input ref={file} type="file" accept=".xlsx" hidden onChange={(e) => preview(e.target.files?.[0])} />
           {sheet.canManage && (
             <MenuButton label="더 보기">
@@ -158,6 +170,7 @@ export default function ManMonthPage() {
       {dialog?.kind === 'editors' && <EditorsDialog sheet={sheet} busy={busy} onClose={() => setDialog(null)} run={run} />}
       {dialog?.kind === 'settings' && <SettingsDialog sheet={sheet} busy={busy} onClose={() => setDialog(null)} run={run} />}
       {dialog?.kind === 'publish' && <PublishDialog sheet={sheet} onClose={() => setDialog(null)} />}
+      {dialog?.kind === 'copy' && <CopyDialog sheet={sheet} onClose={() => setDialog(null)} />}
       {dialog?.kind === 'import' && (() => {
         const r = dialog.result
         const nothing = !r.projectsCreated && !r.rowsCreated && !r.cellsSet && !r.cellsCleared
@@ -538,6 +551,47 @@ function PublishDialog({ sheet, onClose }: { sheet: MmSheet; onClose: () => void
           {cats.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
         </select>
       </div>
+    </Modal>
+  )
+}
+
+/** 표 복사: 기본은 바로 다음 기간(끝난 다음 월요일부터 같은 주 수). 값까지 옮기면 날짜가 겹치는 부분만 옮겨진다. */
+function CopyDialog({ sheet, onClose }: { sheet: MmSheet; onClose: () => void }) {
+  const navigate = useNavigate()
+  const toast = useToast()
+  const next = useMemo(() => {
+    const [y, m, d] = sheet.startDate.split('-').map(Number)
+    const t = new Date(y, m - 1, d + sheet.weeks * 7)
+    return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`
+  }, [sheet.startDate, sheet.weeks])
+  const [title, setTitle] = useState(`${sheet.title} (복사)`)
+  const [start, setStart] = useState(next)
+  const [weeks, setWeeks] = useState(sheet.weeks)
+  const [withValues, setWithValues] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const copy = async () => {
+    setBusy(true)
+    try {
+      const s = await mmApi.copy(sheet.id, { title: title.trim(), startDate: start, weeks, withValues })
+      toast(`새 표를 만들었습니다 — 프로젝트 ${s.projects.length} · 인원 ${s.rows.length}`, 'success')
+      navigate(`/mm/${s.id}`)
+    } catch (e) { toast(errorMessage(e), 'error') } finally { setBusy(false) }
+  }
+  return (
+    <Modal title="표 복사" onClose={onClose}
+           footer={<><button type="button" className="btn" onClick={onClose}>취소</button><button type="button" className="btn btn--primary" disabled={busy || !title.trim() || !start} onClick={copy}>새 표 만들기</button></>}>
+      <p className="small muted">프로젝트·인원(계정·소속·역할)·편집자를 그대로 옮긴 새 표를 만듭니다. 새 표의 주인은 나입니다. 원래 표는 바뀌지 않습니다.</p>
+      <div className="field"><label htmlFor="mmc-t">새 표 제목</label><input id="mmc-t" className="input" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} autoFocus /></div>
+      <div className="row" style={{ gap: 8 }}>
+        <div className="field" style={{ flex: 1 }}><label htmlFor="mmc-s">시작 주 (월요일로 맞춤)</label><input id="mmc-s" type="date" className="input" value={start} onChange={(e) => setStart(e.target.value)} /></div>
+        <div className="field" style={{ width: 120 }}><label htmlFor="mmc-w">주 수</label><WeeksInput id="mmc-w" value={weeks} onChange={setWeeks} /></div>
+      </div>
+      <p className="small">기간: <strong>{start ? periodText(start, weeks) : '—'}</strong>{start === next && <span className="muted"> (지금 표 바로 다음)</span>}</p>
+      <label className="check">
+        <input type="checkbox" checked={withValues} onChange={(e) => setWithValues(e.target.checked)} />
+        값·메모도 옮기기 — 같은 날짜(주)의 값만, 새 기간 밖은 버림
+      </label>
+      {withValues && start >= next && <p className="small muted">새 기간이 지금 표 뒤라 겹치는 주가 없어 옮겨질 값이 없습니다.</p>}
     </Modal>
   )
 }

@@ -47,7 +47,7 @@ public class ExportController {
             default -> throw ApiException.badRequest("format 은 html, md, docx 중 하나입니다.");
         };
         PostDetail post = posts.getDetail(id, viewer, false);
-        Exported out = exporter.export(post, f, attachments, baseUrl(req));
+        Exported out = exporter.export(post, f, attachments, baseUrl(req), viewer);
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType(out.contentType()))
                 .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename(out.filename(), StandardCharsets.UTF_8).build().toString())
