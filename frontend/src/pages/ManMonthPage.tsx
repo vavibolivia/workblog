@@ -210,8 +210,9 @@ function ProjectDialog({ sheet, project, busy, onClose, run, onAddPerson }: { sh
            footer={<>
              {project && <button type="button" className="btn btn--danger" disabled={busy} onClick={() => (confirm ? run(() => mmApi.removeProject(sheet.id, project.id), '프로젝트를 지웠습니다.') : setConfirm(true))}>{confirm ? `정말 삭제 (인원 ${count}명 포함)` : '삭제'}</button>}
              {project && <button type="button" className="btn" onClick={() => onAddPerson(project.id)}>이 프로젝트에 인원 추가</button>}
+             <button type="button" className="btn" onClick={onClose}>취소</button>
              <button type="button" className="btn btn--primary" disabled={busy || !name.trim()}
-                     onClick={() => run(() => (project ? mmApi.renameProject(sheet.id, project.id, name.trim()) : mmApi.addProject(sheet.id, name.trim())))}>저장</button>
+                     onClick={() => run(() => (project ? mmApi.renameProject(sheet.id, project.id, name.trim()) : mmApi.addProject(sheet.id, name.trim())))}>{project ? '저장' : '추가'}</button>
            </>}>
       <div className="field"><label htmlFor="mm-pname">프로젝트 이름</label><input id="mm-pname" className="input" value={name} onChange={(e) => setName(e.target.value)} maxLength={100} autoFocus /></div>
     </Modal>
@@ -444,8 +445,8 @@ function EditorsDialog({ sheet, busy, onClose, run }: { sheet: MmSheet; busy: bo
   const chosen = candidates.filter((u) => ids.has(u.id))
   const flip = (id: number, on: boolean) => setIds((s) => { const n = new Set(s); if (on) n.add(id); else n.delete(id); return n })
   return (
-    <Modal title="편집자 지정" onClose={onClose} wide
-           footer={<button type="button" className="btn btn--primary" disabled={busy} onClick={() => run(() => mmApi.setEditors(sheet.id, [...ids]), '편집자를 저장했습니다.')}>저장 ({ids.size}명)</button>}>
+    <Modal title="편집자 지정" onClose={onClose}
+           footer={<><button type="button" className="btn" onClick={onClose}>취소</button><button type="button" className="btn btn--primary" disabled={busy} onClick={() => run(() => mmApi.setEditors(sheet.id, [...ids]), '편집자를 저장했습니다.')}>저장 ({ids.size}명)</button></>}>
       <p className="small muted">편집자는 모든 칸·프로젝트·인원을 고칠 수 있습니다. 표 주인과 관리자는 항상 편집·설정 가능. 나머지는 보기만.</p>
       <div className="mm-chips">
         {chosen.length === 0 ? <span className="small muted">아직 편집자가 없습니다. 아래에서 고르세요.</span>

@@ -219,7 +219,7 @@ export default function EditorPage() {
         </div>
 
         <div className="editor__foot">
-          {editing && <input className="input grow" style={{ maxWidth: 420, height: 36 }} value={changeNote} onChange={(e) => setChangeNote(e.target.value)} placeholder="변경 메모 (선택) 예) 2단계 절차 수정" maxLength={500} />}
+          {editing && <input className="input editor__note" value={changeNote} onChange={(e) => setChangeNote(e.target.value)} placeholder="변경 메모 (선택) 예) 2단계 절차 수정" maxLength={500} />}
           <div className="row" style={{ marginLeft: 'auto' }}>
             <button type="button" className="btn" onClick={() => navigate(-1)} disabled={busy}>취소</button>
             <button type="button" className="btn" onClick={() => save('DRAFT')} disabled={busy}>임시 저장</button>

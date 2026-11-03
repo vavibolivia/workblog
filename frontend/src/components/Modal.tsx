@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 
 /**
  * 대화상자. dirty(고친 내용 있음)면 바깥 클릭으로는 닫히지 않고 Esc 는 한 번 더 묻는다. busy(저장 중)면 닫히지 않는다.
@@ -33,7 +34,8 @@ export default function Modal({ title, onClose, children, footer, wide = false, 
     return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = prev; before?.focus?.({ preventScroll: true }) }
   }, [])
   const close = () => { if (busy) return; if (dirty && !ask) { setAsk(true); return } onClose() }
-  return (
+  // body 에 바로 그린다 — sticky 툴바 같은 쌓임 맥락 안에 갇혀 어두운 막이 상단 메뉴를 못 덮는 일이 없게
+  return createPortal(
     <div className="modal-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget && !dirty && !busy) onClose() }}>
       <div className={`modal${wide ? ' modal--wide' : ''}`} role="dialog" aria-modal="true" aria-label={title} ref={box}>
         <div className="modal__head">
@@ -50,6 +52,7 @@ export default function Modal({ title, onClose, children, footer, wide = false, 
         )}
         {footer && <div className="modal__foot">{footer}</div>}
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

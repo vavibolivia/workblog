@@ -119,7 +119,7 @@ export default function AdminDataPage() {
       <div className="alert alert--warn" style={{ marginBottom: 16 }}>덤프에는 모든 글·첨부 원본·사용자 비밀번호 해시·API 토큰 해시가 그대로 들어 있습니다. 사내 반출 절차에 따라 옮기고 보관하세요.</div>
       {err && <div className="alert alert--error" style={{ marginBottom: 16 }}>{err}</div>}
 
-      <div className="status-grid">
+      <div className="status-grid dm-grid">
         <div className="card">
           <div className="card__head"><h3>1. 내보내기 (덤프 받기)</h3></div>
           <div className="card__body dm-form">
@@ -158,7 +158,9 @@ export default function AdminDataPage() {
           <div className="card__body dm-form">
             <p className="small muted" style={{ margin: 0 }}>다른 서버에서 받은 덤프를 올리면 먼저 미리 보기(무엇이 추가·갱신·충돌하는지)를 보여 줍니다. 미리 보기는 아무것도 바꾸지 않습니다. [적용]을 눌러야 반영됩니다.</p>
             <div className="row row--wrap">
-              <input key={fileKey} type="file" accept=".zip,application/zip" disabled={progress !== null || applying} onChange={(e) => pickFile(e.target.files?.[0] ?? null)} />
+              <input key={fileKey} id="dm-file" type="file" accept=".zip,application/zip" hidden disabled={progress !== null || applying} onChange={(e) => pickFile(e.target.files?.[0] ?? null)} />
+              <label htmlFor="dm-file" className="btn" aria-disabled={progress !== null || applying}>파일 고르기</label>
+              <span className="small muted ellipsis" style={{ maxWidth: 320 }}>{file?.name ?? '고른 파일 없음 (.zip)'}</span>
               <button type="button" className="btn" onClick={doUpload} disabled={!file || progress !== null || applying}>
                 {progress !== null ? (progress < 100 ? `올리는 중 ${progress}%` : '검사하는 중…') : '올리고 미리 보기'}
               </button>
@@ -199,7 +201,7 @@ export default function AdminDataPage() {
                     <td className="nowrap">{transferLabel(t)}{t.direction === 'EXPORT' && t.baseline && <span className="small muted"> · 기준</span>}</td>
                     <td><button type="button" className="link-btn" onClick={() => openDetail(t)}>{t.dumpName}</button></td>
                     <td className="nowrap">{t.actorName}</td>
-                    <td><span className={`chip chip--xs ${t.status === 'OK' ? 'chip--success' : t.status === 'FAILED' ? 'chip--danger' : 'chip--neutral'}`}>{t.status === 'OK' ? '완료' : t.status === 'FAILED' ? '실패' : '진행 중'}</span></td>
+                    <td><span className={`chip chip--xs ${t.status === 'OK' ? 'chip--neutral' : t.status === 'FAILED' ? 'chip--danger' : 'chip--neutral'}`}>{t.status === 'OK' ? '완료' : t.status === 'FAILED' ? '실패' : '진행 중'}</span></td>
                     <td className="small">{t.summary}</td>
                   </tr>
                 ))}

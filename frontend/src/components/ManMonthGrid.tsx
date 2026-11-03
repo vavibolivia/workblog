@@ -749,7 +749,7 @@ export default function ManMonthGrid(props: Props) {
       <div className="sr-only" aria-live="polite">{live}</div>
       {!compact && (
         <div className="mm-tools">
-          <span className="mm-tools__sel">{mode === 'person' ? <span className="muted">사람별 부하 — 보기 전용 · 1.0 초과는 빨강·물결 밑줄</span> : selInfo}</span>
+          <span className="mm-tools__sel">{mode === 'person' ? <span className="muted">사람별 부하 — 보기 전용 · 1.0 초과는 빨간 칸</span> : selInfo}</span>
           {mode === 'person' && (
             <span className="mm-tools__grp">
               <label className="mm-chk"><input type="checkbox" checked={overOnly} onChange={(e) => setOverOnly(e.target.checked)} /> 1.0 초과인 사람만</label>
@@ -788,7 +788,7 @@ export default function ManMonthGrid(props: Props) {
           {thisWeek >= 0 && <button type="button" className="btn btn--sm mm-tools__now" onClick={() => jumpToNow(true)}>이번 주로</button>}
         </div>
       )}
-      {showBar && focusRow && focus && (
+      {showBar && (
         <div className={`mm-notebar${focusNote ? ' has-note' : ''}`} role="note">
           {focusRow && focus ? <>
             {focusLoad && focusLoad.parts.length > 0 && (
@@ -817,7 +817,7 @@ export default function ManMonthGrid(props: Props) {
           {head}
           <tbody>
             {body}
-            {empty && <tr><td className="mm-sticky mm-c0 mm-empty" colSpan={3}>{q ? '찾는 프로젝트·인원이 없습니다.' : mode === 'person' && overOnly ? '1.0 을 넘는 사람이 없습니다.' : '아직 프로젝트·인원이 없습니다.'}</td><td colSpan={weeks.length} /></tr>}
+            {empty && <tr><td className="mm-c0 mm-empty" colSpan={3 + weeks.length}>{q ? '찾는 프로젝트·인원이 없습니다.' : mode === 'person' && overOnly ? '1.0 을 넘는 사람이 없습니다.' : '아직 프로젝트·인원이 없습니다.'}</td></tr>}
           </tbody>
           <tfoot>
             <tr className="mm-total">

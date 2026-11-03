@@ -45,7 +45,12 @@ export default function RichContent({ content, format, readOnlyEmbeds }: { conte
   if (format === 'MARKDOWN') return <Markdown>{content}</Markdown>
   return (
     <>
-      <div className="rich" ref={ref} dangerouslySetInnerHTML={{ __html: html }} />
+      {/* 본문 사진을 누르면 원본을 새 탭으로(줄여 보인 도식 글자를 읽을 수 있게) */}
+      <div className="rich" ref={ref} dangerouslySetInnerHTML={{ __html: html }}
+           onClick={(e) => {
+             const img = (e.target as HTMLElement).closest('.img-figure img') as HTMLImageElement | null
+             if (img && !img.closest('a') && img.src) window.open(img.src, '_blank', 'noopener')
+           }} />
       {slots.map((s, i) => createPortal(s.id === 'events' ? <MmEventsEmbed readOnly={readOnlyEmbeds} /> : <MmEmbed id={s.id} readOnly={readOnlyEmbeds} />, s.el, `mm${i}`))}
     </>
   )

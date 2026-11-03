@@ -63,7 +63,7 @@ export default function FrontGate() {
       <div className="row front__actions" style={{ gap: 6 }}>
         {!folded && <Link to={hrefOf(cur)} className="btn btn--sm">{cur.kind === 'POST' ? '글 열기' : '전체 화면 · 관리'}</Link>}
         {admin && <button type="button" className="btn btn--sm" onClick={() => setPicking(true)}>대문 고르기</button>}
-        <button type="button" className="btn btn--sm btn--ghost" onClick={() => fold(!folded)} aria-expanded={!folded} title={folded ? '대문 내용 펼치기' : '대문 내용 접기 — 이 브라우저에서 기억'}>{folded ? '펼치기 ▾' : '접기 ▴'}</button>
+        <button type="button" className="btn btn--sm" onClick={() => fold(!folded)} aria-expanded={!folded} title={folded ? '대문 내용 펼치기' : '대문 내용 접기 — 이 브라우저에서 기억'}>{folded ? '펼치기 ▾' : '접기 ▴'}</button>
       </div>
     </div>
     <div className={`front${folded ? ' front--folded' : ''}`}>
@@ -71,7 +71,7 @@ export default function FrontGate() {
         <div className="front__tabs" role="tablist" aria-label="대문 항목">
           {items.map((i) => (
             <button key={keyOf(i)} type="button" role="tab" aria-selected={keyOf(i) === keyOf(cur)} className={keyOf(i) === keyOf(cur) ? 'is-on' : undefined} onClick={() => pick(keyOf(i))} title={i.title}>
-              <span className="front__kind">{KIND_LABEL[i.kind]}</span><span className="front__title">{i.title}</span>
+              <span className="front__title">{i.title}</span>
             </button>
           ))}
         </div>

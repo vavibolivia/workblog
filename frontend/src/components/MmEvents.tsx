@@ -5,6 +5,7 @@ import { useAuth } from '../lib/auth'
 import { EVENT_COLORS, MM_EVENTS_CHANGED, evColor, eventPeriod, mmEventApi, notifyEventsChanged, type MmEvent, type MmEventKind, type MmEventRequest } from '../lib/manMonthApi'
 import { useToast } from '../lib/toast'
 import Modal from './Modal'
+import { IcNote } from './Icons'
 import { relatedMatch } from './ManMonthGrid'
 
 /** 모든 공수 표의 프로젝트 이름(가나다순, 중복 없음) */
@@ -72,9 +73,9 @@ export function EventDialog({ event, initialDate, initialRelated, canEdit, proje
            footer={<>
              {event && <button type="button" className="btn btn--danger" style={{ marginRight: 'auto' }} disabled={busy}
                                onClick={() => (confirmDel ? remove() : setConfirmDel(true))}>{confirmDel ? '정말 삭제' : '삭제'}</button>}
+             {!event && <label className="check small"><input type="checkbox" checked={more} onChange={(e) => setMore(e.target.checked)} /> 계속 넣기</label>}
              <span className="small muted" style={{ marginRight: event ? 0 : 'auto' }}>{touched ? bad ?? '' : ''}</span>
              <button type="button" className="btn" onClick={onClose}>취소</button>
-             {!event && <label className="check small"><input type="checkbox" checked={more} onChange={(e) => setMore(e.target.checked)} /> 계속 넣기</label>}
              <button type="button" className="btn btn--primary" disabled={busy || !!bad} onClick={save}>{event ? '저장' : '넣기'}</button>
            </>}>
       <p className="small muted ev-shared">공용 이벤트 — 기간이 걸친 <strong>모든 공수 표</strong>와 글 속 이벤트 표에 보입니다. 고치기·삭제는 등록한 사람과 관리자.</p>
@@ -147,7 +148,7 @@ export function EventsTable({ events, canEdit, empty, onOpen }:
                   onClick={() => onOpen(e)} tabIndex={0} onKeyDown={(k) => { if (k.key === 'Enter') onOpen(e) }}
                   title={canEdit ? '눌러서 고치기' : '눌러서 자세히'}>
                 <td className="ev-date">{cont && <span className="ev-cont">이어짐 · </span>}{eventPeriod(e)}{!cont && e.id === nextId && <span className="ev-next">다음</span>}{!cont && now && <span className="ev-next ev-next--now">진행 중</span>}</td>
-                <td className="ev-title">{e.title}{e.note && <span className="ev-hasnote" title={e.note}> 📝</span>}</td>
+                <td className="ev-title">{e.title}{e.note && <span className="ev-hasnote" title={e.note}> <IcNote /></span>}</td>
                 <td className="muted">{e.related ?? ''}</td>
               </tr>
             )

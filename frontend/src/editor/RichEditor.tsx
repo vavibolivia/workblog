@@ -289,7 +289,7 @@ function Toolbar({ editor, onImage, onExcel, onFile, onDocument, onDiagram, onDi
           )}
           <B cmd={onExcel} title="엑셀 파일을 표로 넣고 원본을 첨부"><IcExcel /> 엑셀</B>
           <WorkPlanMenu insert={(h) => editor.chain().focus().insertContent(h).run()}
-                        Button={({ onClick }) => <B cmd={onClick} title="업무산정 — 공수 표(주별 인원·할 일 메모)와 이벤트를 글에 넣기"><span aria-hidden>📊</span> 업무산정</B>} />
+                        Button={({ onClick }) => <B cmd={onClick} title="업무산정 — 공수 표(주별 인원·할 일 메모)와 이벤트를 글에 넣기">업무산정</B>} />
           {onDocument && <B cmd={onDocument} title="문서 파일(HTML·Word·Excel·CSV·Markdown·텍스트)을 본문으로 가져오기"><IcDocument /> 문서</B>}
           <B cmd={() => setDiagramMenu((v) => !v)} title="draw.io 다이어그램"><IcDiagram /> 다이어그램</B>
           {diagramMenu && (
@@ -338,7 +338,7 @@ function Toolbar({ editor, onImage, onExcel, onFile, onDocument, onDiagram, onDi
         <B cmd={() => c().toggleCode().run()} active={editor.isActive('code')} title="인라인 코드">{'</>'}</B>
       </div>
       <div className="rte__group rte__group--rel">
-        <B cmd={() => setPalette(palette === 'color' ? null : 'color')} title="글자색"><span className="rte__swatch" style={{ background: attrs.color ?? '#1b2430' }} />가</B>
+        <B cmd={() => setPalette(palette === 'color' ? null : 'color')} title="글자색"><span className="rte__swatch" style={{ background: attrs.color ?? 'var(--ink)' }} />가</B>
         <B cmd={() => setPalette(palette === 'bg' ? null : 'bg')} title="배경색(강조)"><span className="rte__swatch" style={{ background: attrs.backgroundColor ?? '#fff2a8' }} />▣</B>
         {palette && (
           <div className="rte__palette" onMouseDown={(e) => e.preventDefault()}>

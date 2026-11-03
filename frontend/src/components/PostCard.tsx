@@ -13,6 +13,13 @@ export function Highlight({ text, q }: { text: string; q?: string }) {
 }
 
 /** 글 카드. 목록형(기본)과 앨범형(썸네일 격자)을 같은 데이터로 그린다. */
+/** 검색 중이고 요약에 검색어가 없으면 본문 일치 문장(snippet)을 보여 줘 왜 찾아졌는지 보이게 */
+function pickSnippet(post: { summary?: string | null; snippet: string }, q?: string): string {
+  const k = q?.trim().toLowerCase()
+  if (k && post.snippet && !(post.summary ?? '').toLowerCase().includes(k)) return post.snippet
+  return post.summary || post.snippet
+}
+
 export default function PostCard({ post, q, view = 'list' }: { post: PostSummary; q?: string; view?: ListView }) {
   const date = post.publishedAt ?? post.createdAt
   const badges = (
@@ -34,7 +41,7 @@ export default function PostCard({ post, q, view = 'list' }: { post: PostSummary
         </Link>
         <div className="album-card__body">
           <h3><Link to={`/posts/${post.id}`}><Highlight text={post.title} q={q} /></Link></h3>
-          <p className="album-card__snippet"><Highlight text={post.summary || post.snippet} q={q} /></p>
+          <p className="album-card__snippet"><Highlight text={pickSnippet(post, q)} q={q} /></p>
           <div className="album-card__meta">
             <CategoryPath category={post.category} className="post-card__cat" />
             <span>{formatDate(date)}</span>
@@ -62,7 +69,7 @@ export default function PostCard({ post, q, view = 'list' }: { post: PostSummary
           {post.version > 1 && <span>v{post.version}</span>}
         </div>
         <h3><Link to={`/posts/${post.id}`}><Highlight text={post.title} q={q} /></Link></h3>
-        <p className="post-card__snippet"><Highlight text={post.summary || post.snippet} q={q} /></p>
+        <p className="post-card__snippet"><Highlight text={pickSnippet(post, q)} q={q} /></p>
         {post.matchedAttachment && <p className="post-card__attach-match"><span className="attach-kind">첨부</span><span className="ellipsis"><Highlight text={post.matchedAttachment} q={q} /></span></p>}
         <div className="post-card__foot">
           <div className="post-card__author">

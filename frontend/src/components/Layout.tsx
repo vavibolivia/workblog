@@ -20,6 +20,7 @@ export default function Layout() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const [params] = useSearchParams()
+  const location = useLocation()
   const [q, setQ] = useState(params.get('q') ?? '')
   const [open, setOpen] = useState(false)
   const [keysHelp, setKeysHelp] = useState(false)
@@ -70,7 +71,7 @@ export default function Layout() {
           </form>
 
           <nav className="gnb__nav" aria-label="주 메뉴">
-            <NavLink to="/" end className="gnb__link">홈</NavLink>
+            <NavLink to="/" end className={({ isActive }) => `gnb__link${isActive || location.pathname === '/posts' ? ' active' : ''}`}>홈</NavLink>
             <NavLink to="/history" className="gnb__link">이력</NavLink>
             <NavLink to="/stats" className="gnb__link">통계</NavLink>
             {user?.role === 'ADMIN' && <AdminMenu />}

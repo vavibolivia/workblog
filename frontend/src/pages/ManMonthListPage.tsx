@@ -57,7 +57,7 @@ export default function ManMonthListPage() {
                   <td className="small">{s.startDate} 부터 {s.weeks}주</td>
                   <td className="small">{s.ownerName ?? '—'}</td>
                   <td className="small muted">{relativeTime(s.updatedAt)}</td>
-                  <td>{s.canEdit ? <span className="chip chip--success">편집</span> : <span className="chip chip--neutral">보기</span>}</td>
+                  <td>{s.canEdit ? <span className="chip">편집</span> : <span className="chip chip--neutral">보기</span>}</td>
                 </tr>
               ))}
               {list && list.length === 0 && <tr><td colSpan={5} className="empty">아직 공수 표가 없습니다. [새 공수 표] 로 시작하세요.</td></tr>}
@@ -67,7 +67,7 @@ export default function ManMonthListPage() {
       </div>
       {creating && (
         <Modal title="새 공수 표" onClose={() => setCreating(false)}
-               footer={<button type="button" className="btn btn--primary" disabled={busy || !title.trim()} onClick={create}>만들기</button>}>
+               footer={<><button type="button" className="btn" onClick={() => setCreating(false)}>취소</button><button type="button" className="btn btn--primary" disabled={busy || !title.trim()} onClick={create}>만들기</button></>}>
           <div className="field"><label htmlFor="mmn-t">제목</label><input id="mmn-t" className="input" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} placeholder="예) 2027 상반기 프로젝트 인력 운영" autoFocus /></div>
           <div className="row" style={{ gap: 8 }}>
             <div className="field" style={{ flex: 1 }}><label htmlFor="mmn-s">시작 주 (고른 날의 월요일로 맞춤)</label><input id="mmn-s" type="date" className="input" value={start} onChange={(e) => setStart(e.target.value)} /></div>

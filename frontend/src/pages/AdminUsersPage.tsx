@@ -82,7 +82,7 @@ export default function AdminUsersPage() {
                   <td>{u.department ?? <span className="muted">–</span>}{u.position && <span className="small muted"> · {u.position}</span>}</td>
                   <td>{u.email ?? <span className="muted">–</span>}</td>
                   <td>{u.role === 'ADMIN' ? <span className="chip">관리자</span> : <span className="chip chip--neutral">구성원</span>}</td>
-                  <td>{u.active ? <span className="chip chip--success">활성</span> : <span className="chip chip--danger">비활성</span>}</td>
+                  <td>{u.active ? <span className="chip chip--neutral">활성</span> : <span className="chip chip--danger">비활성</span>}</td>
                   <td className="small muted">{formatDate(u.createdAt)}</td>
                   <td>
                     <div className="row" style={{ justifyContent: 'flex-end', gap: 6 }}>
