@@ -42,7 +42,7 @@ interface Props {
 
 type Pos = MmPos
 interface Rect { r0: number; r1: number; w0: number; w1: number }
-interface PersonAgg { key: string; name: string; department: string | null; projects: string[]; cells: Record<string, number>; parts: Record<string, string[]> }
+interface PersonAgg { key: string; name: string; department: string | null; projects: string[]; cells: Record<string, number>; parts: Record<string, string[]>; notes: Record<string, string[]> }
 const QUICK = [0.25, 0.5, 0.75, 1]
 const MAX_LANES = 3
 const COL = 46            // 주 칸 너비(px) — CSS .mm-cell 과 같게
@@ -203,6 +203,7 @@ export default function ManMonthGrid(props: Props) {
   const projectAgg = useMemo(() => new Map(groups.map((g) => [g.p.id, {
     sums: weeks.map((w) => r2(g.rows.reduce((t, r) => t + (rowCells.get(r.id)?.[String(w.index)] ?? 0), 0))),
     mm: r2(g.rows.reduce((t, r) => t + totalMm(rowCells.get(r.id) ?? {}, weeks), 0)),
+    notes: weeks.map((w) => g.rows.flatMap((r) => { const t = r.notes?.[String(w.index)]; return t ? [`${r.personName}: ${t}`] : [] })),
     over: g.rows.some((r) => { const l = personLoad.get(personKey(r)); return !!l && [...l.values()].some((e) => e.sum > 1.0001) }),
   }])), [groups, weeks, rowCells, personLoad])
 
@@ -211,13 +212,14 @@ export default function ManMonthGrid(props: Props) {
     const m = new Map<string, PersonAgg>()
     for (const r of sheet.rows) {
       const k = personKey(r)
-      const a = m.get(k) ?? { key: k, name: r.personName, department: r.department, projects: [], cells: {}, parts: {} }
+      const a = m.get(k) ?? { key: k, name: r.personName, department: r.department, projects: [], cells: {}, parts: {}, notes: {} }
       const pn = projectName.get(r.projectId) ?? ''
       a.projects.push(pn)
       for (const [w, v] of Object.entries(rowCells.get(r.id) ?? {})) {
         a.cells[w] = r2((a.cells[w] ?? 0) + v)
         ;(a.parts[w] ??= []).push(`${pn} ${fmtVal(v)}`)
       }
+      for (const [w, t] of Object.entries(r.notes ?? {})) (a.notes[w] ??= []).push(`${pn}: ${t}`)
       m.set(k, a)
     }
     const peak = (a: PersonAgg) => Math.max(0, ...Object.values(a.cells))
@@ -702,7 +704,8 @@ export default function ManMonthGrid(props: Props) {
         {agg.sums.map((s, i) => {
           const re = rel.get(i)
           return (
-            <td key={i} className={`mm-psum${i === thisWeek ? ' is-now' : ''}`} title={s ? String(s) : undefined}>
+            <td key={i} className={`mm-psum${i === thisWeek ? ' is-now' : ''}${agg.notes[i].length ? ' has-note' : ''}`}
+                title={[s ? String(s) : '', ...agg.notes[i].map((t) => `메모 ${t}`)].filter(Boolean).join('\n') || undefined}>
               {re && <button type="button" className="mm-diamond" style={{ ['--ev' as string]: EVENT_KINDS[re[0].kind].color }}
                              onClick={() => (re.length > 1 ? props.onWeekEvents?.(`${g.p.name} · ${weeks[i].label} 주`, re) : props.onEventOpen?.(re[0]))}
                              title={re.map((e) => `${EVENT_KINDS[e.kind].sym} ${EVENT_KINDS[e.kind].label} ${eventPeriod(e)} ${e.title}`).join('\n')}
@@ -723,9 +726,10 @@ export default function ManMonthGrid(props: Props) {
         const v = a.cells[String(w.index)]
         const parts = a.parts[String(w.index)]
         const over = !!v && v > 1.0001
-        return <td key={w.index} className={`mm-cell mm-ro${over ? ' is-over' : ''}${w.index === thisWeek ? ' is-now' : ''}`}
+        const notes = a.notes[String(w.index)]
+        return <td key={w.index} className={`mm-cell mm-ro${over ? ' is-over' : ''}${w.index === thisWeek ? ' is-now' : ''}${notes ? ' has-note' : ''}`}
                    style={{ backgroundColor: cellBg(v, over) }}
-                   title={parts ? `${over ? '1.0 초과 — ' : ''}${parts.join(' + ')}` : undefined}>{fmtVal(v)}</td>
+                   title={[parts ? `${over ? '1.0 초과 — ' : ''}${parts.join(' + ')}` : '', ...(notes ?? []).map((t) => `메모 ${t}`)].filter(Boolean).join('\n') || undefined}>{fmtVal(v)}</td>
       })}
     </tr>
   ))
