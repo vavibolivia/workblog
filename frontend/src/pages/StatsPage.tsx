@@ -131,7 +131,7 @@ function BarChart({ data }: { data: StatsResponse }) {
               <rect x={cx - barW / 2} y={padT + innerH - h} width={barW} height={Math.max(h, x.count > 0 ? 2 : 0)} rx={barW > 6 ? 3 : 1}
                     className={`bar-chart__bar${hover === i ? ' is-hover' : ''}`} />
               {(i % labelEvery === 0 || i === d.length - 1) && d.length - 1 - i >= (i === d.length - 1 ? 0 : labelEvery / 2) && (
-                <text x={cx} y={H - 8} textAnchor="middle" className="bar-chart__tick">{fmt(x.date)}</text>
+                <text x={cx} y={H - 8} textAnchor={i === d.length - 1 && d.length > 1 ? 'end' : 'middle'} className="bar-chart__tick">{fmt(x.date)}</text>
               )}
             </g>
           )

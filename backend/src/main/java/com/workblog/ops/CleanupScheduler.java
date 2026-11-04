@@ -70,10 +70,14 @@ public class CleanupScheduler {
                     log.warn("휴지통 글 {} 영구 삭제 실패: {}", postId, e.toString());
                 }
             }
-            // ② 고아 첨부
+            // ② 고아 첨부. 글을 고치며 본문에서 뺀 사진도 post_id 가 끊겨 고아가 되지만, 이전 버전(post_revisions)이나
+            //    다른 글 본문이 그 주소(/api/files/{public_id})를 아직 쓰고 있으면 지우지 않는다 — 이력 보기·되돌리기에서 사진이 깨지던 문제.
             Instant orphanCutoff = orphanCutoff(start, props.orphanAttachmentHours());
             List<java.util.Map<String, Object>> rows = jdbc.queryForList(
-                    "SELECT id, stored_name FROM attachments WHERE post_id IS NULL AND created_at < ?", Timestamp.from(orphanCutoff));
+                    "SELECT a.id, a.stored_name FROM attachments a WHERE a.post_id IS NULL AND a.created_at < ?"
+                            + " AND NOT EXISTS (SELECT 1 FROM post_revisions r WHERE strpos(r.content, a.public_id) > 0)"
+                            + " AND NOT EXISTS (SELECT 1 FROM posts p WHERE strpos(p.content, a.public_id) > 0)",
+                    Timestamp.from(orphanCutoff));
             for (var r : rows) {
                 if (deleteFile((String) r.get("stored_name"))) files++; else failed++;
                 jdbc.update("DELETE FROM attachments WHERE id = ?", ((Number) r.get("id")).longValue());

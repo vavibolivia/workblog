@@ -117,6 +117,7 @@ export default function AdminTemplatesPage() {
 
       {!editing && (
         <div className="card">
+          <div className="card__head"><h3>템플릿</h3><span className="small muted">전체 {list?.length ?? 0}개</span></div>
           <div className="table-wrap">
             <table className="table">
               <thead><tr><th>순서</th><th>이름</th><th>설명</th><th>기본 카테고리</th><th>기본 태그</th><th>수정일</th><th></th></tr></thead>

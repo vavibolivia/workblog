@@ -12,13 +12,14 @@
 .rte__group--end { margin-left: auto; }
 .rte__btn { height: 32px; min-width: 32px; padding: 0 7px; border: 1px solid transparent; border-radius: 6px; background: transparent; font-size: 14px; color: var(--ink-2); display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 .rte__btn:hover { background: var(--canvas); }
-.rte__btn[aria-pressed="true"] { background: var(--sky-50); color: var(--navy); border-color: var(--sky-100); }
+.rte__btn[aria-pressed="true"] { background: var(--sky-50); color: var(--navy); border-color: #5b8fc7; }
+:root[data-theme="dark"] .rte__btn[aria-pressed="true"] { background: #1f4a75; border-color: #4a8fd0; color: #cfe3ff; }
 .rte__btn:disabled { opacity: .35; }
 .rte__select { height: 32px; padding: 0 6px 0 7px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--paper); font-size: 13px; max-width: 130px; }
 .rte__select--sm { max-width: 76px; }
 .rte__swatch { display: inline-block; width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(0,0,0,.15); }
 .rte__palette { position: absolute; top: 100%; left: 0; margin-top: 4px; display: grid; grid-template-columns: repeat(7, 26px); gap: 4px; padding: 8px; background: var(--paper); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 8px 24px rgba(11,42,91,.14); z-index: 30; }
-.rte__color { width: 26px; height: 26px; border-radius: 5px; border: 1px solid rgba(0,0,0,.12); padding: 0; font-size: 12px; }
+.rte__color { width: 26px; height: 26px; border-radius: 5px; border: 1px solid rgba(0,0,0,.3); padding: 0; font-size: 12px; }
 .rte__color--reset { grid-column: span 7; width: auto; height: 28px; background: var(--canvas); font-size: 12px; }
 .rte__menu { position: absolute; top: 100%; left: 0; margin-top: 4px; min-width: 180px; padding: 6px; background: var(--paper); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 8px 24px rgba(11,42,91,.14); z-index: 30; display: flex; flex-direction: column; }
 .rte__menu button { text-align: left; padding: 7px 10px; border: 0; background: transparent; border-radius: 5px; font-size: 13px; }
@@ -91,7 +92,7 @@
 .rich img { max-width: 100%; height: auto; }
 
 /* X2 표 메뉴: 셀 배경색(8색+없음)·셀 정렬 */
-.rte__menu:has(.rte__cellcolors) { min-width: 250px; max-height: 70vh; overflow-y: auto; }
+.rte__menu:has(.rte__cellcolors) { min-width: 250px; max-height: min(70vh, calc(100vh - var(--gnb-h) - 140px)); overflow-y: auto; }
 .rte__menu-label { padding: 4px 10px 2px; font-size: 12px; color: var(--muted); }
 .rte__cellcolors { display: grid; grid-template-columns: repeat(9, 22px); gap: 4px; padding: 4px 10px 6px; }
 .rte__menu .rte__cellcolors button { width: 22px; height: 22px; padding: 0; border: 1px solid rgba(0,0,0,.14); border-radius: 5px; text-align: center; font-size: 12px; line-height: 1; }
@@ -109,6 +110,11 @@
   .rte__group + .rte__group { padding-left: 0; border-left: 0; }
   .rte__group--end { margin-left: 0; }
   .rte__menu, .rte__palette { max-width: calc(100vw - 32px); }
+  /* 색 단추 묶음은 툴바 오른쪽에 있어 왼쪽 기준이면 팔레트가 화면 밖으로 잘린다 → 묶음 오른쪽 끝에 맞춘다 */
+  .rte__palette { left: auto; right: 0; }
+  /* 에디터 CSS 는 나중에 붙어 global.css 모바일 규칙을 덮으므로 여기서 맞춘다(제목·툴바 시작선 18px) */
+  .rich--edit { padding: 16px 18px; }
+  .editor__bar { padding: 12px 18px; }
   .rte__menu { max-height: min(70vh, calc(100dvh - 120px)); overflow-y: auto; }
 }
 
@@ -137,7 +143,7 @@
 @media (max-width: 640px) { .rte__anchor { position: static; } }
 
 /* 자리표시 글씨 통일(제목·본문·태그 입력 = 입력칸과 같은 회색) */
-.editor input.editor__title::placeholder, .editor .tag-input input::placeholder, .rich.rich--edit p.is-editor-empty:first-child::before { color: #8592a5; }
+.editor input.editor__title::placeholder, .editor .tag-input input::placeholder, .rich.rich--edit p.is-editor-empty:first-child::before { color: #687386; }
 :root[data-theme="dark"] .editor input.editor__title::placeholder, :root[data-theme="dark"] .editor .tag-input input::placeholder, :root[data-theme="dark"] .rich.rich--edit p.is-editor-empty:first-child::before { color: #7d8898; }
 
 /* 머리 줄 높이: 새 글(템플릿 단추 32px)과 수정(글자만)을 같게 */

@@ -145,7 +145,10 @@ export default function ManMonthGrid(props: Props) {
         const d0 = Math.max(0, r0), d1 = Math.min(total - 1, r1)
         const md = (s: string) => shortDate(s).replace(/\(.\)$/, '')
         // 여러 날이면 날 수도 적는다 — 앞의 옅은 막대가 그 기간(요일 위치까지)이라는 걸 글로도
-        const label = `${e.endDate ? `${md(e.startDate)}~${md(e.endDate)} (${r1 - r0 + 1}일)` : shortDate(e.startDate)}${e.related ? ` ${e.related}` : ''} ${e.title}`
+        // 제목이 관련 이름으로 시작하면("UAO 운영 점검 회의" + 관련 UAO) 관련을 되풀이하지 않는다
+        const rel = e.related?.trim()
+        const showRel = rel && !e.title.trim().toLowerCase().startsWith(rel.toLowerCase())
+        const label = `${e.endDate ? `${md(e.startDate)}~${md(e.endDate)} (${r1 - r0 + 1}일)` : shortDate(e.startDate)}${showRel ? ` ${rel}` : ''} ${e.title}`
         const textPx = [...label].reduce((t, ch) => t + (ch.charCodeAt(0) > 255 ? 12 : 7), 30)
         // 칠한 막대는 실제 기간만(요일 위치까지), 글자는 오른쪽으로 이어진다 — 겹치지 않게 글자 끝까지 자리 잡음
         const px0 = d0 * COL / 7, barPx = Math.max(8, (d1 - d0 + 1) * COL / 7)

@@ -103,7 +103,7 @@ export default function PostHistoryPage() {
         </div>
 
         <div className="card">
-          <div className="card__head">
+          <div className="card__head card__head--wrap">
             <h3>{detail ? `v${detail.version} · ${detail.title}` : '버전을 선택하세요'}</h3>
             <div className="row">
               <div className="segmented" role="group" aria-label="보기">
