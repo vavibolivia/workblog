@@ -33,6 +33,15 @@ s, sh = call("GET", f"/api/mm/sheets/{MS}", tok=A)
 linked = [r for r in sh["rows"] if r["userId"] == _acct["id"]]
 check("MMS account rename syncs all linked rows", len(linked) == 2 and all(r["personName"] == "동기새이름" + _sx and r["department"] == "새부서" for r in linked), linked)
 
+# 3a) 일반 편집자가 이름을 바꾸면 남(관리자)이 만든 이벤트는 바꾸지 않음(이벤트 수정 권한을 넘지 않음)
+s, r = call("POST", "/api/auth/login", {"username": "mms" + _sx, "password": "mmpass1234"}); _ET = r["token"]
+call("PUT", f"/api/mm/sheets/{MS}/editors", {"userIds": [_acct["id"]]}, A)
+s, sh = call("PUT", f"/api/mm/sheets/{MS}/projects/{PA}", {"name": "임시" + _sx}, _ET)
+s2, evs = call("GET", "/api/mm/events?from=2026-11-01&to=2026-11-30", tok=A)
+_e1 = [e for e in evs.get("events", []) if e["id"] == ev.get("id")]
+check("MMS editor rename does not touch others' events", s == 200 and _e1 and _e1[0]["related"] == _pa and "권한이 없어" in sh["changes"][0]["summary"], (s, _e1, sh.get("changes", [{}])[0]))
+call("PUT", f"/api/mm/sheets/{MS}/projects/{PA}", {"name": _pa}, _ET)   # 되돌림(이벤트는 옛 이름 그대로라 다시 맞음)
+
 # 3) 프로젝트 이름 변경 → 인원 그대로, 이벤트 '관련' 따라감
 _pa2 = "동기A2" + _sx
 n_before = len([r for r in sh["rows"] if r["projectId"] == PA])

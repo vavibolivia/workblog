@@ -305,7 +305,7 @@ data/postviews.json   열람 감사 로그                                     f
 | POST | `/api/mm/sheets` | `{title, startDate, weeks(1~104), description?}` — startDate 는 그 주 월요일로 맞춤 |
 | GET · PATCH · DELETE | `/api/mm/sheets/{id}` | 상세(프로젝트·행·칸·편집자·변경 이력 30건) · 설정(시작 주를 바꾸면 값은 날짜 기준으로 유지, 기간 밖은 지움) · 삭제 |
 | PUT | `/api/mm/sheets/{id}/editors` | `{userIds:[…]}` 편집자 목록 전체 교체 |
-| POST · PUT · DELETE | `/api/mm/sheets/{id}/projects[/{projectId}]` | 프로젝트 `{name, sortOrder?}`. 이름을 바꾸면 '관련' 에 옛 이름을 쓴 이벤트도 새 이름으로(다른 표에 옛 이름 프로젝트가 있으면 그대로). 지우면 그 프로젝트 행·값·메모도 지워짐 |
+| POST · PUT · DELETE | `/api/mm/sheets/{id}/projects[/{projectId}]` | 프로젝트 `{name, sortOrder?}`. 이름을 바꾸면 '관련' 에 옛 이름을 쓴 이벤트도 새 이름으로 — 관리자는 모든 이벤트, 그 밖에는 자기가 만든 이벤트만(이벤트 수정 권한과 같음, 나머지는 변경 이력에 안내). 다른 표에 옛 이름 프로젝트가 있으면 그대로. 지우면 그 프로젝트 행·값·메모도 지워짐 |
 | POST | `/api/mm/sheets/{id}/projects/{projectId}/move?dir=-1|1` | 프로젝트 순서 한 칸 위·아래 |
 | POST | `/api/mm/sheets/{id}/rows/{rowId}/move?dir=-1|1` | 인원 순서 한 칸 위·아래(같은 프로젝트 안) |
 | POST · PUT · DELETE | `/api/mm/sheets/{id}/rows[/{rowId}]` | 인원 `{projectId, userId?, personName?, department?, role?}` — 계정을 주면 이름은 계정 이름, 소속은 계정 부서(없을 때만 department). 고칠 때 이름·소속·계정은 이 표의 같은 사람(같은 계정, 없으면 같은 이름) 행 모두에 적용, 프로젝트·역할은 그 행만. 계정 이름·부서를 바꾸면 연결된 행이 함께 바뀜 |

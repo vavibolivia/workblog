@@ -218,7 +218,7 @@ function ProjectDialog({ sheet, project, busy, onClose, run, onAddPerson }: { sh
                      onClick={() => run(() => (project ? mmApi.renameProject(sheet.id, project.id, name.trim()) : mmApi.addProject(sheet.id, name.trim())))}>{project ? '저장' : '추가'}</button>
            </>}>
       <div className="field"><label htmlFor="mm-pname">프로젝트 이름</label><input id="mm-pname" className="input" value={name} onChange={(e) => setName(e.target.value)} maxLength={100} autoFocus />
-        {renamed && <p className="small muted">저장하면 인원 {count}명은 그대로 새 이름 아래로 가고, '관련' 에 옛 이름을 쓴 이벤트도 새 이름으로 바뀝니다.</p>}
+        {renamed && <p className="small muted">저장하면 인원 {count}명은 그대로 새 이름 아래로 가고, '관련' 에 옛 이름을 쓴 이벤트도 새 이름으로 바뀝니다(관리자가 아니면 내가 만든 이벤트만 — 나머지는 변경 이력에 남김).</p>}
       </div>
       {project && sheet.projects.length > 1 && (
         <div className="field"><span className="label">순서 <span className="muted small">({pos + 1} / {sheet.projects.length}번째)</span></span>

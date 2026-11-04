@@ -225,16 +225,26 @@ public class ManMonthService {
         String old = requireProject(id, projectId);
         String name = req.name().trim();
         jdbc.update("UPDATE mm_projects SET name = ?, sort_order = COALESCE(?, sort_order) WHERE id = ?", name, req.sortOrder(), projectId);
-        int events = 0;
+        int events = 0, skipped = 0;
         if (!old.trim().equalsIgnoreCase(name)) {
             // 이벤트의 '관련' 은 프로젝트 이름(글자)으로 잇는다 → 옛 이름을 쓰던 이벤트도 새 이름으로.
             // 다른 표에 옛 이름 프로젝트가 아직 있으면 그쪽 연결이 끊기므로 그때는 그대로 둔다.
+            // 이벤트 수정 권한(만든 사람·관리자, MmEventService)을 넘지 않게: 관리자는 모두, 아니면 내가 만든 이벤트만 바꾼다.
             Integer others = jdbc.queryForObject("SELECT count(*) FROM mm_projects WHERE lower(trim(name)) = lower(?)", Integer.class, old.trim());
-            if (others == null || others == 0)
-                events = jdbc.update("UPDATE mm_events SET related = ?, updated_at = now() WHERE lower(trim(related)) = lower(?)", name, old.trim());
+            if (others == null || others == 0) {
+                if (actor.isAdmin()) {
+                    events = jdbc.update("UPDATE mm_events SET related = ?, updated_at = now() WHERE lower(trim(related)) = lower(?)", name, old.trim());
+                } else {
+                    events = jdbc.update("UPDATE mm_events SET related = ?, updated_at = now() WHERE lower(trim(related)) = lower(?) AND created_by_id = ?", name, old.trim(), actor.getId());
+                    Integer left = jdbc.queryForObject("SELECT count(*) FROM mm_events WHERE lower(trim(related)) = lower(?)", Integer.class, old.trim());
+                    skipped = left == null ? 0 : left;
+                }
+            }
         }
         touch(id);
-        log(id, actor, old.equals(name) ? "프로젝트 수정: " + name : "프로젝트 이름: " + old + " → " + name + (events > 0 ? " (관련 이벤트 " + events + "건도 바꿈)" : ""));
+        log(id, actor, old.equals(name) ? "프로젝트 수정: " + name : "프로젝트 이름: " + old + " → " + name
+                + (events > 0 ? " (관련 이벤트 " + events + "건도 바꿈)" : "")
+                + (skipped > 0 ? " (다른 사람이 만든 관련 이벤트 " + skipped + "건은 권한이 없어 옛 이름 그대로 — 만든 사람·관리자가 고쳐야 함)" : ""));
         return get(id, actor);
     }
 
