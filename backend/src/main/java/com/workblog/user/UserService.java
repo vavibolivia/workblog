@@ -16,9 +16,12 @@ public class UserService {
     private final com.workblog.post.PostRepository posts;
     private final com.workblog.attachment.AttachmentService attachments;
     private final PasswordPolicy passwordPolicy;
+    private final org.springframework.jdbc.core.JdbcTemplate jdbc;
 
     public UserService(UserRepository users, PasswordEncoder encoder, com.workblog.post.PostRepository posts,
-                       com.workblog.attachment.AttachmentService attachments, PasswordPolicy passwordPolicy) {
+                       com.workblog.attachment.AttachmentService attachments, PasswordPolicy passwordPolicy,
+                       org.springframework.jdbc.core.JdbcTemplate jdbc) {
+        this.jdbc = jdbc;
         this.users = users;
         this.encoder = encoder;
         this.posts = posts;
@@ -89,6 +92,7 @@ public class UserService {
             passwordPolicy.check(req.newPassword());
             u.setPassword(encoder.encode(req.newPassword()));
         }
+        syncPeople(u);
         return UserResponse.from(u);
     }
 
@@ -103,7 +107,18 @@ public class UserService {
         if (id.equals(actor.getId())) throw ApiException.badRequest("자기 자신은 삭제할 수 없습니다.");
         User u = getById(id);
         long n = posts.countByAuthorId(id);
-        if (n > 0) throw ApiException.badRequest("글이 " + n + "건 있는 계정은 삭제할 수 없습니다. 비활성화하세요.");
+        // 글·댓글·고친 이력·글에 붙은 첨부는 이 계정을 가리킨다(지우면 기록이 깨짐) → 남아 있으면 비활성화로 안내
+        long c = count("SELECT count(*) FROM comments WHERE author_id = ?", id);
+        long r = count("SELECT count(*) FROM post_revisions WHERE edited_by = ?", id);
+        long a = count("SELECT count(*) FROM attachments WHERE uploader_id = ? AND post_id IS NOT NULL", id);
+        if (n + c + r + a > 0) {
+            List<String> why = new java.util.ArrayList<>();
+            if (n > 0) why.add("글 " + n + "건");
+            if (c > 0) why.add("댓글 " + c + "건");
+            if (r > 0) why.add("글 수정 기록 " + r + "건");
+            if (a > 0) why.add("글에 붙은 첨부 " + a + "개");
+            throw ApiException.badRequest("이 계정으로 " + String.join(" · ", why) + " 이 남아 있어 영구 삭제할 수 없습니다. 대신 [비활성화] 하세요(기록은 그대로, 로그인만 막힘).");
+        }
         attachments.purgeOrphansForUser(id);
         users.delete(u);
     }
@@ -116,6 +131,7 @@ public class UserService {
         if (u.getRole() == User.Role.ADMIN) u.setDepartment(req.department());
         // 직급·직책은 열람 권한과 관계없어 본인이 고친다. 보내지 않으면(null) 그대로
         if (req.position() != null) u.setPosition(req.position());
+        syncPeople(u);
         return UserResponse.from(u);
     }
 
@@ -126,5 +142,16 @@ public class UserService {
         }
         passwordPolicy.check(req.newPassword());
         u.setPassword(encoder.encode(req.newPassword()));
+    }
+
+    private long count(String sql, Long id) {
+        Long v = jdbc.queryForObject(sql, Long.class, id);
+        return v == null ? 0 : v;
+    }
+
+    /** 공수 표 인원 행은 계정 이름·부서를 복사해 둔다 → 계정이 바뀌면 같이 바꾼다(계정 부서가 비면 행의 소속은 그대로). */
+    private void syncPeople(User u) {
+        jdbc.update("UPDATE mm_rows SET person_name = ?, department = COALESCE(NULLIF(TRIM(?), ''), department) WHERE user_id = ?",
+                u.getDisplayName(), u.getDepartment() == null ? "" : u.getDepartment(), u.getId());
     }
 }

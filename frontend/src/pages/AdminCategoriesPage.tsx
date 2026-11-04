@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { api, CATEGORY_MAX_DEPTH, errorMessage, findCategory, flattenCategories, type CategoryNode } from '../lib/api'
 import { useToast } from '../lib/toast'
 import Modal from '../components/Modal'
+import { TagAdmin } from '../components/TaxonomyAdmin'
 
 type Dialog = { kind: 'new'; parent: CategoryNode | null } | { kind: 'edit'; node: CategoryNode } | null
 
@@ -158,9 +159,10 @@ export default function AdminCategoriesPage() {
       {confirmDelete && (
         <Modal title={`'${confirmDelete.name}' 카테고리를 삭제할까요?`} onClose={() => setConfirmDelete(null)}
                footer={<><button type="button" className="btn" onClick={() => setConfirmDelete(null)}>취소</button><button type="button" className="btn btn--danger" disabled={busy} onClick={remove}>삭제</button></>}>
-          <p>하위 카테고리나 연결된 글이 있으면 삭제되지 않습니다. 먼저 옮기거나 지워 주세요. 글의 변경 이력에는 이 카테고리 이름이 그대로 남습니다.</p>
+          <p>하위 카테고리나 글(휴지통에 있는 글 포함)이 있으면 삭제되지 않습니다. 먼저 옮기거나 지워 주세요. 글의 변경 이력에는 이 카테고리 이름이 그대로 남습니다.</p>
         </Modal>
       )}
+      <TagAdmin />
     </div>
   )
 }

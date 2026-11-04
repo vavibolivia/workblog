@@ -33,10 +33,14 @@ public class PostService {
     private final ReactionService reactions;
     private final CommentRepository comments;
     private final com.workblog.notification.NotificationService notifications;
+    /** 영구 삭제한 글의 대문 항목 정리(front_items 는 글·공수 표를 함께 가리켜 FK 를 걸 수 없음) */
+    private final java.util.function.LongConsumer frontCleanup;
 
     public PostService(PostRepository posts, PostRevisionRepository revisions, CategoryService categories,
                        AttachmentService attachments, ReactionService reactions, CommentRepository comments,
-                       com.workblog.notification.NotificationService notifications) {
+                       com.workblog.notification.NotificationService notifications,
+                       org.springframework.jdbc.core.JdbcTemplate jdbc) {
+        this.frontCleanup = id -> jdbc.update("DELETE FROM front_items WHERE kind = 'POST' AND ref_id = ?", id);
         this.posts = posts;
         this.revisions = revisions;
         this.categories = categories;
@@ -173,6 +177,7 @@ public class PostService {
         Post p = posts.findById(id).orElseThrow(() -> ApiException.notFound("글"));
         if (!p.isDeleted()) throw ApiException.badRequest("먼저 삭제한 뒤(휴지통) 영구 삭제할 수 있습니다.");
         attachments.purgeForPost(id);
+        frontCleanup.accept(id);
         posts.delete(p);
     }
 

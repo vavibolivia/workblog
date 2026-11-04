@@ -307,11 +307,24 @@ class CategoryServiceTest {
     void delete_with_linked_posts_including_deleted_ones_is_400() {
         Category c = node(1, "A", null);
         when(repo.existsByParentId(1L)).thenReturn(false);
-        when(repo.countAllPosts(1L)).thenReturn(1L);
+        when(repo.countLivePosts(1L)).thenReturn(1L);
 
         assertThatThrownBy(() -> service.delete(1L))
                 .satisfies(t -> assertApi(t, HttpStatus.BAD_REQUEST))
                 .hasMessageContaining("글");
+        verify(repo, never()).delete(c);
+    }
+
+    @Test
+    void delete_blocked_only_by_trashed_posts_says_trash() {
+        Category c = node(1, "A", null);
+        when(repo.existsByParentId(1L)).thenReturn(false);
+        when(repo.countLivePosts(1L)).thenReturn(0L);
+        when(repo.countTrashedPosts(1L)).thenReturn(2L);
+
+        assertThatThrownBy(() -> service.delete(1L))
+                .satisfies(t -> assertApi(t, HttpStatus.BAD_REQUEST))
+                .hasMessageContaining("휴지통");
         verify(repo, never()).delete(c);
     }
 

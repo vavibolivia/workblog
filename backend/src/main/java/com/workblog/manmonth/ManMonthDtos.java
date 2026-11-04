@@ -63,7 +63,7 @@ public final class ManMonthDtos {
 
     public record ProjectRequest(@NotBlank @Size(max = 100) String name, Integer sortOrder) {}
 
-    /** userId 를 주면 이름·소속을 계정에서 채운다(personName · department 를 함께 주면 그 값이 우선). */
+    /** userId 를 주면 이름은 계정 이름, 소속은 계정 부서(계정에 부서가 없을 때만 department). 이름·소속·계정은 이 표의 같은 사람 행 모두에 적용된다. */
     public record RowRequest(Long projectId, Long userId, @Size(max = 100) String personName, @Size(max = 100) String department,
                              @Size(max = 100) String role, Integer sortOrder) {}
 

@@ -42,9 +42,9 @@ class PostTest {
     }
 
     @Test
-    void joinTags_is_case_sensitive_for_dedupe() {
-        // 현재 구현은 소문자화하지 않는다 (필드 주석의 'lower-case' 와 다름)
-        assertThat(Post.joinTags(List.of("Java", "java"))).isEqualTo("Java,java");
+    void joinTags_dedupes_ignoring_case_keeping_first_spelling() {
+        // 태그 필터가 대소문자를 무시하므로 대소문자만 다른 태그는 같은 태그 — 먼저 나온 글자 그대로 하나만
+        assertThat(Post.joinTags(List.of("Java", "java", "Spring"))).isEqualTo("Java,Spring");
     }
 
     @Test

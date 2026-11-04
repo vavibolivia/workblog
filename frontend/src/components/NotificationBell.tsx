@@ -54,6 +54,14 @@ export default function NotificationBell() {
     navigate(notificationHref(n))
   }
 
+  const remove = async (id: number) => {
+    try { setCount(await notificationsApi.remove(id)); setItems((l) => l?.filter((n) => n.id !== id) ?? l) }
+    catch (e) { setErr(errorMessage(e)) }
+  }
+  const removeRead = async () => {
+    try { setCount(await notificationsApi.removeRead()); setItems((l) => l?.filter((n) => !n.read) ?? l) }
+    catch (e) { setErr(errorMessage(e)) }
+  }
   const readAll = async () => {
     try { await notificationsApi.readAll(); setCount(0); setItems((l) => l?.map((n) => ({ ...n, read: true })) ?? l) }
     catch (e) { toast(errorMessage(e), 'error') }
@@ -70,7 +78,10 @@ export default function NotificationBell() {
         <div className="notif__panel" role="dialog" aria-label="알림">
           <div className="notif__head">
             <strong>알림</strong>
-            <button type="button" className="notif__link" onClick={readAll} disabled={count === 0 && !(items ?? []).some((n) => !n.read)}>모두 읽음</button>
+            <span className="notif__acts">
+              <button type="button" className="notif__link" onClick={readAll} disabled={count === 0 && !(items ?? []).some((n) => !n.read)}>모두 읽음</button>
+              <button type="button" className="notif__link" onClick={removeRead} disabled={!(items ?? []).some((n) => n.read)}>읽은 알림 지우기</button>
+            </span>
           </div>
           {err && <div className="alert alert--error" style={{ margin: 8 }}>{err}</div>}
           {!items && !err && <div className="notif__empty"><div className="spinner" style={{ margin: '0 auto' }} /></div>}
@@ -78,7 +89,8 @@ export default function NotificationBell() {
           {items && items.length > 0 && (
             <ul className="notif__list">
               {items.map((n) => (
-                <li key={n.id}>
+                <li key={n.id} className="notif__row">
+                  <button type="button" className="notif__del" onClick={() => remove(n.id)} aria-label="이 알림 지우기" title="이 알림 지우기">×</button>
                   <button type="button" className={`notif__item${n.read ? '' : ' notif__item--unread'}`} onClick={() => go(n)}>
                     <span className="notif__text">{notificationText(n)}</span>
                     <span className="notif__title ellipsis">{n.available ? n.postTitle : '볼 수 없는 글'}</span>

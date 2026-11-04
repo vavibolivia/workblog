@@ -100,6 +100,20 @@ public class NotificationService {
         return toResponse(n, me);
     }
 
+    /** 내 알림 하나 지우기 */
+    public UnreadCount delete(Long id, User me) {
+        Notification n = repo.findById(id).filter(x -> x.getRecipient().getId().equals(me.getId()))
+                .orElseThrow(() -> ApiException.notFound("알림"));
+        repo.delete(n);
+        return unreadCount(me);
+    }
+
+    /** 읽은 알림 모두 지우기(안 읽은 것은 남김) */
+    public UnreadCount deleteRead(User me) {
+        repo.deleteRead(me.getId());
+        return unreadCount(me);
+    }
+
     public UnreadCount markAllRead(User me) {
         repo.markAllRead(me.getId(), Instant.now());
         return new UnreadCount(0);

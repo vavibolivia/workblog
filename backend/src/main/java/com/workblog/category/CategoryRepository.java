@@ -32,6 +32,13 @@ public interface CategoryRepository extends JpaRepository<Category, Long> {
     @Query(value = "SELECT p.category_id, count(*) FROM posts p WHERE p.deleted_at IS NULL AND p.status = 'PUBLISHED' GROUP BY p.category_id", nativeQuery = true)
     List<Object[]> publishedCounts();
 
+    /** 보는 사람 기준 카테고리별 글 수 — 목록을 눌렀을 때 보이는 글과 같은 조건(PostRepository.VISIBLE). [categoryId, count] */
+    @Query(value = "SELECT p.category_id, count(*) FROM posts p WHERE " + com.workblog.post.PostRepository.VISIBLE + " GROUP BY p.category_id", nativeQuery = true)
+    List<Object[]> visibleCounts(@Param("viewerId") long viewerId, @Param("isAdmin") boolean isAdmin);
+
+    @Query(value = "SELECT count(*) FROM posts p WHERE p.category_id = :id AND p.deleted_at IS NOT NULL", nativeQuery = true)
+    long countTrashedPosts(@Param("id") Long id);
+
     @Query(value = "SELECT count(*) FROM posts p WHERE p.category_id = :id AND p.deleted_at IS NULL", nativeQuery = true)
     long countLivePosts(@Param("id") Long id);
 

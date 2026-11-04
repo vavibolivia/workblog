@@ -61,9 +61,17 @@ public class CleanupScheduler {
             List<Long> expired = jdbc.queryForList("SELECT id FROM posts WHERE deleted_at IS NOT NULL AND deleted_at < ?", Long.class, Timestamp.from(trashCutoff));
             for (Long postId : expired) {
                 try {
-                    List<String> stored = jdbc.queryForList("SELECT stored_name FROM attachments WHERE post_id = ?", String.class, postId);
-                    for (String s : stored) { if (deleteFile(s)) files++; else failed++; }
-                    jdbc.update("DELETE FROM attachments WHERE post_id = ?", postId);
+                    // 다른 글·이력·템플릿이 같은 파일을 쓰면 파일은 남기고 글에서만 뗀다(고아 정리에서도 참조 검사로 남음)
+                    for (var a : jdbc.queryForList("SELECT id, public_id, stored_name FROM attachments WHERE post_id = ?", postId)) {
+                        String pub = (String) a.get("public_id");
+                        if (Boolean.TRUE.equals(jdbc.queryForObject(com.workblog.attachment.AttachmentService.USED_ELSEWHERE_SQL, Boolean.class, postId, pub, postId, pub, pub))) {
+                            jdbc.update("UPDATE attachments SET post_id = NULL WHERE id = ?", a.get("id"));
+                            continue;
+                        }
+                        if (deleteFile((String) a.get("stored_name"))) files++; else failed++;
+                        jdbc.update("DELETE FROM attachments WHERE id = ?", a.get("id"));
+                    }
+                    jdbc.update("DELETE FROM front_items WHERE kind = 'POST' AND ref_id = ?", postId);
                     jdbc.update("DELETE FROM posts WHERE id = ?", postId);
                     posts++;
                 } catch (RuntimeException e) {
@@ -76,7 +84,8 @@ public class CleanupScheduler {
             List<java.util.Map<String, Object>> rows = jdbc.queryForList(
                     "SELECT a.id, a.stored_name FROM attachments a WHERE a.post_id IS NULL AND a.created_at < ?"
                             + " AND NOT EXISTS (SELECT 1 FROM post_revisions r WHERE strpos(r.content, a.public_id) > 0)"
-                            + " AND NOT EXISTS (SELECT 1 FROM posts p WHERE strpos(p.content, a.public_id) > 0)",
+                            + " AND NOT EXISTS (SELECT 1 FROM posts p WHERE strpos(p.content, a.public_id) > 0)"
+                            + " AND NOT EXISTS (SELECT 1 FROM post_templates t WHERE strpos(t.content, a.public_id) > 0)",
                     Timestamp.from(orphanCutoff));
             for (var r : rows) {
                 if (deleteFile((String) r.get("stored_name"))) files++; else failed++;

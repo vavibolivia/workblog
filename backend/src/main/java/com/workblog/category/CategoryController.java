@@ -20,8 +20,8 @@ public class CategoryController {
 
     /** 전체 트리(발행 글 수 포함). 로그인 사용자 모두. */
     @GetMapping
-    public List<CategoryNode> tree() {
-        return service.tree();
+    public List<CategoryNode> tree(@com.workblog.auth.CurrentUser com.workblog.user.User user) {
+        return service.tree(user);
     }
 
     @GetMapping("/meta")

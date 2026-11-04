@@ -59,6 +59,9 @@ _s, _r = call("POST", f"/api/notifications/{_mine['id']}/read", tok=C2); check("
 _s, _r = call("POST", f"/api/notifications/{_mine['id']}/read", tok=C1); check("NOTI mark one read", _s == 200 and _r["read"] is True, (_s, _r))
 _s, _r = call("GET", "/api/notifications?unreadOnly=true", tok=C1); check("NOTI unreadOnly excludes read", _s == 200 and not any(n["id"] == _mine["id"] for n in _r["content"]), _r)
 _s, _r = call("POST", "/api/notifications/read-all", tok=C1); check("NOTI read-all → 0", _s == 200 and _unread(C1) == 0, (_s, _unread(C1)))
+_s, _r = call("DELETE", f"/api/notifications/{_mine['id']}", tok=C2); check("NOTI cannot delete others' notification 404", _s == 404, _s)
+_s, _r = call("DELETE", f"/api/notifications/{_mine['id']}", tok=C1); check("NOTI delete one", _s == 200 and not any(n["id"] == _mine["id"] for n in _notifs(C1)), _s)
+_s, _r = call("DELETE", "/api/notifications", tok=C1); check("NOTI delete read ones", _s == 200 and _notifs(C1) == [], (_s, len(_notifs(C1))))
 
 # ---- 동시 편집 충돌 ----
 _s, _r = call("GET", f"/api/posts/{_cp}?view=false", tok=U); _v = _r["version"]

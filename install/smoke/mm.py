@@ -70,7 +70,7 @@ s, _fp = call("POST", "/api/posts", {"title": "smoke 공수 글 " + _mm_sfx, "co
 FP = _fp["id"] if s in (200, 201) else None
 check("FRONT temp post with sheet link", FP is not None, s)
 s, r = call("PUT", "/api/front", {"items": _front_keep + [{"kind": "POST", "refId": FP}]}, MO); check("FRONT non-admin replace 403", s == 403, s)
-s, r = call("PUT", "/api/front", {"items": _front_keep + [{"kind": "MM_SHEET", "refId": MM}]}, A); check("FRONT sheet itself rejected (posts only) 400", s == 400, s)
+s, r = call("PUT", "/api/front", {"items": _front_keep + [{"kind": "MM_SHEET", "refId": MM}]}, A); check("FRONT sheet itself not added (posts only, ignored)", s == 200 and not any(i["kind"] == "MM_SHEET" for i in r), (s, r))
 s, r = call("PUT", "/api/front", {"items": _front_keep + [{"kind": "POST", "refId": FP}]}, A); check("FRONT admin adds post last", s == 200 and r[-1]["kind"] == "POST" and r[-1]["refId"] == FP, (s, r))
 s, r = call("GET", "/api/front", tok=MO); check("FRONT visible to all", s == 200 and any(i["refId"] == FP and i["kind"] == "POST" for i in r), (s, r))
 s, r = call("PUT", "/api/front", {"items": _front_keep + [{"kind": "POST", "refId": 999999999}]}, A); check("FRONT unknown item 400", s == 400, s)

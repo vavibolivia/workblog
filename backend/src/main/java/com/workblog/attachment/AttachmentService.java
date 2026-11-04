@@ -47,7 +47,17 @@ public class AttachmentService {
     private final long maxBytes;
     private final AttachmentTextService texts;
 
-    public AttachmentService(AttachmentRepository repo, WorkblogProperties props, AttachmentTextService texts) {
+    private final org.springframework.jdbc.core.JdbcTemplate jdbc;
+
+    /** 이 첨부 주소(/api/files/{public_id})를 다른 글 본문·이력·템플릿이 아직 쓰는지(postId 글 자신은 뺌). 쓰면 지우지 않는다. */
+    public static final String USED_ELSEWHERE_SQL =
+            "SELECT (EXISTS (SELECT 1 FROM posts p WHERE p.id <> ? AND strpos(p.content, ?) > 0)"
+            + " OR EXISTS (SELECT 1 FROM post_revisions r WHERE r.post_id <> ? AND strpos(r.content, ?) > 0)"
+            + " OR EXISTS (SELECT 1 FROM post_templates t WHERE strpos(t.content, ?) > 0))";
+
+    public AttachmentService(AttachmentRepository repo, WorkblogProperties props, AttachmentTextService texts,
+                             org.springframework.jdbc.core.JdbcTemplate jdbc) {
+        this.jdbc = jdbc;
         this.repo = repo;
         this.texts = texts;
         this.root = Path.of(props.storage().dir()).toAbsolutePath().normalize();
@@ -170,10 +180,14 @@ public class AttachmentService {
         return repo.findByPostIdOrderByCreatedAtAsc(postId).stream().map(AttachmentResponse::from).toList();
     }
 
-    /** 글 영구 삭제 시: 글의 첨부 파일과 레코드를 지운다. */
+    /** 글 영구 삭제 시: 글의 첨부 파일과 레코드를 지운다. 다른 글·이력·템플릿이 같은 파일을 쓰면 파일은 남기고 글에서만 뗀다. */
     @Transactional
     public void purgeForPost(Long postId) {
         for (Attachment a : repo.findByPostId(postId)) {
+            if (Boolean.TRUE.equals(jdbc.queryForObject(USED_ELSEWHERE_SQL, Boolean.class, postId, a.getPublicId(), postId, a.getPublicId(), a.getPublicId()))) {
+                a.detach();
+                continue;
+            }
             try { Files.deleteIfExists(root.resolve(a.getStoredName()).normalize()); } catch (IOException e) { log.warn("첨부 파일 삭제 실패: {}", a.getStoredName()); }
             repo.delete(a);
         }

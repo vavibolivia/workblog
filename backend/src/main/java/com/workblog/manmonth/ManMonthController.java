@@ -86,6 +86,18 @@ public class ManMonthController {
         return service.updateProject(id, projectId, req, user);
     }
 
+    @PostMapping("/{id}/projects/{projectId}/move")
+    @Operation(summary = "프로젝트 순서 옮기기", description = "dir = -1 위로, 1 아래로")
+    public SheetDetail moveProject(@PathVariable long id, @PathVariable long projectId, @RequestParam int dir, @CurrentUser User user) {
+        return service.moveProject(id, projectId, dir, user);
+    }
+
+    @PostMapping("/{id}/rows/{rowId}/move")
+    @Operation(summary = "인원 순서 옮기기", description = "같은 프로젝트 안에서. dir = -1 위로, 1 아래로")
+    public SheetDetail moveRow(@PathVariable long id, @PathVariable long rowId, @RequestParam int dir, @CurrentUser User user) {
+        return service.moveRow(id, rowId, dir, user);
+    }
+
     @DeleteMapping("/{id}/projects/{projectId}")
     public SheetDetail deleteProject(@PathVariable long id, @PathVariable long projectId, @CurrentUser User user) {
         return service.deleteProject(id, projectId, user);

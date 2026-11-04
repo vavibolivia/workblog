@@ -168,7 +168,7 @@ export default function ManMonthPage() {
                                                     onAddPerson={(pid) => setDialog({ kind: 'row', projectId: pid })} />}
       {dialog?.kind === 'row' && <RowDialog sheet={sheet} row={dialog.row} projectId={dialog.projectId} busy={busy} onClose={() => setDialog(null)} run={run} />}
       {dialog?.kind === 'editors' && <EditorsDialog sheet={sheet} busy={busy} onClose={() => setDialog(null)} run={run} />}
-      {dialog?.kind === 'settings' && <SettingsDialog sheet={sheet} busy={busy} onClose={() => setDialog(null)} run={run} />}
+      {dialog?.kind === 'settings' && <SettingsDialog sheet={sheet} busy={busy} onClose={() => setDialog(null)} run={run} usedBy={posts.map((p) => p.title)} />}
       {dialog?.kind === 'publish' && <PublishDialog sheet={sheet} onClose={() => setDialog(null)} />}
       {dialog?.kind === 'copy' && <CopyDialog sheet={sheet} onClose={() => setDialog(null)} />}
       {dialog?.kind === 'import' && (() => {
@@ -205,6 +205,9 @@ function ProjectDialog({ sheet, project, busy, onClose, run, onAddPerson }: { sh
   const [name, setName] = useState(project?.name ?? '')
   const [confirm, setConfirm] = useState(false)
   const count = project ? sheet.rows.filter((r) => r.projectId === project.id).length : 0
+  const pos = project ? sheet.projects.findIndex((p) => p.id === project.id) : -1
+  const renamed = !!project && name.trim() !== '' && name.trim() !== project.name
+  const move = (dir: -1 | 1) => project && run(() => mmApi.moveProject(sheet.id, project.id, dir), undefined, true)
   return (
     <Modal title={project ? `프로젝트 — ${project.name}` : '프로젝트 추가'} onClose={onClose}
            footer={<>
@@ -214,7 +217,18 @@ function ProjectDialog({ sheet, project, busy, onClose, run, onAddPerson }: { sh
              <button type="button" className="btn btn--primary" disabled={busy || !name.trim()}
                      onClick={() => run(() => (project ? mmApi.renameProject(sheet.id, project.id, name.trim()) : mmApi.addProject(sheet.id, name.trim())))}>{project ? '저장' : '추가'}</button>
            </>}>
-      <div className="field"><label htmlFor="mm-pname">프로젝트 이름</label><input id="mm-pname" className="input" value={name} onChange={(e) => setName(e.target.value)} maxLength={100} autoFocus /></div>
+      <div className="field"><label htmlFor="mm-pname">프로젝트 이름</label><input id="mm-pname" className="input" value={name} onChange={(e) => setName(e.target.value)} maxLength={100} autoFocus />
+        {renamed && <p className="small muted">저장하면 인원 {count}명은 그대로 새 이름 아래로 가고, '관련' 에 옛 이름을 쓴 이벤트도 새 이름으로 바뀝니다.</p>}
+      </div>
+      {project && sheet.projects.length > 1 && (
+        <div className="field"><span className="label">순서 <span className="muted small">({pos + 1} / {sheet.projects.length}번째)</span></span>
+          <div className="row" style={{ gap: 6 }}>
+            <button type="button" className="btn btn--sm" disabled={busy || pos <= 0} onClick={() => move(-1)}>▲ 위로</button>
+            <button type="button" className="btn btn--sm" disabled={busy || pos >= sheet.projects.length - 1} onClick={() => move(1)}>▼ 아래로</button>
+          </div>
+        </div>
+      )}
+      {project && confirm && <p className="small" style={{ color: 'var(--danger)' }}>이 프로젝트와 인원 {count}명의 입력 값·메모가 모두 지워집니다. 같은 사람이 다른 프로젝트에도 있으면 그쪽 행은 남습니다.</p>}
     </Modal>
   )
 }
@@ -405,8 +419,17 @@ function RowEditDialog({ sheet, row, busy, onClose, run }: { sheet: MmSheet; row
   useEffect(() => { activeUsers().then(setUsers) }, [])
   const pick = (p: Picked) => { if (p.kind !== 'user') return; setUserId(p.user.id); setName(p.user.displayName); setDept(p.user.department ?? '') }
   const linked = userId != null ? users.find((u) => u.id === userId) : undefined
-  const body = { projectId: pid, userId, personName: name.trim(), department: dept.trim(), role: role.trim() }
+  // 계정을 연결하면 이름·소속은 계정을 따른다(계정이 바뀌면 같이 바뀜). 계정에 부서가 없을 때만 소속을 적는다.
+  const acctName = linked?.displayName ?? (userId === row.userId ? row.personName : name)
+  const acctDept = linked?.department?.trim() || ''
+  const body = { projectId: pid, userId, personName: (userId != null ? acctName : name).trim(), department: (userId != null && acctDept ? acctDept : dept).trim(), role: role.trim() }
   const filled = Object.keys(row.cells).length
+  // 이름·소속·계정 연결은 이 표에서 같은 사람의 행 모두에 함께 적용된다(서버 samePersonRows 와 같은 기준)
+  const pname = new Map(sheet.projects.map((p) => [p.id, p.name]))
+  const same = sheet.rows.filter((r) => personKey(r) === personKey(row))
+  const inProject = sheet.rows.filter((r) => r.projectId === row.projectId)
+  const rpos = inProject.findIndex((r) => r.id === row.id)
+  const move = (dir: -1 | 1) => run(() => mmApi.moveRow(sheet.id, row.id, dir), undefined, true)
   return (
     <Modal title={`인원 — ${row.personName}`} onClose={onClose}
            footer={<>
@@ -418,9 +441,17 @@ function RowEditDialog({ sheet, row, busy, onClose, run }: { sheet: MmSheet; row
       <div className="field"><label htmlFor="mm-proj">프로젝트 <span className="muted small">(바꾸면 입력한 값과 함께 옮겨집니다)</span></label>
         <select id="mm-proj" className="select" value={pid} onChange={(e) => setPid(Number(e.target.value))}>{sheet.projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
       </div>
-      <div className="field"><label htmlFor="mm-name">이름</label><input id="mm-name" className="input" value={name} onChange={(e) => setName(e.target.value)} maxLength={100} autoFocus /></div>
+      {userId != null ? (
+        <div className="field"><span className="label">이름</span>
+          <p className="small" style={{ margin: 0 }}><strong>{acctName}</strong> <span className="muted">— 연결된 계정의 이름입니다. 계정 이름이 바뀌면 같이 바뀝니다.</span></p></div>
+      ) : (
+        <div className="field"><label htmlFor="mm-name">이름</label><input id="mm-name" className="input" value={name} onChange={(e) => setName(e.target.value)} maxLength={100} autoFocus /></div>
+      )}
+      {same.length > 1 && <p className="small muted">이름·소속·계정 연결은 이 표에서 같은 사람의 {same.length}개 행({same.map((r) => pname.get(r.projectId) ?? '').join(', ')})에 함께 적용됩니다. 프로젝트·역할은 이 행만.</p>}
       <div className="row" style={{ gap: 8 }}>
-        <div className="field" style={{ flex: 1 }}><label htmlFor="mm-dept">소속</label><input id="mm-dept" className="input" value={dept} onChange={(e) => setDept(e.target.value)} maxLength={100} /></div>
+        {userId != null && acctDept
+          ? <div className="field" style={{ flex: 1 }}><span className="label">소속</span><p className="small" style={{ margin: '8px 0 0' }}>{acctDept} <span className="muted">(계정)</span></p></div>
+          : <div className="field" style={{ flex: 1 }}><label htmlFor="mm-dept">소속</label><input id="mm-dept" className="input" value={dept} onChange={(e) => setDept(e.target.value)} maxLength={100} /></div>}
         <div className="field" style={{ flex: 1 }}><label htmlFor="mm-role">역할</label><input id="mm-role" className="input" value={role} onChange={(e) => setRole(e.target.value)} maxLength={100} placeholder="예) PM · 개발 · QA" /></div>
       </div>
       <div className="field"><label htmlFor="mm-user">계정 연결 <span className="muted small">(연결하면 사람별 부하에서 다른 프로젝트와 합산)</span></label>
@@ -430,6 +461,14 @@ function RowEditDialog({ sheet, row, busy, onClose, run }: { sheet: MmSheet; row
               <button type="button" className="btn btn--ghost btn--sm" onClick={() => setUserId(null)}>연결 해제</button></p>
           : <PersonPicker sheet={sheet} users={users} suggest={row.personName} withSheetPeople={false} busy={busy} onPick={pick} />}
       </div>
+      {inProject.length > 1 && (
+        <div className="field"><span className="label">순서 <span className="muted small">({pname.get(row.projectId)} 안에서 {rpos + 1} / {inProject.length}번째)</span></span>
+          <div className="row" style={{ gap: 6 }}>
+            <button type="button" className="btn btn--sm" disabled={busy || rpos <= 0} onClick={() => move(-1)}>▲ 위로</button>
+            <button type="button" className="btn btn--sm" disabled={busy || rpos >= inProject.length - 1} onClick={() => move(1)}>▼ 아래로</button>
+          </div>
+        </div>
+      )}
     </Modal>
   )
 }
@@ -477,7 +516,7 @@ function lostCells(sheet: MmSheet, start: string, weeks: number): number {
   return lost
 }
 
-function SettingsDialog({ sheet, busy, onClose, run }: { sheet: MmSheet; busy: boolean; onClose: () => void; run: Run }) {
+function SettingsDialog({ sheet, busy, onClose, run, usedBy = [] }: { sheet: MmSheet; busy: boolean; onClose: () => void; run: Run; usedBy?: string[] }) {
   const navigate = useNavigate()
   const [title, setTitle] = useState(sheet.title)
   const [desc, setDesc] = useState(sheet.description ?? '')
@@ -501,6 +540,7 @@ function SettingsDialog({ sheet, busy, onClose, run }: { sheet: MmSheet; busy: b
              <button type="button" className="btn" onClick={onClose}>취소</button>
              <button type="button" className={`btn ${confirmLoss ? 'btn--danger' : 'btn--primary'}`} disabled={busy || !title.trim() || !start} onClick={save}>{confirmLoss ? `${lost}칸 지우고 저장` : '저장'}</button>
            </>}>
+      {confirm && <p className="small" style={{ color: 'var(--danger)', marginTop: 0 }}>표와 프로젝트·인원·값·메모가 모두 지워집니다(이벤트는 공용이라 남음).{usedBy.length > 0 && ` 이 표를 담은 글 ${usedBy.length}개(${usedBy.join(', ')})에는 '지워진 공수 표' 안내가 보이게 됩니다.`}</p>}
       <div className="field"><label htmlFor="mm-t">제목</label><input id="mm-t" className="input" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} /></div>
       <div className="field"><label htmlFor="mm-d">설명</label><input id="mm-d" className="input" value={desc} onChange={(e) => setDesc(e.target.value)} maxLength={1000} /></div>
       <div className="row" style={{ gap: 8 }}>

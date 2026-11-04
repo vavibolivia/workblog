@@ -42,6 +42,9 @@ export const mmApi = {
   setEditors: (id: number, userIds: number[]) => http.put<MmSheet>(`${base}/${id}/editors`, { userIds }).then((r) => r.data),
   addProject: (id: number, name: string) => http.post<MmSheet>(`${base}/${id}/projects`, { name }).then((r) => r.data),
   renameProject: (id: number, projectId: number, name: string) => http.put<MmSheet>(`${base}/${id}/projects/${projectId}`, { name }).then((r) => r.data),
+  /** 순서 한 칸 옮기기: dir = -1 위로, 1 아래로 */
+  moveProject: (id: number, projectId: number, dir: -1 | 1) => http.post<MmSheet>(`${base}/${id}/projects/${projectId}/move`, null, { params: { dir } }).then((r) => r.data),
+  moveRow: (id: number, rowId: number, dir: -1 | 1) => http.post<MmSheet>(`${base}/${id}/rows/${rowId}/move`, null, { params: { dir } }).then((r) => r.data),
   removeProject: (id: number, projectId: number) => http.delete<MmSheet>(`${base}/${id}/projects/${projectId}`).then((r) => r.data),
   addRow: (id: number, body: MmRowRequest) => http.post<MmSheet>(`${base}/${id}/rows`, body).then((r) => r.data),
   updateRow: (id: number, rowId: number, body: MmRowRequest) => http.put<MmSheet>(`${base}/${id}/rows/${rowId}`, body).then((r) => r.data),

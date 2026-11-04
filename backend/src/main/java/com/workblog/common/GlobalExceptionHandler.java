@@ -28,6 +28,13 @@ public class GlobalExceptionHandler {
 
     public record ErrorBody(int status, String error, String message, Instant timestamp) {}
 
+    /** DB 제약 위반(다른 데이터가 아직 가리키는 것을 지우려 할 때 등) — 일반 500 대신 무엇이 막았는지 알 수 있게 409 */
+    @ExceptionHandler(org.springframework.dao.DataIntegrityViolationException.class)
+    public ResponseEntity<ErrorBody> handleIntegrity(org.springframework.dao.DataIntegrityViolationException e) {
+        log.warn("데이터 제약 위반: {}", e.getMostSpecificCause().getMessage());
+        return body(HttpStatus.CONFLICT, "다른 데이터가 아직 이것을 쓰고 있어 처리할 수 없습니다. 연결된 글·댓글 등을 먼저 정리하거나 비활성화를 쓰세요.");
+    }
+
     @ExceptionHandler(ApiException.class)
     public ResponseEntity<ErrorBody> handleApi(ApiException e) {
         return body(e.getStatus(), e.getMessage());

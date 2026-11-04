@@ -39,6 +39,18 @@ public class NotificationController {
         return service.markRead(id, me);
     }
 
+    @DeleteMapping("/{id}")
+    @Operation(summary = "알림 지우기", description = "내 알림 하나. 남은 안 읽은 수를 돌려줌")
+    public UnreadCount delete(@PathVariable Long id, @CurrentUser User me) {
+        return service.delete(id, me);
+    }
+
+    @DeleteMapping
+    @Operation(summary = "읽은 알림 모두 지우기", description = "안 읽은 알림은 남김")
+    public UnreadCount deleteRead(@CurrentUser User me) {
+        return service.deleteRead(me);
+    }
+
     @Operation(summary = "모두 읽음 처리")
     @PostMapping("/read-all")
     public UnreadCount readAll(@CurrentUser User me) {

@@ -5,7 +5,7 @@ import ManMonthBoard from './ManMonthBoard'
 /** 글 본문 안의 공수 표(본문에 `/mm/번호` 링크만 있는 줄). readOnly = 대문·이력 등 보기만 하는 곳. */
 export default function MmEmbed({ id, readOnly }: { id: number; readOnly?: boolean }) {
   const state = useMmSheet(id)
-  if (state.err) return <div className="alert alert--error">공수 표 #{id}: {state.err}</div>
+  if (state.err) return <div className="alert alert--error">공수 표 #{id}: {/찾을 수 없/.test(state.err) ? '지워졌거나 없는 공수 표입니다. 글을 고쳐 이 줄을 지우세요.' : state.err}</div>
   if (!state.sheet) return <div className="spinner" aria-label="공수 표 불러오는 중" />
   return (
     <div className="mm-embed">

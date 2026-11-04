@@ -92,7 +92,7 @@ code, pre, kbd { font-family: var(--mono); }
 .textarea { height: auto; padding: 10px 12px; resize: vertical; line-height: 1.6; }
 .input::placeholder, .textarea::placeholder { color: #687386; }
 .field { display: flex; flex-direction: column; gap: 6px; }
-.field > label { font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.field > label, .field > .label { font-size: 13px; font-weight: 600; color: var(--ink-2); }
 .field__hint { font-size: 12px; color: var(--muted); }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 @media (max-width: 640px) { .form-row { grid-template-columns: 1fr; } }
@@ -146,7 +146,7 @@ code, pre, kbd { font-family: var(--mono); }
 .modal__head { padding: 18px 22px 0; display: flex; justify-content: space-between; align-items: center; }
 .modal__head h3 { font-size: 17px; }
 .modal__body { padding: 16px 22px; overflow: auto; display: flex; flex-direction: column; gap: 14px; }
-.modal__foot { padding: 0 22px 18px; display: flex; justify-content: flex-end; gap: 8px; }
+.modal__foot { padding: 0 22px 18px; display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
 .modal--wide { max-width: 860px; }
 
 .pagination { display: flex; justify-content: center; align-items: center; gap: 4px; padding: 20px 0 8px; }
@@ -1516,3 +1516,28 @@ body { word-break: keep-all; overflow-wrap: anywhere; }
 /* 카드 머리: 검색칸이 남는 폭을 쓰고 개수는 한 줄 */
 .card__head > .input { flex: 1 1 0; min-width: 0; }
 .card__head > .small.muted { white-space: nowrap; flex: none; }
+
+/* 공수 표 프로젝트 머리 칸: 이름은 말줄임, 인원 수·[+ 인원]·[⋯] 은 늘 칸 안에(좁은 화면에서 옆 주 칸에 가려 누를 수 없던 문제) */
+.mm-phead { display: flex; align-items: center; gap: 2px 4px; min-width: 0; }
+.mm-phead > .mm-toggle { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
+.mm-phead > :not(.mm-toggle) { flex: none; }
+@media (max-width: 760px) {
+  .mm-phead { flex-wrap: wrap; }
+  .mm-phead > .mm-toggle { flex: 1 0 100%; }
+}
+
+/* 관리 표의 숫자 칸 */
+.table .num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+/* 태그 관리 표: 길어도 카드 안에서 스크롤, 머리 줄 고정 */
+.tax-scroll { max-height: 420px; overflow-y: auto; }
+.tax-scroll thead th { position: sticky; top: 0; background: var(--paper); z-index: 1; }
+.table th.num { text-align: right; }
+
+/* 알림: 알림마다 지우기(×) — 마우스를 올리거나 포커스일 때 보임(터치 기기는 늘) */
+.notif__acts { display: inline-flex; gap: 4px; }
+.notif__row { position: relative; }
+.notif__row > .notif__item { padding-right: 30px; }
+.notif__del { position: absolute; top: 6px; right: 6px; z-index: 1; width: 24px; height: 24px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font-size: 16px; line-height: 1; cursor: pointer; opacity: 0; }
+.notif__row:hover .notif__del, .notif__del:focus-visible { opacity: 1; }
+.notif__del:hover { background: var(--canvas); color: var(--ink); }
+@media (hover: none) { .notif__del { opacity: 1; } }

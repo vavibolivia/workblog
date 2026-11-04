@@ -106,7 +106,14 @@ public class Post {
         if (tags == null) return "";
         return tags.stream().filter(t -> t != null && !t.isBlank())
                 .map(t -> t.trim().replace(",", " ").replaceAll("\\s+", " "))
-                .distinct().collect(Collectors.joining(","));
+                .filter(distinctIgnoreCase())
+                .collect(Collectors.joining(","));
+    }
+
+    /** 대소문자만 다른 태그는 하나로(태그 필터가 대소문자를 무시하므로 같은 태그) — 먼저 나온 글자 그대로 */
+    private static java.util.function.Predicate<String> distinctIgnoreCase() {
+        java.util.Set<String> seen = new java.util.HashSet<>();
+        return t -> seen.add(t.toLowerCase(java.util.Locale.ROOT));
     }
 
     public static List<String> splitTags(String tags) {

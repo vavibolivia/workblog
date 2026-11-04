@@ -222,10 +222,33 @@ public class ManMonthService {
 
     public SheetDetail updateProject(long id, long projectId, ProjectRequest req, User actor) {
         requireEdit(load(id), actor);
-        requireProject(id, projectId);
-        jdbc.update("UPDATE mm_projects SET name = ?, sort_order = COALESCE(?, sort_order) WHERE id = ?", req.name().trim(), req.sortOrder(), projectId);
+        String old = requireProject(id, projectId);
+        String name = req.name().trim();
+        jdbc.update("UPDATE mm_projects SET name = ?, sort_order = COALESCE(?, sort_order) WHERE id = ?", name, req.sortOrder(), projectId);
+        int events = 0;
+        if (!old.trim().equalsIgnoreCase(name)) {
+            // 이벤트의 '관련' 은 프로젝트 이름(글자)으로 잇는다 → 옛 이름을 쓰던 이벤트도 새 이름으로.
+            // 다른 표에 옛 이름 프로젝트가 아직 있으면 그쪽 연결이 끊기므로 그때는 그대로 둔다.
+            Integer others = jdbc.queryForObject("SELECT count(*) FROM mm_projects WHERE lower(trim(name)) = lower(?)", Integer.class, old.trim());
+            if (others == null || others == 0)
+                events = jdbc.update("UPDATE mm_events SET related = ?, updated_at = now() WHERE lower(trim(related)) = lower(?)", name, old.trim());
+        }
         touch(id);
-        log(id, actor, "프로젝트 수정: " + req.name().trim());
+        log(id, actor, old.equals(name) ? "프로젝트 수정: " + name : "프로젝트 이름: " + old + " → " + name + (events > 0 ? " (관련 이벤트 " + events + "건도 바꿈)" : ""));
+        return get(id, actor);
+    }
+
+    /** 프로젝트 순서 한 칸 옮기기(dir = -1 위로, 1 아래로). 순서를 1..n 으로 다시 매긴다. */
+    public SheetDetail moveProject(long id, long projectId, int dir, User actor) {
+        requireEdit(load(id), actor);
+        String name = requireProject(id, projectId);
+        List<Long> ids = new ArrayList<>(jdbc.queryForList("SELECT id FROM mm_projects WHERE sheet_id = ? ORDER BY sort_order, id", Long.class, id));
+        int i = ids.indexOf(projectId), j = i + Integer.signum(dir);
+        if (dir == 0 || j < 0 || j >= ids.size()) return get(id, actor);
+        Collections.swap(ids, i, j);
+        for (int k = 0; k < ids.size(); k++) jdbc.update("UPDATE mm_projects SET sort_order = ? WHERE id = ?", k + 1, ids.get(k));
+        touch(id);
+        log(id, actor, "프로젝트 순서: " + name + (dir < 0 ? " 위로" : " 아래로"));
         return get(id, actor);
     }
 
@@ -259,10 +282,43 @@ public class ManMonthService {
         requireRow(id, rowId);
         if (req.projectId() != null) requireProject(id, req.projectId());
         String[] p = person(req);
-        jdbc.update("UPDATE mm_rows SET project_id = COALESCE(?, project_id), user_id = ?, person_name = ?, department = ?, role = ?, " +
-                "sort_order = COALESCE(?, sort_order) WHERE id = ?", req.projectId(), req.userId(), p[0], p[1], blankToNull(req.role()), req.sortOrder(), rowId);
+        // 이름·소속·계정 연결은 '사람' 정보 → 이 표에서 같은 사람(같은 계정, 계정이 없으면 같은 이름)의 행 모두에 적용.
+        // 프로젝트·역할·순서는 이 행만. (한 행만 고쳐 다른 프로젝트 행에 옛 이름이 남던 문제)
+        List<Long> same = samePersonRows(id, rowId);
+        for (Long rid : same)
+            jdbc.update("UPDATE mm_rows SET user_id = ?, person_name = ?, department = ? WHERE id = ?", req.userId(), p[0], p[1], rid);
+        jdbc.update("UPDATE mm_rows SET project_id = COALESCE(?, project_id), role = ?, sort_order = COALESCE(?, sort_order) WHERE id = ?",
+                req.projectId(), blankToNull(req.role()), req.sortOrder(), rowId);
         touch(id);
-        log(id, actor, "인원 수정: " + p[0]);
+        log(id, actor, "인원 수정: " + p[0] + (same.size() > 1 ? " (같은 사람 " + same.size() + "개 행)" : ""));
+        return get(id, actor);
+    }
+
+    /** 이 행과 같은 사람의 행들(이 행 포함): 계정이 있으면 같은 계정, 없으면 계정 없는 같은 이름(대소문자·앞뒤 공백 무시). */
+    List<Long> samePersonRows(long sheetId, long rowId) {
+        Map<String, Object> r = jdbc.queryForMap("SELECT user_id, person_name FROM mm_rows WHERE id = ?", rowId);
+        Object uid = r.get("user_id");
+        return uid != null
+                ? jdbc.queryForList("SELECT id FROM mm_rows WHERE sheet_id = ? AND user_id = ?", Long.class, sheetId, ((Number) uid).longValue())
+                : jdbc.queryForList("SELECT id FROM mm_rows WHERE sheet_id = ? AND user_id IS NULL AND lower(trim(person_name)) = lower(trim(?))",
+                        Long.class, sheetId, (String) r.get("person_name"));
+    }
+
+    /** 인원 순서 한 칸 옮기기 — 같은 프로젝트 안에서(dir = -1 위로, 1 아래로). 표 전체 행 순서를 1..n 으로 다시 매긴다. */
+    public SheetDetail moveRow(long id, long rowId, int dir, User actor) {
+        requireEdit(load(id), actor);
+        String name = requireRow(id, rowId);
+        List<long[]> rows = new ArrayList<>(jdbc.query("SELECT id, project_id FROM mm_rows WHERE sheet_id = ? ORDER BY sort_order, id",
+                (rs, n) -> new long[]{rs.getLong(1), rs.getLong(2)}, id));
+        int i = -1;
+        for (int k = 0; k < rows.size(); k++) if (rows.get(k)[0] == rowId) i = k;
+        int j = -1, step = Integer.signum(dir);
+        for (int k = i + step; step != 0 && k >= 0 && k < rows.size(); k += step) if (rows.get(k)[1] == rows.get(i)[1]) { j = k; break; }
+        if (j < 0) return get(id, actor);
+        Collections.swap(rows, i, j);
+        for (int k = 0; k < rows.size(); k++) jdbc.update("UPDATE mm_rows SET sort_order = ? WHERE id = ?", k + 1, rows.get(k)[0]);
+        touch(id);
+        log(id, actor, "인원 순서: " + name + (dir < 0 ? " 위로" : " 아래로"));
         return get(id, actor);
     }
 
@@ -408,15 +464,15 @@ public class ManMonthService {
         return l.get(0);
     }
 
-    /** [이름, 소속]. 계정을 고르면 계정 값, 직접 준 값이 있으면 그 값. */
+    /** [이름, 소속]. 계정을 연결하면 이름은 늘 계정 이름, 소속은 계정 부서(계정에 부서가 없을 때만 준 값) — 계정이 바뀌면 같이 바뀐다(UserService). */
     String[] person(RowRequest req) {
         String name = blankToNull(req.personName());
         String dept = blankToNull(req.department());
         if (req.userId() != null) {
             List<String[]> u = jdbc.query("SELECT display_name, department FROM users WHERE id = ?", (rs, i) -> new String[]{rs.getString(1), rs.getString(2)}, req.userId());
             if (u.isEmpty()) throw ApiException.badRequest("없는 사용자입니다: " + req.userId());
-            if (name == null) name = u.get(0)[0];
-            if (dept == null) dept = u.get(0)[1];
+            name = u.get(0)[0];
+            if (blankToNull(u.get(0)[1]) != null) dept = u.get(0)[1].trim();
         }
         if (name == null) throw ApiException.badRequest("이름을 적거나 계정을 고르세요.");
         return new String[]{name, dept};

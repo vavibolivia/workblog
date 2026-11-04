@@ -24,9 +24,16 @@ public class CategoryService {
 
     @Transactional(readOnly = true)
     public List<CategoryNode> tree() {
+        return tree(null);
+    }
+
+    /** viewer 가 있으면 그 사람이 실제로 볼 수 있는 글만 센다(비공개·열람 제한 글 제외 — 트리 숫자와 눌렀을 때 목록이 같게). */
+    @Transactional(readOnly = true)
+    public List<CategoryNode> tree(com.workblog.user.User viewer) {
         List<Category> all = repo.findAllOrdered();
         Map<Long, Long> direct = new HashMap<>();
-        for (Object[] r : repo.publishedCounts()) direct.put(((Number) r[0]).longValue(), ((Number) r[1]).longValue());
+        for (Object[] r : viewer == null ? repo.publishedCounts() : repo.visibleCounts(viewer.getId(), viewer.isAdmin()))
+            if (r[0] != null) direct.put(((Number) r[0]).longValue(), ((Number) r[1]).longValue());
         Map<Long, List<Category>> byParent = new HashMap<>();
         for (Category c : all) byParent.computeIfAbsent(c.getParentId(), k -> new ArrayList<>()).add(c);
         return build(null, byParent, direct);
@@ -164,7 +171,9 @@ public class CategoryService {
     public void delete(Long id) {
         Category c = get(id);
         if (repo.existsByParentId(id)) throw ApiException.badRequest("하위 카테고리가 있어 삭제할 수 없습니다. 하위 카테고리를 먼저 옮기거나 삭제하세요.");
-        if (repo.countAllPosts(id) > 0) throw ApiException.badRequest("이 카테고리에 연결된 글이 있어 삭제할 수 없습니다. 글을 다른 카테고리로 옮긴 뒤 삭제하세요.");
+        long live = repo.countLivePosts(id), trashed = repo.countTrashedPosts(id);
+        if (live > 0) throw ApiException.badRequest("이 카테고리에 글 " + live + "건이 있어 삭제할 수 없습니다. 글을 다른 카테고리로 옮긴 뒤 삭제하세요.");
+        if (trashed > 0) throw ApiException.badRequest("휴지통에 이 카테고리 글 " + trashed + "건이 남아 있어 삭제할 수 없습니다. [휴지통] 에서 영구 삭제하거나, 복구해 다른 카테고리로 옮긴 뒤 삭제하세요.");
         repo.delete(c);
     }
 

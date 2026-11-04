@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { api, findCategory, type CategoryNode, type TagCount } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { Avatar } from './Avatar'
@@ -10,6 +10,7 @@ import { publishCategoryTree } from '../lib/categoryLeaves'
 export default function Sidebar() {
   const { user } = useAuth()
   const [params] = useSearchParams()
+  const { pathname } = useLocation()
   const [tree, setTree] = useState<CategoryNode[]>([])
   const [tags, setTags] = useState<TagCount[]>([])
   const [myCount, setMyCount] = useState<number | null>(null)
@@ -26,7 +27,7 @@ export default function Sidebar() {
       api.posts.list({ authorId: user.id, size: 1 }).then((p) => setMyCount(p.totalElements)).catch(() => null)
       api.posts.list({ authorId: user.id, status: 'DRAFT', size: 1 }).then((p) => setDraftCount(p.totalElements)).catch(() => null)
     }
-  }, [user])
+  }, [user, pathname])
 
   const total = tree.reduce((s, c) => s + c.totalCount, 0)
   const activeId = params.get('categoryId') ? Number(params.get('categoryId')) : null

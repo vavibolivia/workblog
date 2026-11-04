@@ -24,6 +24,8 @@ export const notificationsApi = {
   unreadCount: () => http.get<{ count: number }>('/notifications/unread-count').then((r) => r.data.count),
   read: (id: number) => http.post<NotificationItem>(`/notifications/${id}/read`).then((r) => r.data),
   readAll: () => http.post<{ count: number }>('/notifications/read-all').then((r) => r.data),
+  remove: (id: number) => http.delete<{ count: number }>(`/notifications/${id}`).then((r) => r.data.count),
+  removeRead: () => http.delete<{ count: number }>('/notifications').then((r) => r.data.count),
 }
 
 export function notificationText(n: NotificationItem): string {

@@ -697,11 +697,13 @@ export default function ManMonthGrid(props: Props) {
     return [
       <tr key={`p${g.p.id}`} className="mm-project">
         <th scope="rowgroup" className="mm-sticky mm-c0">
+          <div className="mm-phead">
           <button type="button" className="mm-toggle" onClick={() => onToggle(g.p.id)} aria-expanded={open} disabled={!!q} title={q ? '찾는 중에는 모두 펼쳐 보입니다' : open ? '접기' : '펼치기'}>{open ? '▾' : '▸'} {g.p.name}</button>
           <span className="mm-count">{g.rows.length}명</span>
           {agg.over && !open && <span className="mm-overtag" title="이 프로젝트에 사람별 합 1.0 을 넘는 주가 있습니다">1.0 초과</span>}
           {editable && props.onAddPerson && <button type="button" className="mm-mini mm-mini--add" onClick={() => props.onAddPerson?.(g.p.id)} title="이 프로젝트에 인원 추가">+ 인원</button>}
-          {editable && props.onProjectMenu && <button type="button" className="mm-mini" onClick={() => props.onProjectMenu?.(g.p)} title="프로젝트 이름 고치기 · 삭제" aria-label={`${g.p.name} 프로젝트 편집`}>⋯</button>}
+          {editable && props.onProjectMenu && <button type="button" className="mm-mini" onClick={() => props.onProjectMenu?.(g.p)} title="프로젝트 이름 고치기 · 순서 · 삭제" aria-label={`${g.p.name} 프로젝트 편집`}>⋯</button>}
+          </div>
         </th>
         <td className="mm-sticky mm-c1" />
         <td className="mm-sticky mm-c2 mm-pmm" title="이 표 기간의 MM (달마다 값 합 ÷ 그 달 월요일 수)">{agg.mm ? `${agg.mm} MM` : ''}</td>

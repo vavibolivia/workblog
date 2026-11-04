@@ -5,6 +5,7 @@ import { useToast } from '../lib/toast'
 import Modal from '../components/Modal'
 import { Avatar } from '../components/Avatar'
 import { passwordHint, passwordProblem } from '../lib/password'
+import { DepartmentAdmin } from '../components/TaxonomyAdmin'
 
 type Form = { username: string; password: string; displayName: string; email: string; department: string; position: string; role: Role; active: boolean }
 const empty: Form = { username: '', password: '', displayName: '', email: '', department: '', position: '', role: 'USER', active: true }
@@ -162,9 +163,10 @@ export default function AdminUsersPage() {
                  <button type="button" className="btn btn--danger" disabled={busy} onClick={remove}>{busy ? '삭제 중…' : '삭제'}</button>
                </>}>
           <p>아이디 <code>{removing.username}</code> 계정을 영구 삭제합니다. 되돌릴 수 없습니다.</p>
-          <p className="small muted">글을 쓴 적 있는 계정은 삭제할 수 없습니다. 그런 계정은 편집에서 '비활성'으로 바꾸세요.</p>
+          <p className="small muted">글·댓글·글 수정 기록·글에 붙은 첨부가 있는 계정은 삭제할 수 없습니다(기록이 깨지므로). 그런 계정은 편집에서 '비활성'으로 바꾸세요 — 기록은 그대로, 로그인만 막힙니다.</p>
         </Modal>
       )}
+      <DepartmentAdmin onChanged={load} />
     </div>
   )
 }

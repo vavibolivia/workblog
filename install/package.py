@@ -25,14 +25,23 @@ if not os.path.isfile(JAR):
     sys.exit(f"jar 가 없습니다: {JAR}  (먼저 bash install/build.sh)")
 os.makedirs(DIST, exist_ok=True)
 
+# zip·tar.gz(리눅스): 압축 풀고 install.sh 하나만 실행하면 끝 (사용자 지시 "install.sh 만 하도록")
 README = f"""WorkBlog {VERSION}
 
-설치 방법은 https://github.com/vavibolivia/workblog 의 README 를 보세요.
-  Linux  : sudo ./install.sh        (podman 컨테이너로 실행. podman·PostgreSQL 이 없으면 apt/dnf 로 설치,
-                                     image/ 폴더가 있으면 인터넷 없이 그 이미지를 씀)
-           인터넷 되는 Ubuntu 는 한 줄 설치: curl -fsSL https://raw.githubusercontent.com/vavibolivia/workblog/main/install/linux/install.sh | sudo bash
-  Docker : .env.example → .env 로 복사·수정 후 docker compose up -d
-초기 아이디: admin  (비밀번호는 설치 마지막 화면 / 설정 파일의 ADMIN_PASSWORD)
+설치: 압축을 풀고 이 폴더에서 아래 한 줄만 실행하세요.
+
+    sudo ./install.sh
+
+필요한 것(podman·PostgreSQL)은 install.sh 가 알아서 설치합니다.
+image/ 폴더가 있는 묶음(offline)은 인터넷 없이 설치됩니다.
+데이터는 들어 있지 않습니다. 이미 설치된 서버에서 실행하면 프로그램만 바뀌고 글·첨부·DB 는 그대로 둡니다.
+초기 아이디: admin  (비밀번호는 설치 마지막 화면에 나옵니다)
+"""
+
+README_DOCKER = f"""WorkBlog {VERSION} (Docker)
+
+설치: .env.example 을 .env 로 복사해 값을 고친 뒤  docker compose up -d
+초기 아이디: admin  (비밀번호는 .env 의 ADMIN_PASSWORD)
 """
 
 
@@ -49,7 +58,7 @@ bundles = {
     "linux": [("workblog.jar", read(os.path.relpath(JAR, ROOT)), 0o644), ("install.sh", lf(read("install/linux/install.sh")), 0o755), ("README.txt", README.encode("utf-8"), 0o644)],
     "docker": [("workblog.jar", read(os.path.relpath(JAR, ROOT)), 0o644), ("Dockerfile", lf(read("install/docker/Dockerfile")), 0o644),
                ("docker-compose.yml", lf(read("install/docker/docker-compose.yml")), 0o644), (".env.example", lf(read("install/docker/.env.example")), 0o644),
-               ("README.txt", README.encode("utf-8"), 0o644)],
+               ("README.txt", README_DOCKER.encode("utf-8"), 0o644)],
 }
 
 out = []

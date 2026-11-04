@@ -168,4 +168,6 @@ exec(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "collab.py"),
 exec(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "api.py"), encoding="utf-8").read())  # 가입·토큰·PATCH·가져오기·내보내기·문서·영구 삭제
 exec(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "datamove.py"), encoding="utf-8").read())  # data transfer (synthetic dump, self cleanup)
 exec(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "mm.py"), encoding="utf-8").read())  # 공수(Man-month) 표
+exec(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "mmsync.py"), encoding="utf-8").read())  # 공수 동기화·순서 (이름 변경·계정 변경·프로젝트 삭제)
+exec(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "crudsync.py"), encoding="utf-8").read())  # CRUD·동기화(사용자 삭제·태그·부서·카테고리 수·대문·공유 사진)
 print(f"\nRESULT {ok} pass / {bad} fail")

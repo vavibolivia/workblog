@@ -195,6 +195,8 @@ curl -s -X PUT $WB/api/posts/31/import -H "Authorization: Bearer $TOKEN" -F 'fil
 | GET | `/api/notifications/unread-count` | `{ count }` (화면은 60초마다 갱신) |
 | POST | `/api/notifications/{id}/read` | 읽음 처리(내 알림만, 아니면 404) |
 | POST | `/api/notifications/read-all` | 모두 읽음 → `{ count: 0 }` |
+| DELETE | `/api/notifications/{id}` | 내 알림 하나 지우기(아니면 404) → `{ count }` 남은 안 읽은 수 |
+| DELETE | `/api/notifications` | 읽은 알림 모두 지우기(안 읽은 것은 남김) → `{ count }` |
 
 - 언제 생기나: 내 글에 댓글(`COMMENT`) · 내 댓글에 답글(`REPLY`) · 댓글이나 글 본문의 `@아이디`(`MENTION`, 대소문자 무시, 이메일 `a@b.com` 은 제외).
 - 한 댓글로 같은 사람에게는 하나만(REPLY > MENTION > COMMENT). 글 본문 멘션은 글마다 한 사람에게 한 번(수정할 때마다 다시 보내지 않음, 임시 저장 중이던 멘션은 발행할 때 감).
@@ -303,8 +305,10 @@ data/postviews.json   열람 감사 로그                                     f
 | POST | `/api/mm/sheets` | `{title, startDate, weeks(1~104), description?}` — startDate 는 그 주 월요일로 맞춤 |
 | GET · PATCH · DELETE | `/api/mm/sheets/{id}` | 상세(프로젝트·행·칸·편집자·변경 이력 30건) · 설정(시작 주를 바꾸면 값은 날짜 기준으로 유지, 기간 밖은 지움) · 삭제 |
 | PUT | `/api/mm/sheets/{id}/editors` | `{userIds:[…]}` 편집자 목록 전체 교체 |
-| POST · PUT · DELETE | `/api/mm/sheets/{id}/projects[/{projectId}]` | 프로젝트 `{name, sortOrder?}` |
-| POST · PUT · DELETE | `/api/mm/sheets/{id}/rows[/{rowId}]` | 인원 `{projectId, userId?, personName?, department?, role?}` — 계정을 주면 이름·소속을 채움 |
+| POST · PUT · DELETE | `/api/mm/sheets/{id}/projects[/{projectId}]` | 프로젝트 `{name, sortOrder?}`. 이름을 바꾸면 '관련' 에 옛 이름을 쓴 이벤트도 새 이름으로(다른 표에 옛 이름 프로젝트가 있으면 그대로). 지우면 그 프로젝트 행·값·메모도 지워짐 |
+| POST | `/api/mm/sheets/{id}/projects/{projectId}/move?dir=-1|1` | 프로젝트 순서 한 칸 위·아래 |
+| POST | `/api/mm/sheets/{id}/rows/{rowId}/move?dir=-1|1` | 인원 순서 한 칸 위·아래(같은 프로젝트 안) |
+| POST · PUT · DELETE | `/api/mm/sheets/{id}/rows[/{rowId}]` | 인원 `{projectId, userId?, personName?, department?, role?}` — 계정을 주면 이름은 계정 이름, 소속은 계정 부서(없을 때만 department). 고칠 때 이름·소속·계정은 이 표의 같은 사람(같은 계정, 없으면 같은 이름) 행 모두에 적용, 프로젝트·역할은 그 행만. 계정 이름·부서를 바꾸면 연결된 행이 함께 바뀜 |
 | PUT | `/api/mm/sheets/{id}/cells` | `{changes:[{rowId, week, value}]}` — value 가 null·0 이면 비움, 0~1.0 (한 번에 최대 5000칸) |
 | GET | `/api/mm/sheets/{id}/excel?template=` | 엑셀(화면과 같은 모양: 왼쪽 프로젝트·이름·소속·역할, 위 월/주). `template=true` 면 값 없는 양식 |
 | POST | `/api/mm/sheets/{id}/excel?dryRun=&keepBlank=` | multipart `file` — 주 머리 날짜로 주를, (프로젝트, 이름) 으로 행을 찾아 반영(없으면 만듦). `dryRun=true` 면 미리보기(바뀌는 칸·지워지는 칸 수만, 아무것도 안 바뀜). `keepBlank=true`(기본) 면 빈 칸은 기존 값 유지. 값 50·50% 는 0.5. 파일에 없는 행은 그대로 |
@@ -321,4 +325,20 @@ data/postviews.json   열람 감사 로그                                     f
 | 메서드 | 경로 | 설명 |
 |---|---|---|
 | GET | `/api/front` | 대문 항목(순서대로). 보는 사람이 볼 수 없는 글·삭제된 글은 빠짐 |
-| PUT | `/api/front` | 관리자. `{items:[{kind:"POST", refId}]}` 로 통째로 바꿈(최대 30). 글이 아닌 항목은 400 |
+| PUT | `/api/front` | 관리자. `{items:[{kind:"POST", refId}]}` 로 통째로 바꿈(최대 30). 글이 아닌 항목(MM_SHEET)은 무시. 휴지통에 간 대문 글은 목록에 안 보여도 남아 있다가 복구하면 돌아옴, 영구 삭제하면 빠짐 |
+
+## 15. 태그 · 부서 관리 (관리자)
+
+태그와 부서는 따로 표가 없고 글자로 여러 곳에 있다(태그: 글·템플릿, 부서: 사용자·카테고리 열람 제한·공수 표 소속). 아래 API 는 그 모든 곳을 한 트랜잭션에서 바꾼다. 비교는 대소문자·앞뒤 공백 무시. 화면은 관리 > 카테고리 아래 [태그], 관리 > 사용자 아래 [부서].
+
+| 메서드 | 경로 | 설명 |
+|---|---|---|
+| GET | `/api/admin/tags` | `[{name, posts, templates}]` 태그마다 쓰는 글(휴지통 포함)·템플릿 수 |
+| PUT | `/api/admin/tags/rename` | `{from, to}` — 모든 글·템플릿에서 from 을 to 로(이미 있으면 합침). `to` 가 비면 지움 → `{posts, templates}` |
+| GET | `/api/admin/departments` | `[{name, users, categories}]` |
+| PUT | `/api/admin/departments/rename` | `{from, to}` — 사용자 부서 + 카테고리 열람 제한 + 공수 표 소속을 함께(이미 있으면 합침) → `{users, categories}` |
+
+- 글 저장 때 대소문자만 다른 태그는 하나로 합친다(먼저 나온 글자 그대로).
+- 사용자 영구 삭제는 그 계정의 글·댓글·글 수정 기록·글에 붙은 첨부가 남아 있으면 400(이유를 알려 줌) — 대신 비활성화.
+- 카테고리 트리의 글 수는 보는 사람이 실제로 볼 수 있는 글만 센다. 휴지통 글이 남은 카테고리는 지울 수 없다(400 에 휴지통 안내).
+- 글을 영구 삭제해도 다른 글·이력·템플릿이 같은 사진을 쓰면 그 파일은 남는다.
