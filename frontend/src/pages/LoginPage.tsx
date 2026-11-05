@@ -5,7 +5,7 @@ import { useAuth } from '../lib/auth'
 import { BrandMark, IcDiagram, IcExcel, IcImage, IcPaperclip } from '../components/Icons'
 
 /* 소개 줄에 쓰는 선 아이콘(공용 Icons 와 같은 규격: 1.8px, currentColor) */
-const ic = { width: 18, height: 18, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true } as const
+const ic = { width: 22, height: 22, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true } as const
 const IcWrite = () => <svg {...ic}><path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-3-3L5 17z" /><path d="m13.5 8 3 3" /></svg>
 const IcFind = () => <svg {...ic}><circle cx="11" cy="11" r="6.5" /><path d="m20 20-4.3-4.3" /></svg>
 const IcKeep = () => <svg {...ic}><path d="M4 12a8 8 0 1 0 2.3-5.7" /><path d="M4 4v4.5h4.5" /><path d="M12 8v4l2.8 1.8" /></svg>
@@ -56,7 +56,13 @@ export default function LoginPage() {
 
         <section className="intro__story" aria-label="WorkBlog 소개">
           <h1 className="intro__title">일하며 알게 된 것을<br />블로그처럼 씁니다.</h1>
-          <p className="intro__lead">글은 네이버 블로그처럼 쓰고, 검색 한 번으로 찾고, 고친 자국은 모두 이력으로 남습니다. 흩어져 있던 업무 지식이 한곳에 쌓입니다.</p>
+
+          {/* 세 가지 할 일: 아이콘 + 두세 낱말. 읽지 않고 훑어도 보이게 */}
+          <dl className="intro__points">
+            <div><dt><IcWrite /></dt><dd><b>쓰기</b>네이버 블로그처럼<br />엑셀·사진·다이어그램</dd></div>
+            <div><dt><IcFind /></dt><dd><b>찾기</b>한 검색창에서<br />첨부 안 글자까지</dd></div>
+            <div><dt><IcKeep /></dt><dd><b>남기기</b>저장마다 판이 쌓이고<br />낱말 비교 · 되돌리기</dd></div>
+          </dl>
 
           {/* 글 한 편의 생김새: 실제 글 화면과 같은 요소(경로·제목·작성자 줄·본문·첨부)를 작게 */}
           <figure className="intro__post" aria-label="WorkBlog 글 한 편의 예">
@@ -64,7 +70,7 @@ export default function LoginPage() {
             <div className="intro__post-title">20번 서버 배포 절차와 점검 목록</div>
             <div className="intro__post-by"><span className="intro__avatar" aria-hidden>김</span><b>김민준 · 플랫폼팀</b><span>2026-11-05 · v3 · 조회 128</span></div>
             <div className="intro__post-body">
-              <p>배포는 <b>빌드 → 전송 → 기동 → 스모크 테스트</b> 순서로 합니다. 각 단계에서 확인할 것은 아래 표와 같고, 실패하면 이전 jar 로 바로 되돌립니다.</p>
+              <p>배포는 <b>빌드 → 전송 → 기동 → 스모크 테스트</b> 순서로 합니다.</p>
               <table aria-hidden>
                 <thead><tr><th>단계</th><th>확인</th><th>담당</th></tr></thead>
                 <tbody>
@@ -85,14 +91,8 @@ export default function LoginPage() {
           <ol className="intro__rev" aria-label="이 글의 이력">
             <li><b>v1</b><span>처음 작성</span><time>10.28</time></li>
             <li><b>v2</b><span>점검표 추가</span><time>11.01</time></li>
-            <li className="is-now"><b>v3</b><span>순서 바꿈 · 사진 2장</span><time>11.05</time></li>
+            <li className="is-now"><b>v3</b><span>순서 바꿈</span><time>11.05</time></li>
           </ol>
-
-          <dl className="intro__points">
-            <div><dt><IcWrite /> 쓰기</dt><dd>글꼴·크기·강조·표·사진을 그대로. 엑셀 파일을 올리면 글이 되고, 다이어그램도 그 자리에서 그립니다.</dd></div>
-            <div><dt><IcFind /> 찾기</dt><dd>제목·본문·태그는 물론 첨부 파일 안의 글자까지 한 검색창에서. 카테고리는 다섯 단계까지 나눕니다.</dd></div>
-            <div><dt><IcKeep /> 남기기</dt><dd>저장할 때마다 판이 쌓입니다. 누가 무엇을 바꿨는지 낱말 단위로 비교하고, 필요하면 그 판으로 되돌립니다.</dd></div>
-          </dl>
         </section>
 
         <form className="login__box intro__box" onSubmit={submit}>
@@ -115,7 +115,7 @@ export default function LoginPage() {
             : <p className="small muted">계정이 없다면 시스템 관리자에게 요청하세요.</p>}
         </form>
 
-        <p className="intro__foot">사내 전용입니다. 글에 적힌 서버·계정 정보는 밖으로 내보내지 마세요.</p>
+        <p className="intro__foot">사내 전용 · 글에 적힌 서버·계정 정보는 밖으로 내보내지 마세요.</p>
       </div>
     </main>
   )
