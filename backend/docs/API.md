@@ -39,7 +39,7 @@ curl -s -X POST {{BASE_URL}}/api/tokens -H "Authorization: Bearer <JWT>" -H 'Con
 
 | 메서드 | 경로 | 설명 |
 |---|---|---|
-| GET | `/api/posts` | 목록·검색. 쿼리: `q`(제목·본문·태그·카테고리·작성자), `categoryId`, `includeSub`(기본 true = 하위 포함, false = 그 카테고리에 직접 단 글만. 화면 목록은 false), `tag`, `authorId`, `status`(DRAFT/PUBLISHED), `sort`(LATEST 최신순 기본 · POPULAR 인기순 · VIEWS 조회순 · COMMENTS 댓글 많은 순 · OLDEST 오래된순 · TITLE 제목 가나다/abc 순(한글 먼저). 화면은 최신순·가나다순만 씀), `page`(0부터), `size`(≤100) |
+| GET | `/api/posts` | 목록·검색. 쿼리: `q`(제목·본문·태그·카테고리·작성자), `categoryId`, `includeSub`(기본 true = 하위 포함, false = 그 카테고리에 직접 단 글만. 화면 목록은 false), `tag`, `authorId`, `status`(DRAFT/PUBLISHED), `sort`(LATEST 최신순 기본 · POPULAR 인기순 · VIEWS 조회순 · COMMENTS 댓글 많은 순 · OLDEST 오래된순 · TITLE 제목 가나다/abc 순(한글 먼저) · TITLE_DESC 그 역순. 화면은 기준(날짜/제목)과 방향(오름/내림) 두 토글로 LATEST·OLDEST·TITLE·TITLE_DESC 만 씀), `page`(0부터), `size`(≤100) |
 | GET | `/api/search?q=` | 검색(위와 같음, 유사도 정렬) |
 | GET | `/api/posts/{id}?view=false` | 글 1건(본문 포함). `view=false` 면 조회수를 올리지 않음 |
 | POST | `/api/posts` | 새 글 → 201 |

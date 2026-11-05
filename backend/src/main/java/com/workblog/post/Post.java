@@ -17,7 +17,7 @@ import java.util.stream.Collectors;
 @EntityListeners(AuditingEntityListener.class)
 public class Post {
     /** 목록 정렬 */
-    public enum Sort { LATEST, POPULAR, VIEWS, COMMENTS, OLDEST, TITLE }
+    public enum Sort { LATEST, POPULAR, VIEWS, COMMENTS, OLDEST, TITLE, TITLE_DESC }
 
     public enum Status { DRAFT, PUBLISHED }
     public enum ContentFormat { MARKDOWN, HTML }

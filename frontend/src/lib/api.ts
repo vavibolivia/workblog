@@ -4,7 +4,7 @@ import axios, { AxiosError } from 'axios'
 export type Role = 'ADMIN' | 'USER'
 export type PostStatus = 'DRAFT' | 'PUBLISHED'
 /** 목록 정렬: 최신순 · 인기순(공감→조회) · 조회순 · 오래된순 */
-export type PostSort = 'LATEST' | 'POPULAR' | 'VIEWS' | 'COMMENTS' | 'OLDEST' | 'TITLE'
+export type PostSort = 'LATEST' | 'POPULAR' | 'VIEWS' | 'COMMENTS' | 'OLDEST' | 'TITLE' | 'TITLE_DESC'
 export type ChangeType = 'CREATE' | 'UPDATE' | 'RESTORE' | 'DELETE' | 'UNDELETE'
 export type ContentFormat = 'HTML' | 'MARKDOWN'
 export type AttachmentKind = 'IMAGE' | 'EXCEL' | 'FILE'

@@ -30,6 +30,12 @@ export const IcIndent = ({ size = 16, ...p }: P) => <svg {...base(size)} {...p}>
 export const IcListBullet = ({ size = 16, ...p }: P) => <svg {...base(size)} {...p}><path d="M10 6h10M10 12h10M10 18h10" /><circle cx="5" cy="6" r="1.2" fill="currentColor" /><circle cx="5" cy="12" r="1.2" fill="currentColor" /><circle cx="5" cy="18" r="1.2" fill="currentColor" /></svg>
 export const IcViewList = ({ size = 16, ...p }: P) => <svg {...base(size)} {...p}><rect x="3" y="4" width="18" height="6" rx="1.5" /><rect x="3" y="14" width="18" height="6" rx="1.5" /></svg>
 export const IcViewAlbum = ({ size = 16, ...p }: P) => <svg {...base(size)} {...p}><rect x="3" y="3" width="7.5" height="7.5" rx="1.5" /><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5" /><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5" /><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5" /></svg>
+/** 정렬 기준: 날짜(시계) · 제목(A/Z 글자) */
+export const IcSortLatest = ({ size = 16, ...p }: P) => <svg {...base(size)} {...p}><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></svg>
+export const IcSortTitle = ({ size = 16, ...p }: P) => <svg {...base(size)} {...p}><path d="M4 11 7.5 3 11 11M5.3 8h4.4" /><path d="M13 13.5h6.5L13 21h6.5" /></svg>
+/** 정렬 방향: 오름(짧은 줄 → 긴 줄, 위 화살) · 내림(긴 줄 → 짧은 줄, 아래 화살) */
+export const IcSortAsc = ({ size = 16, ...p }: P) => <svg {...base(size)} {...p}><path d="M11 6h4M11 12h7M11 18h10" /><path d="M5 19V5M2.5 7.5 5 5l2.5 2.5" /></svg>
+export const IcSortDesc = ({ size = 16, ...p }: P) => <svg {...base(size)} {...p}><path d="M11 6h10M11 12h7M11 18h4" /><path d="M5 5v14M2.5 16.5 5 19l2.5-2.5" /></svg>
 export const IcListOrdered = ({ size = 16, ...p }: P) => <svg {...base(size)} {...p}><path d="M11 6h9M11 12h9M11 18h9" /><path d="M4 4.5h1.5V9M4 9h3M4 14.2a1.6 1.6 0 0 1 3 .4c0 1.2-3 2.2-3 4.4h3" strokeWidth={1.5} /></svg>
 export const IcQuote = ({ size = 16, ...p }: P) => <svg {...base(size)} {...p}><path d="M10 7H5v5h5v1a4 4 0 0 1-4 4M20 7h-5v5h5v1a4 4 0 0 1-4 4" /></svg>
 export const IcCode = ({ size = 16, ...p }: P) => <svg {...base(size)} {...p}><path d="m8 8-4 4 4 4M16 8l4 4-4 4M13.5 5.5l-3 13" /></svg>

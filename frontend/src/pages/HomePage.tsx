@@ -7,11 +7,15 @@ import Sidebar from '../components/Sidebar'
 import PostCard, { type ListView } from '../components/PostCard'
 import Pagination from '../components/Pagination'
 import FrontGate from '../components/FrontGate'
-import { IcViewAlbum, IcViewList } from '../components/Icons'
+import { IcSortAsc, IcSortDesc, IcSortLatest, IcSortTitle, IcViewAlbum, IcViewList } from '../components/Icons'
 
 const LIST_VIEW_KEY = 'workblog.listView'
 const SORT_KEY = 'workblog.sort'
-const SORTS: [PostSort, string][] = [['LATEST', '최신순'], ['TITLE', '가나다순']]
+/** 화면 정렬 = 기준(날짜·제목) × 방향(오름·내림). 기준을 바꾸면 그 기준의 기본 방향(날짜는 최신 먼저, 제목은 가나다 먼저). */
+const SORTS: [PostSort, string][] = [['LATEST', '최신순'], ['OLDEST', '오래된순'], ['TITLE', '가나다순'], ['TITLE_DESC', '가나다 역순']]
+const isTitleSort = (s: PostSort) => s === 'TITLE' || s === 'TITLE_DESC'
+const isAscSort = (s: PostSort) => s === 'OLDEST' || s === 'TITLE'
+const sortLabel = (s: PostSort) => SORTS.find(([k]) => k === s)?.[1] ?? ''
 
 function loadSort(): PostSort {
   try { const v = localStorage.getItem(SORT_KEY); return SORTS.some(([k]) => k === v) ? (v as PostSort) : 'LATEST' } catch { return 'LATEST' }
@@ -150,14 +154,25 @@ export default function HomePage() {
             )}
           </div>
           <div className="row" style={{ gap: 8 }}>
-            <div className="segmented" role="radiogroup" aria-label="정렬">
-              {SORTS.map(([k, label]) => (
-                <button key={k} type="button" role="radio" aria-checked={sort === k} className={sort === k ? 'is-on' : undefined} onClick={() => changeSort(k)}>{label}</button>
-              ))}
-            </div>
-            <div className="segmented segmented--icon" role="radiogroup" aria-label="목록 보기 방식">
-              <button type="button" role="radio" aria-checked={view === 'list'} aria-label="목록형" title="목록형" className={view === 'list' ? 'is-on' : undefined} onClick={() => changeView('list')}><IcViewList /></button>
-              <button type="button" role="radio" aria-checked={view === 'album'} aria-label="앨범형" title="앨범형" className={view === 'album' ? 'is-on' : undefined} onClick={() => changeView('album')}><IcViewAlbum /></button>
+            {/* 정렬: 기준 토글(날짜 ↔ 제목) + 방향 토글(내림 ↔ 오름). 아이콘은 지금 상태 */}
+            {(() => {
+              const title = isTitleSort(sort), asc = isAscSort(sort)
+              const nextKey: PostSort = title ? 'LATEST' : 'TITLE'
+              const flip: PostSort = title ? (asc ? 'TITLE_DESC' : 'TITLE') : (asc ? 'LATEST' : 'OLDEST')
+              return (
+                <div className="segmented segmented--icon" aria-label="정렬">
+                  <button type="button" aria-label={`정렬 기준: ${title ? '제목' : '날짜'} (누르면 ${sortLabel(nextKey)})`} title={`${title ? '제목' : '날짜'} 기준 · 누르면 ${sortLabel(nextKey)}`}
+                          onClick={() => changeSort(nextKey)}>{title ? <IcSortTitle /> : <IcSortLatest />}</button>
+                  <button type="button" aria-label={`정렬 방향: ${sortLabel(sort)} (누르면 ${sortLabel(flip)})`} title={`${sortLabel(sort)} · 누르면 ${sortLabel(flip)}`}
+                          onClick={() => changeSort(flip)}>{asc ? <IcSortAsc /> : <IcSortDesc />}</button>
+                </div>
+              )
+            })()}
+            {/* 보기 방식도 단추 하나로 번갈아: 목록형 ↔ 앨범형. 아이콘은 지금 보기 */}
+            <div className="segmented segmented--icon">
+              <button type="button" aria-label={view === 'album' ? '보기: 앨범형 (누르면 목록형)' : '보기: 목록형 (누르면 앨범형)'}
+                      title={view === 'album' ? '앨범형 · 누르면 목록형' : '목록형 · 누르면 앨범형'}
+                      onClick={() => changeView(view === 'album' ? 'list' : 'album')}>{view === 'album' ? <IcViewAlbum /> : <IcViewList />}</button>
             </div>
           </div>
         </div>

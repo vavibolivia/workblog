@@ -50,6 +50,9 @@ public interface PostRepository extends JpaRepository<Post, Long> {
             // TITLE 가나다/abc 순: 한글 제목 먼저(유니코드 순 = 가나다 순), 그다음 영문·숫자(대소문자 무시). DB 콜레이션과 무관하게 같게.
             " CASE WHEN :sort = 'TITLE' THEN (CASE WHEN p.title ~ '^[가-힣ㄱ-ㅎㅏ-ㅣ]' THEN 0 ELSE 1 END) END ASC, " +
             " CASE WHEN :sort = 'TITLE' THEN lower(p.title) COLLATE \"C\" END ASC, " +
+            // TITLE_DESC: TITLE 의 정반대(영문·숫자 역순 먼저, 그다음 한글 역순)
+            " CASE WHEN :sort = 'TITLE_DESC' THEN (CASE WHEN p.title ~ '^[가-힣ㄱ-ㅎㅏ-ㅣ]' THEN 0 ELSE 1 END) END DESC, " +
+            " CASE WHEN :sort = 'TITLE_DESC' THEN lower(p.title) COLLATE \"C\" END DESC, " +
             " COALESCE(p.published_at, p.created_at) DESC",
            countQuery = "SELECT count(*) " + FROM + FILTER,
            nativeQuery = true)

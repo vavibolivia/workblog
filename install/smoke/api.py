@@ -157,6 +157,9 @@ check("SORT comments: comment counts non-increasing", s == 200 and _cc == sorted
 s, r = call("GET", "/api/posts?sort=TITLE&size=50", tok=U); _tt = [p["title"] for p in r["content"] if not p["pinned"]]
 _tk = [(0 if t[:1] and ('가' <= t[0] <= '힣' or 'ㄱ' <= t[0] <= 'ㅣ') else 1, t.lower()) for t in _tt]
 check("SORT title: Hangul first, then 가나다/abc", s == 200 and _tk == sorted(_tk), _tt[:8])
+s, r = call("GET", "/api/posts?sort=TITLE_DESC&size=50", tok=U); _tt = [p["title"] for p in r["content"] if not p["pinned"]]
+_tk = [(0 if t[:1] and ('가' <= t[0] <= '힣' or 'ㄱ' <= t[0] <= 'ㅣ') else 1, t.lower()) for t in _tt]
+check("SORT title desc: exact reverse of TITLE", s == 200 and _tk == sorted(_tk, reverse=True), _tt[:8])
 s, r = call("GET", "/api/posts?sort=BOGUS", tok=U); check("SORT unknown value 400", s == 400, s)
 
 # ---- 문서 (R14) ----
