@@ -23,13 +23,13 @@ public interface PostRepository extends JpaRepository<Post, Long> {
     /** 발행 + 전체 공개 글은 모두에게, 임시 저장·비공개 글은 작성자(와 명시 필터를 쓴 관리자)에게만. 열람 제한 카테고리는 RESTRICT_OK. */
     String VISIBLE = " p.deleted_at IS NULL AND ((p.status = 'PUBLISHED' AND p.visibility = 'PUBLIC') OR p.author_id = :viewerId OR :isAdmin = TRUE) AND " + RESTRICT_OK;
 
-    /** 카테고리 필터는 하위 포함: c.path 가 선택한 카테고리의 path 로 시작하면 포함. */
+    /** 카테고리 필터: includeSub 이면 하위 포함(c.path 가 선택한 카테고리의 path 로 시작), 아니면 그 카테고리에 직접 단 글만(c.id). */
     String FILTER = VISIBLE +
             " AND (:q = '' OR p.title ILIKE CONCAT('%', :q, '%') OR p.content ILIKE CONCAT('%', :q, '%') OR p.tags ILIKE CONCAT('%', :q, '%') " +
             "      OR u.display_name ILIKE CONCAT('%', :q, '%') OR c.name ILIKE CONCAT('%', :q, '%') " +
             // 첨부 파일 내용(엑셀·워드·PDF 등에서 꺼낸 텍스트, attachments.text_content)
             "      OR EXISTS (SELECT 1 FROM attachments att WHERE att.post_id = p.id AND att.text_content ILIKE CONCAT('%', :q, '%'))) " +
-            " AND (:catPath = '' OR c.path LIKE CONCAT(:catPath, '%')) " +
+            " AND (:catPath = '' OR (:includeSub = TRUE AND c.path LIKE CONCAT(:catPath, '%')) OR (:includeSub = FALSE AND c.id = :catId)) " +
             " AND (:tag = '' OR CONCAT(',', p.tags, ',') ILIKE CONCAT('%,', :tag, ',%')) " +
             " AND (:authorId = 0 OR p.author_id = :authorId) " +
             " AND (:status = '' OR p.status = :status) ";
@@ -47,11 +47,16 @@ public interface PostRepository extends JpaRepository<Post, Long> {
             " CASE WHEN :sort IN ('POPULAR', 'VIEWS') THEN p.view_count ELSE 0 END DESC, " +
             " CASE WHEN :sort = 'COMMENTS' THEN (SELECT count(*) FROM comments cm WHERE cm.post_id = p.id AND cm.deleted_at IS NULL) ELSE 0 END DESC, " +
             " CASE WHEN :sort = 'OLDEST' THEN COALESCE(p.published_at, p.created_at) END ASC, " +
+            // TITLE 가나다/abc 순: 한글 제목 먼저(유니코드 순 = 가나다 순), 그다음 영문·숫자(대소문자 무시). DB 콜레이션과 무관하게 같게.
+            " CASE WHEN :sort = 'TITLE' THEN (CASE WHEN p.title ~ '^[가-힣ㄱ-ㅎㅏ-ㅣ]' THEN 0 ELSE 1 END) END ASC, " +
+            " CASE WHEN :sort = 'TITLE' THEN lower(p.title) COLLATE \"C\" END ASC, " +
             " COALESCE(p.published_at, p.created_at) DESC",
            countQuery = "SELECT count(*) " + FROM + FILTER,
            nativeQuery = true)
     Page<Post> search(@Param("q") String q,
                       @Param("catPath") String catPath,
+                      @Param("catId") long catId,
+                      @Param("includeSub") boolean includeSub,
                       @Param("tag") String tag,
                       @Param("authorId") long authorId,
                       @Param("status") String status,

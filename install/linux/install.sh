@@ -17,6 +17,7 @@
 #       --data <폴더>    넣을 데이터(db_*.dump + files/). 기본: 옆의 data/
 #       --no-data        데이터를 넣지 않음
 #       --force-data     DB 에 글이 있어도 데이터로 바꿈(바꾸기 전 DB 를 /var/backups/workblog 에 덤프, root 만 읽음)
+#                        data/FORCE 파일이 들어 있는 묶음(package.py --data … --force 로 만든 것)은 이 옵션 없이도 데이터로 바꾼다(엎어치기)
 #       --pg-pass <비밀번호>  PostgreSQL 관리자(postgres) 비밀번호가 없을 때 만들 값 (기본 postgres — 사내 요청. 5432 를 외부에 열지 말 것)
 #
 # 상황별로 알아서 처리한다:
@@ -70,6 +71,8 @@ while [ $# -gt 0 ]; do
   esac
 done
 [ -n "$DATA_DIR" ] || DATA_DIR="$HERE/data"
+# 묶음에 data/FORCE 가 있으면 "이 데이터로 엎어친다"는 뜻 — --force-data 와 같다(--no-data 가 우선)
+[ "$NO_DATA" = 1 ] || [ ! -f "$DATA_DIR/FORCE" ] || FORCE_DATA=1
 IMAGE_DIR="$HERE/image"
 
 say()  { printf '\033[1;34m==\033[0m %s\n' "$*"; }

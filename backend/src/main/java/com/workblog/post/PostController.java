@@ -35,11 +35,12 @@ public class PostController {
                 page.page(), page.size(), page.totalElements(), page.totalPages());
     }
 
-    /** 목록 + 검색. q / categoryId(하위 포함) / tag / authorId / status 필터, sort(LATEST·POPULAR·VIEWS·OLDEST), 페이지네이션. */
+    /** 목록 + 검색. q / categoryId(+ includeSub, 기본 true = 하위 포함) / tag / authorId / status 필터, sort(LATEST·POPULAR·VIEWS·OLDEST), 페이지네이션. */
     @Operation(summary = "글 목록·검색", description = "sort: LATEST 최신순(기본) · POPULAR 인기순(공감→조회) · VIEWS 조회순 · COMMENTS 댓글 많은 순 · OLDEST 오래된순. 공지 글은 검색어가 없을 때 항상 맨 위.")
     @GetMapping("/posts")
     public PageResponse<PostSummary> list(@RequestParam(required = false) String q,
                                           @RequestParam(required = false) Long categoryId,
+                                          @RequestParam(defaultValue = "true") boolean includeSub,
                                           @RequestParam(required = false) String tag,
                                           @RequestParam(required = false) Long authorId,
                                           @RequestParam(required = false) Post.Status status,
@@ -47,7 +48,7 @@ public class PostController {
                                           @RequestParam(defaultValue = "0") int page,
                                           @RequestParam(defaultValue = "10") int size,
                                           @CurrentUser User viewer) {
-        return withAttachmentMatches(service.search(q, categoryId, tag, authorId, status, sort, page, size, viewer), q);
+        return withAttachmentMatches(service.search(q, categoryId, includeSub, tag, authorId, status, sort, page, size, viewer), q);
     }
 
     @GetMapping("/search")

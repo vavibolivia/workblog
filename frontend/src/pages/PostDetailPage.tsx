@@ -10,7 +10,6 @@ import { Avatar } from '../components/Avatar'
 import CategoryPath from '../components/CategoryPath'
 import CommentSection from '../components/CommentSection'
 import ExportMenu from '../components/ExportMenu'
-import ViewersButton from '../components/ViewersButton'
 import Toc from '../components/Toc'
 import RelatedPosts from '../components/RelatedPosts'
 import StaleNotice from '../components/StaleNotice'
@@ -48,14 +47,20 @@ export default function PostDetailPage() {
     catch (e) { toast(errorMessage(e), 'error') } finally { setBusy(false) }
   }
 
-  const [liking, setLiking] = useState(false)
-  const toggleLike = async () => {
-    if (liking) return
-    setLiking(true)
-    try {
-      const r = await api.posts.like(postId)
-      setPost((p) => p ? { ...p, likedByMe: r.liked, likeCount: r.count } : p)
-    } catch (e) { toast(errorMessage(e, '공감을 처리하지 못했습니다.'), 'error') } finally { setLiking(false) }
+  // 제목 인라인 편집: 글쓴이·관리자가 제목을 클릭하면 글상자. Enter 저장 · Esc 취소 · 포커스 이탈 시 저장. 새 리비전(changeNote '제목 수정')으로 남는다.
+  const [editingTitle, setEditingTitle] = useState(false)
+  const [titleDraft, setTitleDraft] = useState('')
+  const titleRef = useRef<HTMLInputElement>(null)
+  useEffect(() => { if (editingTitle) { titleRef.current?.focus(); titleRef.current?.select() } }, [editingTitle])
+  const startTitleEdit = () => { if (!post?.editable || post.deletedAt) return; setTitleDraft(post.title); setEditingTitle(true) }
+  const commitTitle = async () => {
+    if (!editingTitle || !post) return
+    setEditingTitle(false)
+    const t = titleDraft.trim()
+    if (!t || t === post.title) return
+    setBusy(true)
+    try { setPost(await api.posts.patch(postId, { title: t, changeNote: '제목 수정', baseVersion: post.version })); toast('제목을 바꿨습니다.', 'success') }
+    catch (e) { toast(errorMessage(e, '제목을 바꾸지 못했습니다.'), 'error') } finally { setBusy(false) }
   }
 
   return (
@@ -81,7 +86,16 @@ export default function PostDetailPage() {
                   {post.status === 'DRAFT' && <span className="chip chip--draft">임시 저장 · 작성자와 관리자만 볼 수 있음</span>}
                 </div>
               </div>
-              <h1 className="post__title">{post.title}</h1>
+              {editingTitle ? (
+                <input ref={titleRef} className="post__title post__title-edit" value={titleDraft} maxLength={200} aria-label="제목 바꾸기"
+                       onChange={(e) => setTitleDraft(e.target.value)} onBlur={() => void commitTitle()}
+                       onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void commitTitle() } else if (e.key === 'Escape') { e.preventDefault(); setEditingTitle(false) } }} />
+              ) : (
+                <h1 className={`post__title${post.editable && !post.deletedAt ? ' post__title--editable' : ''}`}
+                    title={post.editable && !post.deletedAt ? '클릭하면 제목을 바로 고칠 수 있습니다' : undefined}
+                    tabIndex={post.editable && !post.deletedAt ? 0 : undefined}
+                    onClick={startTitleEdit} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === 'F2') startTitleEdit() }}>{post.title}</h1>
+              )}
               <div className="post__byline">
                 <div className="post__author">
                   <Avatar name={post.author.displayName} />
@@ -91,15 +105,8 @@ export default function PostDetailPage() {
                   </div>
                 </div>
                 <div className="post__actions">
-                  {!post.deletedAt && (
-                    <button type="button" className={`btn btn--sm like-btn${post.likedByMe ? ' like-btn--on' : ''}`} aria-pressed={post.likedByMe} disabled={liking} onClick={toggleLike} title={post.likedByMe ? '공감 취소' : '공감'}>
-                      <span className="like-btn__icon" aria-hidden="true">{post.likedByMe ? '♥' : '♡'}</span> 공감 {post.likeCount}
-                    </button>
-                  )}
-                  <Link to={`/posts/${post.id}/history`} className="btn btn--sm">변경 이력{post.version > 1 ? ` ${post.version}` : ''}</Link>
                   <ExportMenu postId={post.id} title={post.title} />
                   {!post.deletedAt && <FrontToggle kind="POST" refId={post.id} />}
-                  {post.editable && <ViewersButton postId={post.id} />}
                   {post.editable && !post.deletedAt && <>
                     <Link to={`/posts/${post.id}/edit`} className="btn btn--sm btn--primary">수정</Link>
                     <button type="button" className="btn btn--sm btn--danger" onClick={() => setConfirmDelete(true)}>삭제</button>
@@ -107,7 +114,6 @@ export default function PostDetailPage() {
                   {post.editable && post.deletedAt && <button type="button" className="btn btn--sm btn--sky" disabled={busy} onClick={undelete}>삭제 취소</button>}
                 </div>
               </div>
-              {post.summary && <p className="post__summary">{post.summary}</p>}
             </header>
             <div className="post__body" ref={bodyRef}><RichContent content={post.content} format={post.contentFormat} /></div>
             {post.attachments.length > 0 && (() => {

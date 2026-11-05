@@ -55,10 +55,17 @@ public class PostService {
     @Transactional(readOnly = true)
     public PageResponse<PostSummary> search(String q, Long categoryId, String tag, Long authorId, Post.Status status, Post.Sort sort,
                                             int page, int size, User viewer) {
+        return search(q, categoryId, true, tag, authorId, status, sort, page, size, viewer);
+    }
+
+    /** includeSub=false 면 선택한 카테고리에 직접 단 글만(사이드바 글 수와 같은 기준). */
+    @Transactional(readOnly = true)
+    public PageResponse<PostSummary> search(String q, Long categoryId, boolean includeSub, String tag, Long authorId, Post.Status status, Post.Sort sort,
+                                            int page, int size, User viewer) {
         String query = q == null ? "" : q.trim();
         String catPath = categoryId == null ? "" : categories.get(categoryId).getPath();
         boolean showOthersDrafts = viewer.isAdmin() && (authorId != null || status == Post.Status.DRAFT);
-        Page<Post> result = posts.search(query, catPath,
+        Page<Post> result = posts.search(query, catPath, categoryId == null ? 0 : categoryId, includeSub,
                 tag == null ? "" : tag.trim(),
                 authorId == null ? 0 : authorId,
                 status == null ? "" : status.name(),

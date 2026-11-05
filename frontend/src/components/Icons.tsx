@@ -28,6 +28,8 @@ export const IcAlignJustify = ({ size = 16, ...p }: P) => <svg {...base(size)} {
 export const IcOutdent = ({ size = 16, ...p }: P) => <svg {...base(size)} {...p}><path d="M4 5h16M11 10h9M11 14h9M4 19h16" /><path d="M7.5 9 4.5 12l3 3" /></svg>
 export const IcIndent = ({ size = 16, ...p }: P) => <svg {...base(size)} {...p}><path d="M4 5h16M11 10h9M11 14h9M4 19h16" /><path d="m4.5 9 3 3-3 3" /></svg>
 export const IcListBullet = ({ size = 16, ...p }: P) => <svg {...base(size)} {...p}><path d="M10 6h10M10 12h10M10 18h10" /><circle cx="5" cy="6" r="1.2" fill="currentColor" /><circle cx="5" cy="12" r="1.2" fill="currentColor" /><circle cx="5" cy="18" r="1.2" fill="currentColor" /></svg>
+export const IcViewList = ({ size = 16, ...p }: P) => <svg {...base(size)} {...p}><rect x="3" y="4" width="18" height="6" rx="1.5" /><rect x="3" y="14" width="18" height="6" rx="1.5" /></svg>
+export const IcViewAlbum = ({ size = 16, ...p }: P) => <svg {...base(size)} {...p}><rect x="3" y="3" width="7.5" height="7.5" rx="1.5" /><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5" /><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5" /><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5" /></svg>
 export const IcListOrdered = ({ size = 16, ...p }: P) => <svg {...base(size)} {...p}><path d="M11 6h9M11 12h9M11 18h9" /><path d="M4 4.5h1.5V9M4 9h3M4 14.2a1.6 1.6 0 0 1 3 .4c0 1.2-3 2.2-3 4.4h3" strokeWidth={1.5} /></svg>
 export const IcQuote = ({ size = 16, ...p }: P) => <svg {...base(size)} {...p}><path d="M10 7H5v5h5v1a4 4 0 0 1-4 4M20 7h-5v5h5v1a4 4 0 0 1-4 4" /></svg>
 export const IcCode = ({ size = 16, ...p }: P) => <svg {...base(size)} {...p}><path d="m8 8-4 4 4 4M16 8l4 4-4 4M13.5 5.5l-3 13" /></svg>

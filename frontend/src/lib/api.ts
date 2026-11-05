@@ -4,7 +4,7 @@ import axios, { AxiosError } from 'axios'
 export type Role = 'ADMIN' | 'USER'
 export type PostStatus = 'DRAFT' | 'PUBLISHED'
 /** 목록 정렬: 최신순 · 인기순(공감→조회) · 조회순 · 오래된순 */
-export type PostSort = 'LATEST' | 'POPULAR' | 'VIEWS' | 'COMMENTS' | 'OLDEST'
+export type PostSort = 'LATEST' | 'POPULAR' | 'VIEWS' | 'COMMENTS' | 'OLDEST' | 'TITLE'
 export type ChangeType = 'CREATE' | 'UPDATE' | 'RESTORE' | 'DELETE' | 'UNDELETE'
 export type ContentFormat = 'HTML' | 'MARKDOWN'
 export type AttachmentKind = 'IMAGE' | 'EXCEL' | 'FILE'
@@ -278,11 +278,13 @@ export const api = {
       http.put('/users/me/password', { currentPassword, newPassword }),
   },
   posts: {
-    list: (params: { q?: string; categoryId?: number; tag?: string; authorId?: number; status?: PostStatus; sort?: PostSort; page?: number; size?: number }) =>
+    list: (params: { q?: string; categoryId?: number; includeSub?: boolean; tag?: string; authorId?: number; status?: PostStatus; sort?: PostSort; page?: number; size?: number }) =>
       http.get<PageResponse<PostSummary>>('/posts', { params }).then((r) => r.data),
     get: (id: number, view = true) => http.get<PostDetail>(`/posts/${id}`, { params: { view } }).then((r) => r.data),
     create: (body: PostRequest) => http.post<PostDetail>('/posts', body).then((r) => r.data),
     update: (id: number, body: PostRequest) => http.put<PostDetail>(`/posts/${id}`, body).then((r) => r.data),
+    /** 부분 수정(보낸 항목만). 글 화면의 제목 인라인 편집 등. */
+    patch: (id: number, body: { title?: string; changeNote?: string; baseVersion?: number }) => http.patch<PostDetail>(`/posts/${id}`, body).then((r) => r.data),
     /** 기본은 휴지통으로(복구 가능). purge=true 면 관리자가 이력·댓글·첨부까지 영구 삭제. */
     remove: (id: number, purge = false) => http.delete(`/posts/${id}`, { params: purge ? { purge: true } : undefined }),
     /** 글을 파일로 내려받기. 파일 이름은 Content-Disposition 에서, 없으면 호출 쪽이 정한다. */

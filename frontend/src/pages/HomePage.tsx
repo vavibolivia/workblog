@@ -1,15 +1,17 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api, errorMessage, findCategory, relativeTime, changeTypeLabel, type ActivityEntry, type CategoryNode, type PageResponse, type PostSort, type PostStatus, type PostSummary, type UserResponse } from '../lib/api'
 import { useAuth } from '../lib/auth'
+import { useToast } from '../lib/toast'
 import Sidebar from '../components/Sidebar'
 import PostCard, { type ListView } from '../components/PostCard'
 import Pagination from '../components/Pagination'
 import FrontGate from '../components/FrontGate'
+import { IcViewAlbum, IcViewList } from '../components/Icons'
 
 const LIST_VIEW_KEY = 'workblog.listView'
 const SORT_KEY = 'workblog.sort'
-const SORTS: [PostSort, string][] = [['LATEST', '최신순'], ['POPULAR', '인기순'], ['VIEWS', '조회순'], ['COMMENTS', '댓글순'], ['OLDEST', '오래된순']]
+const SORTS: [PostSort, string][] = [['LATEST', '최신순'], ['TITLE', '가나다순']]
 
 function loadSort(): PostSort {
   try { const v = localStorage.getItem(SORT_KEY); return SORTS.some(([k]) => k === v) ? (v as PostSort) : 'LATEST' } catch { return 'LATEST' }
@@ -21,6 +23,7 @@ function loadListView(): ListView {
 
 export default function HomePage() {
   const { user } = useAuth()
+  const toast = useToast()
   const [params, setParams] = useSearchParams()
   const categoryId = params.get('categoryId') ? Number(params.get('categoryId')) : undefined
   const tag = params.get('tag') ?? undefined
@@ -34,19 +37,44 @@ export default function HomePage() {
   const [activity, setActivity] = useState<ActivityEntry[]>([])
   const [tree, setTree] = useState<CategoryNode[]>([])
   const [view, setView] = useState<ListView>(loadListView)
-  const sort = (params.get('sort') as PostSort | null) ?? loadSort()
+  // 화면에 없는 정렬(예전 링크의 POPULAR 등)은 최신순으로
+  const urlSort = params.get('sort')
+  const sort: PostSort = urlSort && SORTS.some(([k]) => k === urlSort) ? (urlSort as PostSort) : loadSort()
 
   const pageSize = view === 'album' ? 12 : 10
 
   useEffect(() => {
     let alive = true
     setErr(null)
-    api.posts.list({ categoryId, tag, authorId, status, sort, page, size: pageSize })
+    // 카테고리를 고르면 그 카테고리에 직접 단 글만(사이드바 숫자와 같은 기준)
+    api.posts.list({ categoryId, includeSub: categoryId ? false : undefined, tag, authorId, status, sort, page, size: pageSize })
       .then((d) => { if (alive) setData(d) }).catch((e) => { if (alive) setErr(errorMessage(e)) })
     return () => { alive = false }
   }, [categoryId, tag, authorId, status, sort, page, pageSize])
 
   useEffect(() => { if (categoryId) api.categories.tree().then(setTree).catch(() => null) }, [categoryId])
+
+  // 가운데 제목(카테고리 이름) 인라인 편집: 관리자가 제목을 클릭하면 글상자. Enter 저장 · Esc 취소 · 포커스 이탈 시 저장.
+  const catNode = categoryId ? findCategory(tree, categoryId) : null
+  const canEditCat = !!(categoryId && catNode && user?.role === 'ADMIN')
+  const [editingCat, setEditingCat] = useState(false)
+  const [catDraft, setCatDraft] = useState('')
+  const catRef = useRef<HTMLInputElement>(null)
+  useEffect(() => { if (editingCat) { catRef.current?.focus(); catRef.current?.select() } }, [editingCat])
+  useEffect(() => { setEditingCat(false) }, [categoryId])
+  const startCatEdit = () => { if (!canEditCat || !catNode) return; setCatDraft(catNode.name); setEditingCat(true) }
+  const commitCat = async () => {
+    if (!editingCat || !catNode || !categoryId) return
+    setEditingCat(false)
+    const n = catDraft.trim()
+    if (!n || n === catNode.name) return
+    try {
+      await api.categories.update(categoryId, { name: n, parentId: catNode.parentId })
+      setTree(await api.categories.tree())
+      window.dispatchEvent(new CustomEvent('workblog:categories-changed'))
+      toast('카테고리 이름을 바꿨습니다.', 'success')
+    } catch (e) { toast(errorMessage(e, '이름을 바꾸지 못했습니다.'), 'error') }
+  }
 
   useEffect(() => {
     if (!authorId) { setAuthor(null); return }
@@ -76,7 +104,7 @@ export default function HomePage() {
     : author ? (author.id === user?.id ? '내가 쓴 글' : `${author.displayName}님의 글`)
     : categoryId ? (findCategory(tree, categoryId)?.name ?? '카테고리') : tag ? `#${tag}` : '전체 글'
   const desc = status === 'DRAFT' ? '아직 발행하지 않은 글입니다. 작성자와 관리자만 볼 수 있습니다.'
-    : categoryId ? '이 카테고리와 하위 카테고리에 발행된 글' : tag ? '이 태그가 붙은 글' : author ? (author.department ?? '') : '전사 구성원이 공유한 최신 글'
+    : categoryId ? '이 카테고리에 직접 발행된 글 (하위 카테고리 글은 각 하위 카테고리에서)' : tag ? '이 태그가 붙은 글' : author ? (author.department ?? '') : '전사 구성원이 공유한 최신 글'
 
   const setPage = (p: number) => { const n = new URLSearchParams(params); n.set('page', String(p)); setParams(n) }
   /** 정렬은 URL(공유 가능)과 localStorage(다음 방문) 둘 다에 남긴다. 바꾸면 1페이지로. */
@@ -95,7 +123,15 @@ export default function HomePage() {
         {front && <FrontGate />}
         <div className="feed-head">
           <div>
-            <h2>{title}</h2>
+            {editingCat ? (
+              <input ref={catRef} className="feed-head__edit" value={catDraft} maxLength={50} aria-label="카테고리 이름 바꾸기"
+                     onChange={(e) => setCatDraft(e.target.value)} onBlur={() => void commitCat()}
+                     onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void commitCat() } else if (e.key === 'Escape') { e.preventDefault(); setEditingCat(false) } }} />
+            ) : (
+              <h2 className={canEditCat ? 'is-editable' : undefined} title={canEditCat ? '클릭하면 카테고리 이름을 바로 고칠 수 있습니다' : undefined}
+                  tabIndex={canEditCat ? 0 : undefined} onClick={startCatEdit}
+                  onKeyDown={(e) => { if (canEditCat && (e.key === 'Enter' || e.key === 'F2')) startCatEdit() }}>{title}</h2>
+            )}
             <p>{desc}{data ? ` · ${data.totalElements}건` : ''}</p>
             {trail.length > 0 && (
               <nav className="path-chips" aria-label="카테고리 경로">
@@ -114,15 +150,14 @@ export default function HomePage() {
             )}
           </div>
           <div className="row" style={{ gap: 8 }}>
-            {(categoryId || tag || authorId || status) && <Link to="/" className="btn btn--sm">필터 해제</Link>}
             <div className="segmented" role="radiogroup" aria-label="정렬">
               {SORTS.map(([k, label]) => (
                 <button key={k} type="button" role="radio" aria-checked={sort === k} className={sort === k ? 'is-on' : undefined} onClick={() => changeSort(k)}>{label}</button>
               ))}
             </div>
-            <div className="segmented" role="radiogroup" aria-label="목록 보기 방식">
-              <button type="button" role="radio" aria-checked={view === 'list'} className={view === 'list' ? 'is-on' : undefined} onClick={() => changeView('list')}>목록형</button>
-              <button type="button" role="radio" aria-checked={view === 'album'} className={view === 'album' ? 'is-on' : undefined} onClick={() => changeView('album')}>앨범형</button>
+            <div className="segmented segmented--icon" role="radiogroup" aria-label="목록 보기 방식">
+              <button type="button" role="radio" aria-checked={view === 'list'} aria-label="목록형" title="목록형" className={view === 'list' ? 'is-on' : undefined} onClick={() => changeView('list')}><IcViewList /></button>
+              <button type="button" role="radio" aria-checked={view === 'album'} aria-label="앨범형" title="앨범형" className={view === 'album' ? 'is-on' : undefined} onClick={() => changeView('album')}><IcViewAlbum /></button>
             </div>
           </div>
         </div>

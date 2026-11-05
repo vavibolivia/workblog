@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef, useState } from 'react'
+import { createContext, useContext, useEffect, useRef, useState, type SyntheticEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { api, errorMessage, type CategoryNode } from '../lib/api'
 import { useAuth } from '../lib/auth'
@@ -8,6 +8,7 @@ import { useToast } from '../lib/toast'
  * 사이드바용 접고 펴는 카테고리 트리.
  * 글 수 표기 규칙(모든 단계 동일): 숫자 = 이 카테고리에 직접 단 글(postCount)만. 하위 카테고리 글은 더하지 않는다.
  * - 우클릭(또는 행의 ⋯ 버튼): 이 카테고리 글 보기 · 이 카테고리에 글쓰기, 관리자는 하위 추가·이름 바꾸기·순서·이동·삭제
+ * - 관리자는 선택된 카테고리 이름을 한 번 더 클릭(또는 더블클릭·F2)하면 그 자리에서 글상자로 이름을 고친다. Enter 저장 · Esc 취소 · 포커스 이탈 시 저장
  * - 관리자는 행을 끌어 다른 카테고리 위에 놓으면 그 하위로, 맨 위 '최상위로' 띠에 놓으면 1단계로 옮긴다(최대 5단계 규칙은 서버가 검사).
  */
 interface TreeCtx {
@@ -18,6 +19,8 @@ interface TreeCtx {
   move: (id: number, parentId: number | null) => void
   /** 끌어 놓기: target 기준 앞(before)·뒤(after)·안(inside) */
   drop: (id: number, target: CategoryNode, where: DropWhere) => void
+  /** 이름 바꾸기(인라인 편집). 같은 이름이면 아무 일도 하지 않는다. */
+  rename: (node: CategoryNode, name: string) => Promise<void>
 }
 type DropWhere = 'before' | 'after' | 'inside'
 const Ctx = createContext<TreeCtx | null>(null)
@@ -53,6 +56,12 @@ export default function CategoryTree({ nodes, activeId, activePathIds = [], onCh
     if (node.parentId === parentId) return
     void run(() => api.categories.update(id, parentId === null ? { name: node.name, moveToRoot: true } : { name: node.name, parentId }),
       `'${node.name}'을(를) ${parentId === null ? '최상위로' : `'${find(nodes, parentId)?.name}' 아래로`} 옮겼습니다.`)
+  }
+
+  const rename = async (node: CategoryNode, name: string) => {
+    const n = name.trim()
+    if (!n || n === node.name) return
+    await run(() => api.categories.update(node.id, { name: n, parentId: node.parentId }), '이름을 바꿨습니다.')
   }
 
   const act = (kind: string) => {
@@ -96,7 +105,7 @@ export default function CategoryTree({ nodes, activeId, activePathIds = [], onCh
       `'${node.name}'을(를) '${target.name}' ${where === 'before' ? '앞' : '뒤'}으로 옮겼습니다.`)
   }
 
-  const ctx: TreeCtx = { isAdmin, dragId, setDragId, openMenu: (node, x, y) => setMenu({ node, x, y }), move, drop }
+  const ctx: TreeCtx = { isAdmin, dragId, setDragId, openMenu: (node, x, y) => setMenu({ node, x, y }), move, drop, rename }
   return (
     <Ctx.Provider value={ctx}>
       {isAdmin && dragId !== null && (
@@ -162,6 +171,13 @@ function Node({ node, activeId, activePathIds }: { node: CategoryNode; activeId:
   }
   const dragging = tree.dragId === node.id
   const canDrop = tree.isAdmin && tree.dragId !== null && tree.dragId !== node.id
+  // 관리자 인라인 이름 바꾸기: 현재 선택된 카테고리 이름을 한 번 더 클릭(또는 아무 이름이나 더블클릭·F2)하면 글상자로 바뀐다.
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(node.name)
+  const inputRef = useRef<HTMLInputElement>(null)
+  useEffect(() => { if (editing) { setDraft(node.name); inputRef.current?.focus(); inputRef.current?.select() } }, [editing, node.name])
+  const startEdit = (e: SyntheticEvent) => { if (!tree.isAdmin) return; e.preventDefault(); e.stopPropagation(); setEditing(true) }
+  const commit = async () => { if (!editing) return; setEditing(false); await tree.rename(node, draft) }
 
   return (
     <li className={onPath ? 'on-path' : undefined} data-depth={node.depth}>
@@ -187,11 +203,22 @@ function Node({ node, activeId, activePathIds }: { node: CategoryNode; activeId:
         {hasKids
           ? <button type="button" className="cat-tree__toggle" aria-label={expanded ? '접기' : '펼치기'} aria-expanded={expanded} onClick={() => setUserOpen(!expanded)}>{expanded ? '▾' : '▸'}</button>
           : <span className="cat-tree__toggle cat-tree__leaf" aria-hidden title="하위 카테고리 없음" />}
-        <Link to={`/?categoryId=${node.id}`} className="cat-tree__link" data-depth={node.depth} onClick={onNameClick}
+        {editing ? (
+          <input ref={inputRef} className="cat-tree__edit" value={draft} aria-label={`${node.name} 이름 바꾸기`} maxLength={50}
+                 onChange={(e) => setDraft(e.target.value)} onBlur={() => void commit()}
+                 onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void commit() } else if (e.key === 'Escape') { e.preventDefault(); setDraft(node.name); setEditing(false) } }}
+                 onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()} draggable={false} onDragStart={(e) => e.preventDefault()} />
+        ) : (
+        <Link to={`/?categoryId=${node.id}`} className="cat-tree__link" data-depth={node.depth}
+              title={tree.isAdmin ? '선택된 상태에서 한 번 더 클릭하거나 더블클릭하면 이름을 바꿉니다' : undefined}
+              onClick={(e) => { if (tree.isAdmin && active) { startEdit(e); return } onNameClick() }}
+              onDoubleClick={startEdit}
+              onKeyDown={(e) => { if (e.key === 'F2') startEdit(e) }}
               onDragStart={(e) => { if (!tree.isAdmin) e.preventDefault() }}>
           <span className="ellipsis">{node.name}</span>
           <span className="cat-tree__count" title={`이 카테고리에 직접 단 글 ${node.postCount}`}>{node.postCount}</span>
         </Link>
+        )}
         <button type="button" className="cat-tree__more" aria-label={`${node.name} 메뉴`} title="메뉴 (우클릭도 가능)"
                 onClick={(e) => { const r = (e.currentTarget as HTMLElement).getBoundingClientRect(); tree.openMenu(node, r.left, r.bottom + 4) }}>⋯</button>
       </div>

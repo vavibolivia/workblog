@@ -49,7 +49,6 @@ export default function PostCard({ post, q, view = 'list' }: { post: PostSummary
           <div className="album-card__foot">
             <span className="post-card__author"><Avatar name={post.author.displayName} size="xs" /><span>{post.author.displayName}</span></span>
             <span className="post-card__stats">
-              <span className={post.likedByMe ? 'is-liked' : undefined}>공감 {post.likeCount}</span>
               <span>댓글 {post.commentCount}</span>
               <span>조회 {post.viewCount}</span>
             </span>
@@ -85,7 +84,6 @@ export default function PostCard({ post, q, view = 'list' }: { post: PostSummary
           )}
           {/* 통계는 썸네일 유무와 상관없이 늘 작성자 줄 오른쪽 끝 */}
           <span className="post-card__stats">
-            <span className={post.likedByMe ? 'is-liked' : undefined}>공감 {post.likeCount}</span>
             <span>댓글 {post.commentCount}</span>
             <span>조회 {post.viewCount}</span>
           </span>

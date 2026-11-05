@@ -19,6 +19,8 @@ export default function Sidebar() {
   // 첫 렌더의 빈 트리는 알리지 않는다(다시 마운트될 때 카테고리 표식이 깜빡임)
   useEffect(() => { if (tree.length) publishCategoryTree(tree) }, [tree])
   const reloadTree = () => { api.categories.tree().then(setTree).catch(() => setTree([])) }
+  // 다른 화면(홈 가운데 제목 편집 등)에서 카테고리를 바꾸면 알려 주는 이벤트 → 트리 다시 읽기
+  useEffect(() => { const h = () => reloadTree(); window.addEventListener('workblog:categories-changed', h); return () => window.removeEventListener('workblog:categories-changed', h) }, [])
 
   useEffect(() => {
     api.categories.tree().then(setTree).catch(() => setTree([]))
