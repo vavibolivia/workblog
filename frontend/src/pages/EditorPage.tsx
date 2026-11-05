@@ -146,6 +146,9 @@ export default function EditorPage() {
       <section className="editor">
         <div className="editor__bar">
           <div className="row row--wrap">
+            {/* 뒤로: 이전 화면으로(주소로 바로 열어 이전이 없으면 글 보기·홈). 저장 안 한 내용은 버림(취소 단추와 같음) */}
+            <button type="button" className="editor__back" aria-label="뒤로" title="뒤로 (저장하지 않음)" disabled={busy}
+                    onClick={() => { if ((window.history.state?.idx ?? 0) > 0) navigate(-1); else navigate(editing ? `/posts/${id}` : '/') }}>‹</button>
             <span style={{ fontWeight: 700 }}>{editing ? '글 수정' : '새 글'}</span>
             {restoredDraft && <span className="chip chip--neutral">작성 중이던 내용을 불러왔습니다</span>}
             {converted && <span className="chip chip--draft">예전 마크다운 글을 서식 편집으로 변환했습니다. 저장하면 새 형식으로 바뀝니다.</span>}

@@ -81,9 +81,17 @@ export default function PostDetailPage() {
                   {post.pinned && <span className="chip chip--notice">공지</span>}
                   <CategoryPath category={post.category} className="post__cat" />
                 </div>
-                <div className="row row--wrap" style={{ gap: 6 }}>
+                {/* 글 메뉴(내보내기·대문·수정·삭제)는 머리 맨 위 오른쪽 */}
+                <div className="post__actions">
                   {post.visibility === 'PRIVATE' && <span className="chip chip--private">비공개 · 나와 관리자만 볼 수 있음</span>}
                   {post.status === 'DRAFT' && <span className="chip chip--draft">임시 저장 · 작성자와 관리자만 볼 수 있음</span>}
+                  <ExportMenu postId={post.id} title={post.title} />
+                  {!post.deletedAt && <FrontToggle kind="POST" refId={post.id} />}
+                  {post.editable && !post.deletedAt && <>
+                    <Link to={`/posts/${post.id}/edit`} className="btn btn--sm btn--primary">수정</Link>
+                    <button type="button" className="btn btn--sm btn--danger" onClick={() => setConfirmDelete(true)}>삭제</button>
+                  </>}
+                  {post.editable && post.deletedAt && <button type="button" className="btn btn--sm btn--sky" disabled={busy} onClick={undelete}>삭제 취소</button>}
                 </div>
               </div>
               {editingTitle ? (
@@ -103,15 +111,6 @@ export default function PostDetailPage() {
                     <strong>{post.author.displayName}{post.author.department ? ` · ${post.author.department}` : ''}</strong>
                     <span>{formatDate(post.publishedAt ?? post.createdAt, true)}{post.version > 1 ? ` · ${formatDate(post.updatedAt, true)} 수정 (v${post.version})` : ''} · 조회 {post.viewCount}</span>
                   </div>
-                </div>
-                <div className="post__actions">
-                  <ExportMenu postId={post.id} title={post.title} />
-                  {!post.deletedAt && <FrontToggle kind="POST" refId={post.id} />}
-                  {post.editable && !post.deletedAt && <>
-                    <Link to={`/posts/${post.id}/edit`} className="btn btn--sm btn--primary">수정</Link>
-                    <button type="button" className="btn btn--sm btn--danger" onClick={() => setConfirmDelete(true)}>삭제</button>
-                  </>}
-                  {post.editable && post.deletedAt && <button type="button" className="btn btn--sm btn--sky" disabled={busy} onClick={undelete}>삭제 취소</button>}
                 </div>
               </div>
             </header>

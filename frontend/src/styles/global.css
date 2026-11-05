@@ -321,7 +321,7 @@ mark { background: #fff2a8; color: inherit; padding: 0 1px; border-radius: 2px; 
 .post__author { display: flex; align-items: center; gap: 10px; }
 .post__author strong { display: block; font-size: 14px; }
 .post__author span { font-size: 12.5px; color: var(--muted); }
-.post__actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.post__actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; justify-content: flex-end; margin-left: auto; }
 .post__summary { margin: 18px 0 0; padding: 4px 0 4px 14px; border-left: 3px solid var(--line-strong); color: var(--ink-2); font-size: 14.5px; }
 .post__body { padding: 28px 36px 36px; }
 .post__tags { padding: 0 36px 26px; display: flex; gap: 6px; flex-wrap: wrap; }
@@ -350,6 +350,8 @@ mark { background: #fff2a8; color: inherit; padding: 0 1px; border-radius: 2px; 
 /* ---------- Editor ---------- */
 .editor { background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius-l); overflow: hidden; }
 .editor__bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 28px; border-bottom: 1px solid var(--line); background: #fbfcfe; flex-wrap: wrap; }
+.editor__back { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; margin-left: -8px; border: 0; border-radius: var(--radius-s); background: transparent; color: var(--ink); font-size: 26px; line-height: 1; padding: 0 0 3px; cursor: pointer; }
+.editor__back:hover { background: var(--line); }
 .editor__title { width: 100%; border: 0; padding: 22px 28px 6px; font-size: 28px; font-weight: 700; letter-spacing: -0.025em; background: transparent; }
 .editor__title:focus { outline: none; }
 .editor__title::placeholder { color: #b7c0cd; }
