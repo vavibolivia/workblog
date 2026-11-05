@@ -60,7 +60,10 @@ export default function Layout() {
         <div className="gnb__inner">
           <Link to="/" className="brand" aria-label="WorkBlog 홈">
             <span className="brand__mark" aria-hidden><BrandMark size={32} /></span>
-            <span className="brand__name">WorkBlog</span>
+            <span className="brand__text">
+              <span className="brand__name">WorkBlog</span>
+              <span className="brand__ver" title={`v${__APP_VERSION__}${__APP_COMMIT__ ? ` · ${__APP_COMMIT__}` : ''} · ${__APP_BUILT__} 빌드`}>v{__APP_VERSION__}</span>
+            </span>
             <span className="brand__sub">사내 지식 공유</span>
           </Link>
 

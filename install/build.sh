@@ -10,6 +10,12 @@ elif [ -d "/c/Program Files/Java/jdk-21.0.12" ]; then export JAVA_HOME="/c/Progr
 fi
 [ -n "${JAVA_HOME:-}" ] && export PATH="$JAVA_HOME/bin:$PATH"
 
+# 버전 정본은 pom.xml. 서버 상태 화면·덤프에 찍히는 OpsStatusService.VERSION 과 다르면 멈춘다(수정마다 버전 올리기 원칙)
+VER="$(sed -n 's|^  <version>\(.*\)</version>|\1|p' "$ROOT/backend/pom.xml" | head -1)"
+grep -q "\"workblog-backend-$VER\"" "$ROOT/backend/src/main/java/com/workblog/ops/OpsStatusService.java" \
+  || { echo "버전 불일치: pom.xml=$VER, OpsStatusService.VERSION 을 workblog-backend-$VER 로 맞추세요" >&2; exit 1; }
+echo "== version $VER"
+
 echo "== frontend build"
 (cd "$ROOT/frontend" && npm ci --no-audit --no-fund >/dev/null && npm run build)
 
