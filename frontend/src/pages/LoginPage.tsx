@@ -2,7 +2,8 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { api, errorMessage } from '../lib/api'
 import { useAuth } from '../lib/auth'
-import { BrandMark, IcDiagram, IcExcel, IcImage, IcPaperclip } from '../components/Icons'
+import { BrandMark } from '../components/Icons'
+import BrainArt from '../components/BrainArt'
 
 /* 소개 줄에 쓰는 선 아이콘(공용 Icons 와 같은 규격: 1.8px, currentColor) */
 const ic = { width: 22, height: 22, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true } as const
@@ -12,8 +13,8 @@ const IcKeep = () => <svg {...ic}><path d="M4 12a8 8 0 1 0 2.3-5.7" /><path d="M
 
 /**
  * 로그인 + 프로그램 소개. 한쪽 면을 칠하는 패널 없이 연회색 바탕 하나 위에
- * 왼쪽은 "이 프로그램이 무엇인지"(글 한 편의 생김새와 그 이력), 오른쪽은 로그인 상자.
- * 색은 바탕 회색 + 남색 하나. 좁은 화면에서는 로그인 상자가 먼저.
+ * 왼쪽은 그림(점과 선으로 이어진 두뇌)과 제목, 오른쪽은 로그인 상자. 색은 회색 + 남색 하나.
+ * 좁은 화면에서는 로그인 상자가 먼저.
  */
 export default function LoginPage() {
   const { user, login, loading } = useAuth()
@@ -55,44 +56,15 @@ export default function LoginPage() {
         </div>
 
         <section className="intro__story" aria-label="WorkBlog 소개">
-          <h1 className="intro__title">일하며 알게 된 것을<br />블로그처럼 씁니다.</h1>
+          <h1 className="intro__title">흩어진 업무 지식이 이어져<br />회사의 두뇌가 됩니다.</h1>
 
-          {/* 세 가지 할 일: 아이콘 + 두세 낱말. 읽지 않고 훑어도 보이게 */}
+          <BrainArt className="brain" />
+
           <dl className="intro__points">
             <div><dt><IcWrite /></dt><dd><b>쓰기</b>네이버 블로그처럼<br />엑셀·사진·다이어그램</dd></div>
             <div><dt><IcFind /></dt><dd><b>찾기</b>한 검색창에서<br />첨부 안 글자까지</dd></div>
             <div><dt><IcKeep /></dt><dd><b>남기기</b>저장마다 판이 쌓이고<br />낱말 비교 · 되돌리기</dd></div>
           </dl>
-
-          {/* 글 한 편의 생김새: 실제 글 화면과 같은 요소(경로·제목·작성자 줄·본문·첨부)를 작게 */}
-          <figure className="intro__post" aria-label="WorkBlog 글 한 편의 예">
-            <div className="intro__post-path"><span>개발</span><i>›</i><span>서버 운영</span><i>›</i><span>배포</span></div>
-            <div className="intro__post-title">20번 서버 배포 절차와 점검 목록</div>
-            <div className="intro__post-by"><span className="intro__avatar" aria-hidden>김</span><b>김민준 · 플랫폼팀</b><span>2026-11-05 · v3 · 조회 128</span></div>
-            <div className="intro__post-body">
-              <p>배포는 <b>빌드 → 전송 → 기동 → 스모크 테스트</b> 순서로 합니다.</p>
-              <table aria-hidden>
-                <thead><tr><th>단계</th><th>확인</th><th>담당</th></tr></thead>
-                <tbody>
-                  <tr><td>빌드</td><td>버전 번호 올렸는지</td><td>작성자</td></tr>
-                  <tr><td>스모크</td><td>407건 통과</td><td>당번</td></tr>
-                </tbody>
-              </table>
-            </div>
-            <div className="intro__post-foot">
-              <span><IcExcel size={14} /> 배포점검표.xlsx</span>
-              <span><IcDiagram size={14} /> 배포 흐름.drawio</span>
-              <span><IcImage size={14} /> 사진 2</span>
-              <span className="intro__post-foot-r"><IcPaperclip size={14} /> 첨부 4 · 댓글 3</span>
-            </div>
-          </figure>
-
-          {/* 이력: 저장할 때마다 판이 쌓인다 — 순서가 있는 내용이라 선·점으로 */}
-          <ol className="intro__rev" aria-label="이 글의 이력">
-            <li><b>v1</b><span>처음 작성</span><time>10.28</time></li>
-            <li><b>v2</b><span>점검표 추가</span><time>11.01</time></li>
-            <li className="is-now"><b>v3</b><span>순서 바꿈</span><time>11.05</time></li>
-          </ol>
         </section>
 
         <form className="login__box intro__box" onSubmit={submit}>

@@ -12,7 +12,7 @@
   <groupId>com.workblog</groupId>
   <artifactId>workblog-backend</artifactId>
   <!-- 버전 정본. 수정할 때마다 올린다(사용자 원칙 2026-11-05). OpsStatusService.VERSION 도 같이 — build.sh 가 다르면 멈춤. 화면 왼쪽 위 표시는 빌드 때 여기서 읽음 -->
-  <version>0.1.4</version>
+  <version>0.1.5</version>
   <name>workblog-backend</name>
   <description>WorkBlog - company-wide knowledge sharing blog (backend)</description>
 
