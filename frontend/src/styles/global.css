@@ -1427,6 +1427,7 @@ body { word-break: keep-all; overflow-wrap: anywhere; }
 .brain__halo { fill: var(--paper); stroke: currentColor; stroke-width: 1.2; stroke-opacity: .6; animation: brain-halo 3.4s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
 @keyframes brain-halo { 0%, 100% { transform: scale(1); stroke-opacity: .6; } 50% { transform: scale(1.25); stroke-opacity: .25; } }
 .brain__core { fill: currentColor; }
+.brain__signals circle { fill: currentColor; opacity: 0; }
 .brain__hubs text { fill: var(--ink); font-family: var(--font); font-size: 11.5px; font-weight: 700; letter-spacing: -0.02em; paint-order: stroke; stroke: var(--canvas); stroke-width: 4px; stroke-linejoin: round; }
 
 /* 세 가지 할 일: 큰 아이콘(가는 원 안) + 제목 + 두세 낱말. 가로 한 줄 */

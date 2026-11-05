@@ -44,10 +44,10 @@ function build() {
   const all = [...LOBES, ...SMALL]
   // 속: 거부 표본 추출. 점끼리 너무 가깝지 않게
   let guard = 0
-  while (pts.length < 150 && guard++ < 20000) {
+  while (pts.length < 205 && guard++ < 30000) {
     const x = 20 + rand() * 340, y = 20 + rand() * 320
     if (!inside(x, y, all)) continue
-    if (pts.some((p) => (p.x - x) ** 2 + (p.y - y) ** 2 < 17 * 17)) continue
+    if (pts.some((p) => (p.x - x) ** 2 + (p.y - y) ** 2 < 14.5 * 14.5)) continue
     pts.push({ x, y })
   }
   // 겉: 원 둘레 중 다른 원 안에 들어가지 않는 점만 — 두뇌 윤곽이 또렷해진다
@@ -66,18 +66,27 @@ function build() {
   const seen = new Set<string>()
   pts.forEach((p, i) => {
     const near = pts.map((q, j) => ({ j, d: (p.x - q.x) ** 2 + (p.y - q.y) ** 2 })).filter((o) => o.j !== i).sort((a, b) => a.d - b.d)
-    const k = p.hub ? 4 : 2 + (rand() < 0.35 ? 1 : 0)
+    const k = p.hub ? 5 : 2 + (rand() < 0.5 ? 1 : 0)
     for (const o of near.slice(0, k)) {
-      if (o.d > 48 * 48) break
+      if (o.d > 44 * 44) break
       const key = i < o.j ? `${i}-${o.j}` : `${o.j}-${i}`
       if (!seen.has(key)) { seen.add(key); edges.push([i, o.j]) }
     }
   })
-  return { pts, edges }
+  // 신호가 흐르는 선: 꼬리표 점마다 가장 긴 선 하나
+  const signals: [number, number][] = []
+  pts.forEach((p, i) => {
+    if (!p.hub) return
+    const mine = edges.filter(([a, b]) => a === i || b === i).map(([a, b]) => (a === i ? [i, b] : [i, a]) as [number, number])
+    mine.sort((e1, e2) => Math.hypot(pts[e2[1]].x - p.x, pts[e2[1]].y - p.y) - Math.hypot(pts[e1[1]].x - p.x, pts[e1[1]].y - p.y))
+    if (mine[0]) signals.push(mine[0])
+  })
+  return { pts, edges, signals }
 }
 
 export default function BrainArt({ className }: { className?: string }) {
-  const { pts, edges } = useMemo(build, [])
+  const { pts, edges, signals } = useMemo(build, [])
+  const still = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
   const maxD = 190
   const delay = (x: number, y: number) => `${(Math.hypot(x - CENTER.x, y - CENTER.y) / maxD * 1.5).toFixed(2)}s`
   return (
@@ -93,6 +102,19 @@ export default function BrainArt({ className }: { className?: string }) {
       <g className="brain__nodes">
         {pts.map((p, i) => p.hub ? null : <circle key={i} cx={p.x} cy={p.y} r={p.edge ? 1.6 : 1.9} style={{ animationDelay: delay(p.x, p.y) }} />)}
       </g>
+      {!still && (
+        <g className="brain__signals">
+          {signals.map(([a, b], i) => {
+            const p = pts[a], q = pts[b]
+            return (
+              <circle key={i} r={2.2}>
+                <animateMotion dur="2.6s" begin={`${2 + i * 0.45}s`} repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;0.55;1" calcMode="linear" path={`M${p.x} ${p.y} L${q.x} ${q.y}`} />
+                <animate attributeName="opacity" values="0;1;1;0;0" keyTimes="0;0.1;0.45;0.55;1" dur="2.6s" begin={`${2 + i * 0.45}s`} repeatCount="indefinite" />
+              </circle>
+            )
+          })}
+        </g>
+      )}
       <g className="brain__hubs">
         {pts.filter((p) => p.hub).map((p, i) => {
           const left = p.x < CENTER.x
