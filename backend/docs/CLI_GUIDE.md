@@ -83,7 +83,7 @@ Claude Code 같은 코딩 도구가 작업하는 프로젝트의 지침 파일(`
 
 - 주소: {{BASE_URL}} — 인증은 환경변수 `WORKBLOG_TOKEN`(개인 API 토큰). 토큰 값은 출력·커밋 금지.
 - CLI: `python workblog.py …` (없으면 `curl -s $WORKBLOG_URL/api/guide/workblog.py -o workblog.py`). 사용법 `$WORKBLOG_URL/api/guide/cli`, 문서 형식 `$WORKBLOG_URL/api/guide/writing`.
-- 올리기 전 `python workblog.py categories` 로 카테고리 확인 → `--category "상위 > 하위"` 지정(카테고리 생성은 관리자만).
+- 올리기 전 `python workblog.py categories` 로 카테고리 확인 → `--category "상위 > 하위"` 지정(카테고리는 화면 사이드바에서 누구나 만들 수 있음: [+ 추가] = 최상위, 카테고리의 ⋯ 메뉴 = 하위).
 - 새 글: 본문 HTML 파일 → `python workblog.py create --title "…" --file 본문.html --category "…" --tags a,b` (마크다운은 `--markdown`).
 - 수정: `get <id>` 로 현재 내용 확인 → 바뀌는 항목만 `update <id> --note "무엇을 왜"` (전체 덮어쓰기 금지).
 - 파일 그대로: 새 글 `import <파일>`, 본문 교체 `replace <id> <파일>`.

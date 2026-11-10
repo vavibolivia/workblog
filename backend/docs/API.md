@@ -136,7 +136,7 @@ curl -s -X PUT $WB/api/posts/31/import -H "Authorization: Bearer $TOKEN" -F 'fil
 | 메서드 | 경로 | 설명 |
 |---|---|---|
 | GET | `/api/categories` | 트리 `[ { id, name, parentId, depth, sortOrder, postCount, totalCount, children:[…] } ]` |
-| POST | `/api/categories` | 관리자. `{ name, parentId }` (6단계가 되면 400, 형제 중복 409) |
+| POST | `/api/categories` | 로그인 사용자 모두(최상위·하위). `{ name, parentId }` (6단계가 되면 400, 형제 중복 409) |
 | PUT | `/api/categories/{id}` | 관리자. `{ name, parentId? | moveToRoot?, sortOrder?, restrictedDepartments? }` (자기 자손 아래로 이동 불가. `restrictedDepartments` 는 11절) |
 | POST | `/api/categories/{id}/move?direction=-1|1` | 관리자. 형제 안에서 순서 이동 |
 | DELETE | `/api/categories/{id}` | 관리자. 하위나 글이 있으면 400 |
@@ -166,7 +166,7 @@ curl -s -X PUT $WB/api/posts/31/import -H "Authorization: Bearer $TOKEN" -F 'fil
 
 - 발행 + 전체 공개 글: 로그인한 모두 조회. 임시 저장·비공개·삭제된 글: 작성자와 관리자만(남에게는 404).
 - 열람 제한 카테고리(하위 포함)의 글: 지정 부서 구성원 · 작성자 · 관리자만(남에게는 404, 11절).
-- 수정·삭제·복원: 작성자와 관리자. 공지 고정·카테고리 관리·사용자 관리·영구 삭제: 관리자.
+- 수정·삭제·복원: 작성자와 관리자. 카테고리 만들기(최상위·하위): 로그인 사용자 모두. 공지 고정·카테고리 이름 변경·이동·삭제·열람 제한·사용자 관리·영구 삭제: 관리자.
 - 모든 변경은 리비전으로 남고 전사 이력에 보입니다. 변경 메모(`changeNote`)를 적어 두면 이력이 읽기 쉽습니다.
 
 ## 10. 템플릿 · 관련 글 · 재검토 · 첨부 내용 검색

@@ -7,7 +7,7 @@ import { useToast } from '../lib/toast'
 /**
  * 사이드바용 접고 펴는 카테고리 트리.
  * 글 수 표기 규칙(모든 단계 동일): 숫자 = 이 카테고리에 직접 단 글(postCount)만. 하위 카테고리 글은 더하지 않는다.
- * - 우클릭(또는 행의 ⋯ 버튼): 이 카테고리 글 보기 · 이 카테고리에 글쓰기, 관리자는 하위 추가·이름 바꾸기·순서·이동·삭제
+ * - 우클릭(또는 행의 ⋯ 버튼): 이 카테고리 글 보기 · 이 카테고리에 글쓰기 · 하위 카테고리 추가(누구나), 관리자는 이름 바꾸기·순서·이동·삭제
  * - 관리자는 선택된 카테고리 이름을 한 번 더 클릭(또는 더블클릭·F2)하면 그 자리에서 글상자로 이름을 고친다. Enter 저장 · Esc 취소 · 포커스 이탈 시 저장
  * - 관리자는 행을 끌어 다른 카테고리 위에 놓으면 그 하위로, 맨 위 '최상위로' 띠에 놓으면 1단계로 옮긴다(최대 5단계 규칙은 서버가 검사).
  */
@@ -122,9 +122,9 @@ export default function CategoryTree({ nodes, activeId, activePathIds = [], onCh
           <div className="menu__head"><strong className="ellipsis">{menu.node.name}</strong><span className="small muted">{menu.node.depth}단계 · 글 {menu.node.postCount}</span></div>
           <button type="button" role="menuitem" onClick={() => act('open')}>이 카테고리 글 보기</button>
           <button type="button" role="menuitem" onClick={() => act('write')}>이 카테고리에 글쓰기</button>
+          <hr className="menu__sep" />
+          <button type="button" role="menuitem" disabled={menu.node.depth >= 5} onClick={() => act('add')}>하위 카테고리 추가{menu.node.depth >= 5 ? ' (5단계 한도)' : ''}</button>
           {isAdmin && <>
-            <hr className="menu__sep" />
-            <button type="button" role="menuitem" disabled={menu.node.depth >= 5} onClick={() => act('add')}>하위 카테고리 추가{menu.node.depth >= 5 ? ' (5단계 한도)' : ''}</button>
             <button type="button" role="menuitem" onClick={() => act('rename')}>이름 바꾸기</button>
             <button type="button" role="menuitem" onClick={() => act('up')}>위로</button>
             <button type="button" role="menuitem" onClick={() => act('down')}>아래로</button>

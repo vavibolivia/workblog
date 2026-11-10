@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
-import { api, findCategory, type CategoryNode, type TagCount } from '../lib/api'
+import { api, errorMessage, findCategory, type CategoryNode, type TagCount } from '../lib/api'
 import { useAuth } from '../lib/auth'
+import { useToast } from '../lib/toast'
 import { Avatar } from './Avatar'
 import CategoryTree from './CategoryTree'
 import { publishCategoryTree } from '../lib/categoryLeaves'
@@ -9,6 +10,7 @@ import { publishCategoryTree } from '../lib/categoryLeaves'
 /** 네이버 블로그의 왼쪽 프로필 + 카테고리 영역. 전사 지식 공간이므로 프로필은 "로그인한 나", 카테고리는 전사 트리. */
 export default function Sidebar() {
   const { user } = useAuth()
+  const toast = useToast()
   const [params] = useSearchParams()
   const { pathname } = useLocation()
   const [tree, setTree] = useState<CategoryNode[]>([])
@@ -30,6 +32,15 @@ export default function Sidebar() {
       api.posts.list({ authorId: user.id, status: 'DRAFT', size: 1 }).then((p) => setDraftCount(p.totalElements)).catch(() => null)
     }
   }, [user, pathname])
+
+  // 최상위 카테고리 만들기: 로그인 사용자 모두(하위는 트리의 ⋯ 메뉴)
+  const addRoot = () => {
+    const name = window.prompt('만들 최상위 카테고리 이름')?.trim()
+    if (!name) return
+    api.categories.create(name, null)
+      .then(() => { toast(`'${name}'을(를) 만들었습니다.`, 'success'); reloadTree() })
+      .catch((e) => toast(errorMessage(e), 'error'))
+  }
 
   const total = tree.reduce((s, c) => s + c.totalCount, 0)
   const activeId = params.get('categoryId') ? Number(params.get('categoryId')) : null
@@ -62,7 +73,12 @@ export default function Sidebar() {
         </div>
 
         <div className="side-section">
-          <div className="row row--between side-section__head"><h4>카테고리</h4>{user?.role === 'ADMIN' && <Link to="/admin/categories" className="small muted side-section__link">관리</Link>}</div>
+          <div className="row row--between side-section__head"><h4>카테고리</h4>
+            <span className="side-section__tools">
+              <button type="button" className="small side-section__link side-section__btn" title="최상위 카테고리 만들기 (하위는 카테고리의 ⋯ 메뉴에서)" onClick={addRoot}>+ 추가</button>
+              {user?.role === 'ADMIN' && <Link to="/admin/categories" className="small muted side-section__link">관리</Link>}
+            </span>
+          </div>
           <ul className="cat-tree">
             <li><div className={`cat-tree__row cat-tree__row--d1 cat-tree__row--all${isAll ? ' active' : ''}`}><span className="cat-tree__toggle" aria-hidden>·</span><Link to="/" className="cat-tree__link"><span>전체 보기</span><span className="cat-tree__count">{total}</span></Link></div></li>
           </ul>
