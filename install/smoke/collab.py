@@ -117,6 +117,9 @@ _s, _r = call("GET", "/api/tags?limit=200", tok=C1); check("RESTRICT tag cloud e
 _s, _r = call("GET", "/api/stats?days=30", tok=C2); check("RESTRICT stats top lists exclude for other dept", _s == 200 and not any(p["id"] == _rp_id for p in _r["mostViewed"] + _r["mostLiked"]), "leaked")
 check("RESTRICT no mention notification to non-member", not any(n["postId"] == _rp_id for n in _notifs(C2)), _notifs(C2)[:2])
 check("RESTRICT mention notification to member", any(n["postId"] == _rp_id for n in _notifs(C1)), _notifs(C1)[:2])
+_s, _r = call("POST", "/api/categories", {"name": "남의부서", "parentId": _rcc}, C2); check("RESTRICT other dept cannot create child 403", _s == 403, _s)
+_s, _r = call("POST", "/api/categories", {"name": "우리부서", "parentId": _rcc}, C1); check("RESTRICT member can create child 201", _s == 201, (_s, _r))
+if _s == 201: call("DELETE", f"/api/categories/{_r['id']}", tok=A)
 _s, _r = call("PUT", f"/api/categories/{_rc}", {"name": f"R{_cs}", "restrictedDepartments": []}, A); check("RESTRICT clear with empty list", _s == 200 and _r["restrictedDepartments"] == [], (_s, _r))
 _s, _r = call("GET", f"/api/posts/{_rp_id}", tok=C2); check("RESTRICT cleared → other dept can read", _s == 200, _s)
 

@@ -47,6 +47,7 @@ s, r = call("POST", "/api/categories", {"name": f"T{suffix}-L1", "parentId": Non
 s, r = call("POST", "/api/categories", {"name": f"U{suffix}", "parentId": None}, U); check("R7 non-admin can create top-level 201", s == 201 and r["depth"] == 1, (s, r)); ucat = r.get("id") if s == 201 else None
 s, r = call("POST", "/api/categories", {"name": "하위", "parentId": ucat}, U); check("R7 non-admin can create child 201", s == 201 and r["depth"] == 2, (s, r)); usub = r.get("id") if s == 201 else None
 s, r = call("PUT", f"/api/categories/{ucat}", {"name": "바꿈"}, U); check("R7 non-admin cannot rename 403", s == 403, s)
+s, r = call("POST", "/api/categories", {"name": " 일반 ", "parentId": None}, U); check("R7 non-admin cannot create root '일반' 403/409", s in (403, 409), s)
 s, r = call("DELETE", f"/api/categories/{usub}", tok=U); check("R7 non-admin cannot delete 403", s == 403, s)
 for _c in (usub, ucat):
     if _c: call("DELETE", f"/api/categories/{_c}", tok=A)

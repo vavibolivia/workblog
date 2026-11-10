@@ -110,6 +110,23 @@ public class CategoryService {
 
     // ---------- commands ----------
 
+    /**
+     * 화면·API 에서 만드는 길(로그인 사용자 모두). 관리자가 아니면:
+     * 열람 제한 카테고리(하위 포함) 아래에는 그 부서 구성원만 만들 수 있고,
+     * 분류 없는 글이 들어가는 기본 이름 '일반'은 최상위에 만들 수 없다({@link #resolveForPost} 가 이름으로 찾기 때문).
+     */
+    public CategoryNode create(CreateCategoryRequest req, com.workblog.user.User actor) {
+        if (actor == null || !actor.isAdmin()) {
+            if (req.parentId() != null && !CategoryAccess.allows(get(req.parentId()), actor)) {
+                throw ApiException.forbidden("열람이 제한된 카테고리 아래에는 해당 부서 구성원만 카테고리를 만들 수 있습니다.");
+            }
+            if (req.parentId() == null && Category.DEFAULT_NAME.equalsIgnoreCase(normalize(req.name()))) {
+                throw ApiException.forbidden("'" + Category.DEFAULT_NAME + "'은(는) 기본 카테고리 이름이라 관리자만 최상위에 만들 수 있습니다.");
+            }
+        }
+        return create(req);
+    }
+
     public CategoryNode create(CreateCategoryRequest req) {
         String name = normalize(req.name());
         Category parent = req.parentId() == null ? null : get(req.parentId());

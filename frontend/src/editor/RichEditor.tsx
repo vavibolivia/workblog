@@ -9,6 +9,7 @@ import { TableKit } from '@tiptap/extension-table'
 import Placeholder from '@tiptap/extension-placeholder'
 import { Indent } from './Indent'
 import { CELL_COLORS, StyledTableCell, StyledTableHeader } from './TableCellStyle'
+import TableTools, { SizedTableRow, TableSizePicker } from './TableTools'
 import { FigureImage } from './FigureImage'
 import DrawioDialog from './DrawioDialog'
 import WorkPlanMenu from './WorkPlanMenu'
@@ -72,6 +73,7 @@ export default function RichEditor({ value, onChange, onUpload, onAttached, onIm
   const [busy, setBusy] = useState<string | null>(null)
   const [tick, setTick] = useState(0)
   const editorRef = useRef<Editor | null>(null)
+  const bodyRef = useRef<HTMLDivElement>(null)
 
   const editor = useEditor({
     extensions: [
@@ -83,8 +85,8 @@ export default function RichEditor({ value, onChange, onUpload, onAttached, onIm
       TextStyleKit,
       TextAlign.configure({ types: ['heading', 'paragraph'], alignments: ['left', 'center', 'right', 'justify'] }),
       Subscript, Superscript,
-      TableKit.configure({ table: { resizable: true, HTMLAttributes: { class: 'rich-table' } }, tableCell: false, tableHeader: false }),
-      StyledTableCell, StyledTableHeader,
+      TableKit.configure({ table: { resizable: true, HTMLAttributes: { class: 'rich-table' } }, tableCell: false, tableHeader: false, tableRow: false }),
+      StyledTableCell, StyledTableHeader, SizedTableRow,
       Indent,
       FigureImage.configure({
         onEditDiagram: (src, apply) => {
@@ -209,7 +211,10 @@ export default function RichEditor({ value, onChange, onUpload, onAttached, onIm
       {drawio && <DrawioDialog initial={drawio.initial} onSave={(png) => saveDiagram(png, drawio.apply)} onClose={() => setDrawio(null)} />}
       <input ref={fileInput} type="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple hidden onChange={(e) => { if (e.target.files) handleFiles(Array.from(e.target.files)); e.target.value = '' }} />
       <input ref={excelInput} type="file" accept=".xlsx,.xlsm,.xls,.csv" hidden onChange={(e) => { if (e.target.files) handleFiles(Array.from(e.target.files)); e.target.value = '' }} />
-      <EditorContent editor={editor} className="rte__content" />
+      <div className="rte__body" ref={bodyRef}>
+        <EditorContent editor={editor} className="rte__content" />
+        <TableTools editor={editor} host={bodyRef} />
+      </div>
       {busy && <div className="rte__busy">{busy}</div>}
     </div>
   )
@@ -255,8 +260,9 @@ function Toolbar({ editor, onImage, onExcel, onFile, onDocument, onDiagram, onDi
           <B cmd={() => setTableMenu((v) => !v)} active={inTable} title="표"><IcTable /> 표</B>
           {tableMenu && (
             <div className="rte__menu" onMouseDown={(e) => e.preventDefault()}>
-              <button type="button" onClick={() => { c().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(); setTableMenu(false) }}>표 삽입 (3×3)</button>
-              <button type="button" onClick={() => { const r = Number(window.prompt('행 수', '3')), col = Number(window.prompt('열 수', '3')); if (r > 0 && col > 0) c().insertTable({ rows: r, cols: col, withHeaderRow: true }).run(); setTableMenu(false) }}>표 삽입 (크기 지정)</button>
+              <span className="rte__menu-label">표 넣기 — 칸 위로 마우스를 움직여 크기를 고르세요</span>
+              <TableSizePicker onPick={(r, col) => { c().insertTable({ rows: r, cols: col, withHeaderRow: true }).run(); setTableMenu(false) }} />
+              <button type="button" onClick={() => { const r = Number(window.prompt('행 수', '3')), col = Number(window.prompt('열 수', '3')); if (r > 0 && col > 0) c().insertTable({ rows: r, cols: col, withHeaderRow: true }).run(); setTableMenu(false) }}>크기를 숫자로 입력</button>
               {/* 표 편집 항목은 커서가 표 안에 있을 때만 보인다(밖에서는 쓸 수 없는 항목이 메뉴를 길게 늘이지 않게) */}
               {inTable ? (<>
               <hr />
@@ -291,7 +297,7 @@ function Toolbar({ editor, onImage, onExcel, onFile, onDocument, onDiagram, onDi
               <hr />
               <button type="button" className="danger" onClick={() => { c().deleteTable().run(); setTableMenu(false) }}>표 삭제</button>
               </>) : (
-                <span className="rte__menu-label">표 안을 누르면 행·열·셀 편집 항목이 나옵니다.</span>
+                <span className="rte__menu-label">표 안을 누르면 표 위에 행·열 추가/삭제 도구가 뜹니다. 세로 선을 끌면 열 너비, 행 아래 선을 끌면 행 높이.</span>
               )}
             </div>
           )}

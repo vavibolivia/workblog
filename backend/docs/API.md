@@ -136,7 +136,7 @@ curl -s -X PUT $WB/api/posts/31/import -H "Authorization: Bearer $TOKEN" -F 'fil
 | 메서드 | 경로 | 설명 |
 |---|---|---|
 | GET | `/api/categories` | 트리 `[ { id, name, parentId, depth, sortOrder, postCount, totalCount, children:[…] } ]` |
-| POST | `/api/categories` | 로그인 사용자 모두(최상위·하위). `{ name, parentId }` (6단계가 되면 400, 형제 중복 409) |
+| POST | `/api/categories` | 로그인 사용자 모두(최상위·하위). 관리자가 아니면 열람 제한 카테고리 아래는 그 부서 구성원만, 최상위 '일반'은 불가(403). `{ name, parentId }` (6단계가 되면 400, 형제 중복 409) |
 | PUT | `/api/categories/{id}` | 관리자. `{ name, parentId? | moveToRoot?, sortOrder?, restrictedDepartments? }` (자기 자손 아래로 이동 불가. `restrictedDepartments` 는 11절) |
 | POST | `/api/categories/{id}/move?direction=-1|1` | 관리자. 형제 안에서 순서 이동 |
 | DELETE | `/api/categories/{id}` | 관리자. 하위나 글이 있으면 400 |

@@ -32,8 +32,8 @@ public class CategoryController {
     /** 만들기는 로그인 사용자 모두(최상위·하위, 2026-11-10 지시). 이름 바꾸기·이동·순서·삭제·열람 제한은 관리자만. */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public CategoryNode create(@Valid @RequestBody CreateCategoryRequest req) {
-        return service.create(req);
+    public CategoryNode create(@Valid @RequestBody CreateCategoryRequest req, @com.workblog.auth.CurrentUser com.workblog.user.User user) {
+        return service.create(req, user);
     }
 
     @PutMapping("/{id}")
