@@ -12,7 +12,11 @@ def _purge_post(_p):
 s, _cu = call("POST", "/api/users", {"username": "crd" + _x, "password": "crdpass1234", "displayName": "CRUD" + _x, "role": "USER"}, A)
 _made_users.append(_cu["id"])
 s, r = call("POST", "/api/auth/login", {"username": "crd" + _x, "password": "crdpass1234"}); _CT = r["token"]
-s, _cp = call("POST", "/api/posts", {"title": "CRUD 댓글 대상 " + _x, "content": "<p>x</p>", "contentFormat": "HTML", "tags": [], "status": "PUBLISHED"}, A)
+# 표 크기(에디터가 저장하는 모양 그대로): 행 높이 = tr style height, 열 너비 = col style width + 셀 colwidth
+_tbl = '<table class="rich-table" style="min-width: 282px;"><colgroup><col style="width: 232px;"><col style="min-width: 25px;"></colgroup><tbody><tr style="height: 89px;"><th colwidth="232"><p>머리</p></th><th><p></p></th></tr></tbody></table>'
+s, _cp = call("POST", "/api/posts", {"title": "CRUD 댓글 대상 " + _x, "content": "<p>x</p>" + _tbl, "contentFormat": "HTML", "tags": [], "status": "PUBLISHED"}, A)
+_tc = (_cp.get("content") or "").replace(" ", "") if s == 201 else ""
+check("TABLE row height and column width survive save", "height:89px" in _tc and "width:232px" in _tc and 'colwidth="232"' in _tc, _tc[:300])
 _made_posts.append(_cp["id"])
 call("POST", f"/api/posts/{_cp['id']}/comments", {"content": "댓글"}, _CT)
 s, r = call("DELETE", f"/api/users/{_cu['id']}?purge=true", tok=A)

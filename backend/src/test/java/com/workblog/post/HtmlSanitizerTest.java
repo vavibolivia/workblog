@@ -129,6 +129,16 @@ class HtmlSanitizerTest {
                 .contains("<td>b</td>");
     }
 
+    /** 에디터가 저장하는 표 크기: 행 높이(tr style height) · 열 너비(colgroup col style width, 셀 colwidth). */
+    @Test
+    void clean_table_row_height_and_column_width_are_kept() {
+        String out = HtmlSanitizer.clean(
+                "<table class=\"rich-table\" style=\"min-width: 282px;\"><colgroup><col style=\"width: 232px;\"><col style=\"min-width: 25px;\"></colgroup>" +
+                "<tbody><tr style=\"height: 89px;\"><th colwidth=\"232\"><p>머리</p></th><th><p></p></th></tr></tbody></table>").replace(" ", "");
+        assertThat(out).contains("<colstyle=\"width:232px;\">").contains("<trstyle=\"height:89px;\">")
+                .contains("colwidth=\"232\"").contains("min-width:282px");
+    }
+
     @Test
     void clean_data_indent_on_blocks_is_kept() {
         String out = HtmlSanitizer.clean("<p data-indent=\"2\">a</p><h2 data-indent=\"1\">b</h2><ul><li data-indent=\"3\">c</li></ul>");
