@@ -50,7 +50,7 @@ function locate(editor: Editor) {
   return null
 }
 
-interface Box { top: number; left: number; width: number; height: number; rowBottom: number | null; rowSized: boolean }
+interface Box { barTop: number; top: number; left: number; width: number; height: number; rowBottom: number | null; rowSized: boolean }
 
 /**
  * 표 안에 커서가 있을 때 표 둘레에 뜨는 도구(2026-11-10 지시 "행/열 단위 삽입·삭제, 크기 변경").
@@ -75,7 +75,13 @@ export default function TableTools({ editor, host }: { editor: Editor; host: Ref
     const left = Math.max(tr.left, wr.left), right = Math.min(tr.right, wr.right)
     const rowDom = loc.row ? editor.view.nodeDOM(loc.row.pos) : null
     const rowNode = loc.row ? editor.state.doc.nodeAt(loc.row.pos) : null
+    // 도구줄 자리: 표 위가 기본. 위에 자리가 없으면(글 맨 앞의 표, 스크롤로 표 머리가 서식 도구줄 밑에 들어감) 표 아래,
+    // 표가 길어 아래도 화면 밖이면 서식 도구줄 바로 밑에 붙인다.
+    const bar = h.previousElementSibling instanceof HTMLElement ? h.previousElementSibling.getBoundingClientRect().bottom : hr.top
+    const floor = Math.max(bar, hr.top) + 4
+    const barTop = tr.top - 40 >= floor ? tr.top - 40 : tr.bottom + 26 + 30 <= window.innerHeight ? tr.bottom + 26 : floor
     return {
+      barTop: Math.round(barTop - hr.top),
       top: Math.round(tr.top - hr.top), left: Math.round(left - hr.left), width: Math.round(right - left), height: Math.round(tr.height),
       rowBottom: rowDom instanceof HTMLElement ? Math.round(rowDom.getBoundingClientRect().bottom - hr.top) : null,
       rowSized: !!rowNode?.attrs.height,
@@ -139,7 +145,7 @@ export default function TableTools({ editor, host }: { editor: Editor; host: Ref
   const keep = (e: { preventDefault: () => void }) => e.preventDefault() // 단추를 눌러도 표 안 커서가 유지되게
   return (
     <>
-      <div className="tbl-tools" role="toolbar" aria-label="표 편집" style={{ left: box.left, top: box.top - 40 }} onMouseDown={keep}>
+      <div className="tbl-tools" role="toolbar" aria-label="표 편집" style={{ left: box.left, top: box.barTop }} onMouseDown={keep}>
         <span className="tbl-tools__label">행</span>
         <button type="button" title="커서가 있는 행 위에 행 추가" onClick={() => c().addRowBefore().run()}>위에 추가</button>
         <button type="button" title="커서가 있는 행 아래에 행 추가" onClick={() => c().addRowAfter().run()}>아래에 추가</button>
