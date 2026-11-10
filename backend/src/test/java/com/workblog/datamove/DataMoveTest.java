@@ -111,6 +111,33 @@ class DataMoveTest {
         }
     }
 
+    /** 설치 때 병합: 폴더에 넣어 둔 덤프가 받는 서버의 기존 글을 지우지 않고 더해지고, 다시 기동해도 또 넣지 않는다. */
+    @Test
+    void dumpDroppedInStartFolderIsMergedIntoExistingData() throws Exception {
+        JdbcTemplate j = b.jdbc();
+        long cat = id(j, "INSERT INTO categories (name, depth, sort_order) VALUES ('받는쪽', 1, 9)");
+        j.update("UPDATE categories SET path = ? WHERE id = ?", "/" + cat + "/", cat);
+        j.update("INSERT INTO posts (title, content, content_format, category_id, tags, status, author_id, version) VALUES ('받는 서버 글', '<p>기존</p>', 'HTML', ?, '', 'PUBLISHED', ?, 1)", cat, b.adminId());
+        Path dir = tmp.resolve("start-b");
+        Files.createDirectories(dir);
+        Path zip = dir.resolve("workblog-dump-test-full.zip");
+        Files.copy(export(a, null), zip);
+        List<String> res = b.svc().importDir(dir);
+        assertThat(res).hasSize(1);
+        assertThat(res.get(0)).startsWith("OK ");
+        assertThat(j.queryForList("SELECT title FROM posts ORDER BY title", String.class)).containsExactly("받는 서버 글", "엔진 점검");
+        assertThat(j.queryForObject("SELECT password FROM users WHERE username = 'admin'", String.class)).isEqualTo("hash-b");
+        assertThat(Files.exists(zip)).isFalse();
+        assertThat(Files.readString(dir.resolve("workblog-dump-test-full.zip.result"))).startsWith("OK ");
+        assertThat(Files.exists(dir.resolve("workblog-dump-test-full.zip.done"))).isTrue();
+        assertThat(b.svc().importDir(dir)).isEmpty();
+        // 자기 덤프는 건너뛴다
+        Path self = dir.resolve("self.zip");
+        Files.copy(export(b, null), self);
+        assertThat(b.svc().importDir(dir).get(0)).startsWith("SKIP ");
+        assertThat(count(j, "posts")).isEqualTo(2);
+    }
+
     @Test
     void previewChangesNothing() throws Exception {
         Map<String, Integer> before = counts(b.jdbc());

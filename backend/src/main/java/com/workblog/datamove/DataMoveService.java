@@ -17,6 +17,8 @@ import com.workblog.user.User;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -30,6 +32,9 @@ import java.io.OutputStream;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
@@ -272,6 +277,73 @@ public class DataMoveService {
         } finally {
             applyLock.unlock();
         }
+    }
+
+    // ---------- 설치 때 병합 ----------
+
+    /** 설치 때 병합할 덤프를 두는 곳: {저장소 상위}/import-on-start (install.sh 가 묶음의 data/workblog-dump-*.zip 을 여기에 넣는다). */
+    public Path startImportDir() {
+        Path parent = storageRoot.getParent() == null ? storageRoot : storageRoot.getParent();
+        return parent.resolve("import-on-start");
+    }
+
+    /** 앱이 뜬 뒤 한 번: 설치가 넣어 둔 덤프를 기존 데이터에 병합한다(관리자 화면 '데이터 이전 › 적용'과 같은 처리). */
+    @EventListener(ApplicationReadyEvent.class)
+    public void importOnStart() {
+        try {
+            importDir(startImportDir());
+        } catch (RuntimeException e) {
+            log.error("설치 때 병합을 하지 못했습니다: {}", e.toString());
+        }
+    }
+
+    /**
+     * 폴더의 *.zip 덤프를 이름 순으로 적용한다. 덤프마다 결과 한 줄을 &lt;이름&gt;.result 에 남기고(install.sh 가 읽는다),
+     * 처리한 덤프는 &lt;이름&gt;.done / .failed 로 바꿔 다음 기동 때 다시 넣지 않는다. 받는 서버 데이터는 지우지 않는다.
+     */
+    public List<String> importDir(Path dir) {
+        List<String> results = new ArrayList<>();
+        if (!Files.isDirectory(dir)) return results;
+        List<Path> zips = new ArrayList<>();
+        try (DirectoryStream<Path> ds2 = Files.newDirectoryStream(dir, "*.zip")) {
+            for (Path p : ds2) zips.add(p);
+        } catch (IOException e) {
+            log.warn("설치 때 병합 폴더를 읽지 못했습니다: {} ({})", dir, e.toString());
+            return results;
+        }
+        zips.sort(null);
+        User actor = new User("install", "", "설치", null, null, User.Role.ADMIN);
+        for (Path zip : zips) {
+            String name = zip.getFileName().toString();
+            String line; boolean ok = false;
+            applyLock.lock();
+            try (DumpArchive a = openChecked(zip)) {
+                Manifest m = a.manifest();
+                long rec = startRecord("IMPORT", m.kind().name(), "APPLY", m.dumpName(), m.sourceInstanceId(), m.since(), m.exportedAt(), false, actor);
+                log.info("설치 때 병합 시작: {}", name);
+                ImportReport rep = new DumpImporter(jdbc, new TransactionTemplate(tm), storageRoot, a, true, texts::extractNow).run();
+                finishRecord(rec, rep.status, importSummary(rep), rep);
+                ok = "OK".equals(rep.status);
+                line = rep.status + " " + importSummary(rep) + ("OK".equals(rep.status) || rep.error == null ? "" : " — " + rep.error);
+            } catch (ApiException e) {
+                line = "SKIP " + e.getMessage();
+            } catch (RuntimeException e) {
+                line = "FAILED " + e;
+            } finally {
+                applyLock.unlock();
+            }
+            log.info("설치 때 병합 {}: {}", name, line);
+            results.add(line);
+            try {
+                Files.writeString(dir.resolve(name + ".result"), line.replace('\n', ' ') + "\n", StandardCharsets.UTF_8);
+                Files.move(zip, dir.resolve(name + (ok ? ".done" : ".failed")), StandardCopyOption.REPLACE_EXISTING);
+            } catch (IOException e) {
+                // 이름을 못 바꾸면 다음 기동 때 또 넣게 된다(다시 넣어도 같은 대상을 갱신할 뿐 중복은 생기지 않음) → 지워 본다
+                log.warn("설치 때 병합 결과를 남기지 못했습니다: {} ({})", name, e.toString());
+                delete(zip);
+            }
+        }
+        return results;
     }
 
     public void discard(String uploadId) {

@@ -14,7 +14,7 @@
 #   sudo ./install.sh --uninstall                       # 서비스·프로그램 제거 (설정·데이터·DB 는 남김)
 #
 # 옵션: --dir /opt/workblog  --port 8080  --admin-pass <비밀번호>  --public-url http://host:8080  --jar <파일>
-#       --data <폴더>    넣을 데이터(db_*.dump + files/). 기본: 옆의 data/
+#       --data <폴더>    넣을 데이터(db_*.dump + files/, 병합용 workblog-dump-*.zip). 기본: 옆의 data/
 #       --no-data        데이터를 넣지 않음
 #       --force-data     DB 에 글이 있어도 데이터로 바꿈(바꾸기 전 DB 를 /var/backups/workblog 에 덤프, root 만 읽음)
 #                        data/FORCE 파일이 들어 있는 묶음(package.py --data … --force 로 만든 것)은 이 옵션 없이도 데이터로 바꾼다(엎어치기)
@@ -27,6 +27,8 @@
 #   - postgres 계정이 서버 안에서도 비밀번호를 요구하면 peer 접속을 허용(pg_hba.conf 백업 남김)
 #   - DB 계정·DB 가 없으면 만들고, 있으면 비밀번호·소유자를 맞춘다. 127.0.0.1 비밀번호 접속이 막혀 있으면 허용
 #   - 데이터: DB 가 비었거나 글이 0건이면(지난 설치가 중간에 멈춘 경우 등) 넣는다. 글이 있으면 그대로 둔다(--force-data 로 바꿈)
+#   - 병합: data/ 에 workblog-dump-*.zip(관리 › 데이터 이전의 전체 덤프)이 있으면, 이미 글이 있는 서버에서도 기존 데이터를 지우지 않고 더한다.
+#           앱이 뜬 뒤 스스로 넣는다($DIR/data/import-on-start). 같은 덤프를 다시 넣어도 중복은 생기지 않는다. 받는 서버 admin 비밀번호는 그대로.
 #   - WorkBlog 이 이미 설치·실행 중이면(옛 java 직접 실행 방식 포함) 멈추고 설정은 유지(주어진 옵션만 반영)한 채 컨테이너를 다시 만든다
 #   - 웹 포트를 다른 프로그램이 쓰고 있으면 새 설치는 다음 빈 포트로, 기존 설치는 무엇이 쓰는지 알려 주고 멈춘다
 # 끝나면 접속 주소와 관리자 계정(아이디 admin)을 출력한다.
@@ -269,7 +271,11 @@ restore_data() {
   tables=$(pgsu psql -w -d "$DB_NAME" -tAc "SELECT count(*) FROM pg_tables WHERE schemaname = 'public'")
   posts=$(pgsu psql -w -d "$DB_NAME" -tAc "SELECT count(*) FROM posts" 2>/dev/null || echo 0)
   if [ "$tables" != 0 ] && [ "$posts" != 0 ] && [ "$FORCE_DATA" != 1 ]; then
-    say "데이터: DB 에 이미 글 ${posts}건이 있어 그대로 둠 (바꾸려면 --force-data)"
+    if ls "$DATA_DIR"/workblog-dump-*.zip >/dev/null 2>&1; then
+      say "데이터: DB 에 이미 글 ${posts}건 — 지우지 않고 병합함(앱이 뜬 뒤)"
+    else
+      say "데이터: DB 에 이미 글 ${posts}건이 있어 그대로 둠 (바꾸려면 --force-data)"
+    fi
     DATA_INFO="기존 DB 그대로 (글 ${posts}건)"
     return 0
   fi
@@ -495,6 +501,20 @@ chown -R workblog:workblog "$DIR/data" "$DIR/logs" "$DIR/static-extra"
 chown root:workblog "$DIR/config"; chmod 750 "$DIR/config"
 find "$DIR/config" -maxdepth 1 -type f -exec chown root:workblog {} + -exec chmod 640 {} +
 
+# 병합할 덤프 놓기: DB 를 통째로 넣은 경우(RESTORED)는 같은 데이터이므로 건너뛴다. 앱이 뜨면 스스로 넣고 <이름>.result 를 남긴다.
+MERGE_DIR="$DIR/data/import-on-start"; MERGE_NAMES=()
+if [ "$NO_DATA" != 1 ] && [ "$RESTORED" != 1 ]; then
+  for z in "$DATA_DIR"/workblog-dump-*.zip; do
+    [ -f "$z" ] || continue
+    install -d -m 750 -o workblog -g workblog "$MERGE_DIR"
+    n=$(basename "$z")
+    rm -f "$MERGE_DIR/$n.result" "$MERGE_DIR/$n.done" "$MERGE_DIR/$n.failed"
+    install -m 600 -o workblog -g workblog "$z" "$MERGE_DIR/$n"
+    MERGE_NAMES+=("$n")
+    say "병합할 덤프: $n"
+  done
+fi
+
 # ========== 7) 컨테이너 ==========
 # --network=host: 호스트의 PostgreSQL(localhost:5432)에 그대로 붙고, 웹 포트도 설정값 그대로.
 # 설치 폴더를 컨테이너 안 같은 경로에 붙여 설정 파일의 경로(STORAGE_DIR 등)를 그대로 쓴다. 프로그램·설정은 읽기 전용.
@@ -549,6 +569,19 @@ if [ "$OK" != 1 ]; then
   podman logs --tail 40 "$CONTAINER" 2>&1 | tail -40 || true
   fail "기동하지 않았습니다(위 로그). 전체: podman logs $CONTAINER"
 fi
+
+# 병합 결과 기다리기(덤프마다 최대 30분). 실패해도 설치는 끝난 것이다 — 관리 › 데이터 이전에서 다시 넣을 수 있다.
+for n in ${MERGE_NAMES[@]+"${MERGE_NAMES[@]}"}; do
+  say "병합 중: $n"
+  r=""
+  for _ in $(seq 1 1800); do
+    [ -f "$MERGE_DIR/$n.result" ] && { r=$(head -1 "$MERGE_DIR/$n.result"); break; }
+    sleep 1
+  done
+  [ -n "$r" ] || r="결과를 받지 못함 — podman logs $CONTAINER 확인"
+  say "병합 결과: $r"
+  DATA_INFO="${DATA_INFO:+$DATA_INFO / }병합 $r"
+done
 
 cat <<EOF
 

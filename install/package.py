@@ -7,6 +7,8 @@
     python install/package.py 0.1.1 --data <폴더> [--force]
                                       → 위에 더해 -with-data-<yyyymmdd-HHMM>.zip (data/ 에 db_*.dump + files/ 동봉 — 데이터까지 옮기는 설치용)
                                         --force 면 data/FORCE 를 넣어, 받는 서버에 글이 있어도 install.sh 가 이 데이터로 엎어친다(바꾸기 전 DB 는 /var/backups/workblog 에 덤프)
+                                        폴더에 workblog-dump-*.zip(관리 › 데이터 이전 › 전체 덤프, 또는 CLI dump)을 넣으면 '병합'용으로 함께 담는다
+                                        — 받는 서버에 글이 있어도 지우지 않고 더한다(db_*.dump 없이 덤프 zip 만 있어도 됨)
        데이터 폴더 만들기: 서버에서 /project/workblog/backup.sh → backup/db/db_workblog-<날짜>.dump 를 data/ 에, backup/files/files-<날짜>.tar.gz 를 풀어 data/files/ 에
                                       → 위에 더해 -linux-offline.zip (image/ 에 컨테이너 이미지 tar 동봉 — 인터넷 없는 서버용)
        이미지 tar 만들기: podman pull docker.io/library/amazoncorretto:21-alpine && podman save -o corretto21.tar docker.io/library/amazoncorretto:21-alpine
@@ -21,8 +23,8 @@ if "--force" in args:
     args.remove("--force"); FORCE = True
 if "--data" in args:
     i = args.index("--data"); DATA_DIR = args[i + 1]; del args[i:i + 2]
-    if not glob.glob(os.path.join(DATA_DIR, "db_*.dump")):
-        sys.exit(f"데이터 폴더에 db_*.dump 가 없습니다: {DATA_DIR}")
+    if not glob.glob(os.path.join(DATA_DIR, "db_*.dump")) and not glob.glob(os.path.join(DATA_DIR, "workblog-dump-*.zip")):
+        sys.exit(f"데이터 폴더에 db_*.dump 도 workblog-dump-*.zip 도 없습니다: {DATA_DIR}")
 if "--image" in args:
     i = args.index("--image"); IMAGE_TAR = args[i + 1]; del args[i:i + 2]
     if not os.path.isfile(IMAGE_TAR):
@@ -105,23 +107,32 @@ if DATA_DIR:  # 데이터 포함 묶음: linux.zip 내용 + data/ (첨부는 그
     import datetime
     stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M")
     dumps = sorted(glob.glob(os.path.join(DATA_DIR, "db_*.dump")))
+    merges = sorted(glob.glob(os.path.join(DATA_DIR, "workblog-dump-*.zip")))
+    if FORCE and not dumps:
+        sys.exit("--force(엎어치기)는 db_*.dump 가 있어야 합니다.")
     fdir = os.path.join(DATA_DIR, "files")
     nfiles = sum(len(fs) for _, _, fs in os.walk(fdir))
-    note = f"""
-[데이터 포함 묶음 — {stamp} 기준 · DB 덤프 {os.path.basename(dumps[-1])} · 첨부·사진 {nfiles}개]
-data/ 에 DB(글·카테고리·사용자·공수 표·대문 등)와 첨부·사진이 들어 있습니다.
+    note = f"\n[데이터 포함 묶음 — {stamp} 기준" + (f" · DB 덤프 {os.path.basename(dumps[-1])} · 첨부·사진 {nfiles}개" if dumps else "")         + (f" · 병합 덤프 {len(merges)}개" if merges else "") + "]\n"
+    if dumps:
+        note += "data/ 에 DB(글·카테고리·사용자·공수 표·대문 등)와 첨부·사진이 들어 있습니다.\n"
+    if merges:
+        note += """  · 병합 덤프(data/workblog-dump-*.zip): 이미 글이 있는 서버에서도 sudo ./install.sh 만 하면 기존 데이터를 지우지 않고 더합니다.
+    글·카테고리·사용자·댓글·첨부가 들어가고, 받는 서버의 admin 비밀번호는 그대로입니다. 다시 설치해도 중복은 생기지 않습니다.
+    (공수 표·대문은 병합 대상이 아닙니다.)
 """
-    if FORCE:
+    if not dumps:
+        note += "  · 데이터 없이 프로그램만: sudo ./install.sh --no-data\n"
+    elif FORCE:
         note += """  · 이 묶음은 '엎어치기'용입니다(data/FORCE). sudo ./install.sh 만 하면 받는 서버에 글이 있어도 이 데이터로 바꿉니다.
     바꾸기 전 지금 DB 는 /var/backups/workblog 에 덤프해 둡니다(root 만 읽음). 첨부·사진은 덮어쓰고, 받는 서버에만 있던 파일은 남습니다.
   · 기존 데이터를 지키려면: sudo ./install.sh --no-data (프로그램만 바뀜)
 """
     else:
         note += """  · 새 서버(DB 가 비었거나 글 0건): sudo ./install.sh 만 하면 데이터까지 들어갑니다.
-  · 이미 글이 있는 서버: 기존 데이터를 그대로 둡니다. 이 데이터로 바꾸려면 sudo ./install.sh --force-data
+  · 이미 글이 있는 서버: 기존 데이터를 그대로 둡니다(병합 덤프가 있으면 그것만 더함). 이 데이터로 바꾸려면 sudo ./install.sh --force-data
   · 데이터 없이 프로그램만: sudo ./install.sh --no-data
 """
-    note += "로그인은 원래 서버의 계정·비밀번호 그대로입니다. 사내용 — 글 안에 서버 계정 정보가 있으니 밖으로 내보내지 마세요.\n"
+    note += ("로그인은 원래 서버의 계정·비밀번호 그대로입니다. " if dumps else "") + "사내용 — 글 안에 서버 계정 정보가 있으니 밖으로 내보내지 마세요.\n"
     dpath = os.path.join(DIST, f"{NAME}-with-data-{stamp}.zip")
     with zipfile.ZipFile(dpath, "w", zipfile.ZIP_DEFLATED, allowZip64=True) as z:
         for n, data, mode in bundles["linux"]:
@@ -133,6 +144,8 @@ data/ 에 DB(글·카테고리·사용자·공수 표·대문 등)와 첨부·�
             z.writestr(zi, data)
         for d in dumps:
             z.write(d, f"{NAME}/data/{os.path.basename(d)}")
+        for d in merges:
+            z.write(d, f"{NAME}/data/{os.path.basename(d)}", compress_type=zipfile.ZIP_STORED)
         if FORCE:
             z.writestr(f"{NAME}/data/FORCE", f"made {stamp}: install.sh overwrites DB and files with data/ (same as --force-data)\n")
         for root, _, fs in os.walk(fdir):

@@ -33,6 +33,7 @@
 3. 설치가 끝나면 화면에 **주소 · 초기 아이디 `admin` · 초기 비밀번호**가 나옴 → 적어 둠.
 4. 접속 확인: `curl -s http://<받는 서버>:8080/api/health` → 응답에 `"status":"UP"` 이 있으면 정상.
 5. 설정 파일(Linux): `/opt/workblog/config/workblog.properties` — 바꾼 뒤 `sudo systemctl restart workblog`.
+6. **설치하면서 병합**: 묶음의 `data/` 에 전체 덤프(`workblog-dump-*.zip`, 3절 ①)가 있으면 `sudo ./install.sh` 가 앱을 띄운 뒤 그 덤프를 3절 '적용'과 똑같이 넣는다. 받는 서버에 글이 있어도 지우지 않고 더하며, 다시 설치해도 중복은 생기지 않는다. 결과는 설치 끝 화면의 '데이터' 줄과 [관리 ▾ › 데이터 이전] 기록에 남는다. 묶음 만들기: `python install/package.py <버전> --data <덤프 zip 을 넣은 폴더>`. 넣지 않으려면 `--no-data`.
 
 ## 3. A. 데이터 이전 (덤프 → 가져오기)
 
