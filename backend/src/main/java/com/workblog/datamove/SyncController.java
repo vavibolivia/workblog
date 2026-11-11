@@ -26,8 +26,9 @@ import java.util.regex.Pattern;
  * 관리 › 업데이트: 프로그램(공개 저장소 릴리스)·데이터(비공개 저장소 릴리스)를 받는 workblog-sync 와 파일로 주고받는다.
  * 앱은 컨테이너 안이라 직접 업데이트하지 않는다. 화면 설정은 {데이터}/sync/settings.json, [지금 업데이트]는 {데이터}/sync/request,
  * 결과는 workblog-sync(호스트, root)가 쓰는 {데이터}/sync/status.json.
- * GitHub 저장소·토큰은 화면에서 입력하면 {데이터}/sync/github.json(600)에 잠깐 두고, workblog-sync 가 바로 읽어
+ * 데이터 저장소·토큰은 화면에서 입력하면 {데이터}/sync/github.json(600)에 잠깐 두고, workblog-sync 가 바로 읽어
  * 호스트의 sync.env(root 전용)로 옮긴 뒤 지운다. 토큰은 화면으로 다시 보내지 않는다(설정됨/없음만).
+ * 프로그램 저장소는 화면에서 바꾸지 못한다 — 업데이트 장치가 그 저장소의 install.sh 를 root 로 실행하므로, 바꾸려면 호스트의 sync.env(root)를 고친다.
  */
 @RestController
 @RequestMapping("/api/admin/sync")
@@ -49,7 +50,7 @@ public class SyncController {
     public record Settings(int intervalMinutes, boolean program, boolean data) {}
 
     /** token 이 비어 있으면 지금 토큰을 그대로 둔다. dataRepo 를 비우면 데이터 받기를 끈다(토큰도 지움). */
-    public record GithubRequest(String programRepo, String dataRepo, String token) {}
+    public record GithubRequest(String dataRepo, String token) {}
 
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
@@ -88,19 +89,16 @@ public class SyncController {
         return s;
     }
 
-    /** GitHub 저장소·토큰 입력. 파일을 남기고 [지금 업데이트]처럼 요청 → workblog-sync 가 sync.env 로 옮기고 바로 확인한다. */
+    /** 데이터 저장소·토큰 입력. 파일을 남기고 [지금 업데이트]처럼 요청 → workblog-sync 가 sync.env 로 옮기고 바로 확인한다. */
     @PutMapping("/github")
     @PreAuthorize("hasRole('ADMIN')")
     public Map<String, Object> github(@RequestBody GithubRequest r) {
         requireInstalled();
-        String prog = r.programRepo() == null ? "" : r.programRepo().trim();
         String data = r.dataRepo() == null ? "" : r.dataRepo().trim();
         String token = r.token() == null ? "" : r.token().trim();
-        if (!REPO.matcher(prog).matches()) throw ApiException.badRequest("프로그램 저장소는 '계정/저장소' 형식입니다(예: vavibolivia/workblog).");
         if (!data.isEmpty() && !REPO.matcher(data).matches()) throw ApiException.badRequest("데이터 저장소는 '계정/저장소' 형식입니다(예: vavibolivia/workblog-data).");
         if (!token.isEmpty() && !TOKEN.matcher(token).matches()) throw ApiException.badRequest("토큰 형식이 아닙니다(GitHub 토큰은 영문·숫자·_ 로 된 ghp_… 또는 github_pat_…).");
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("programRepo", prog);
         body.put("dataRepo", data);
         body.put("token", data.isEmpty() ? "" : token);
         body.put("keepToken", !data.isEmpty() && token.isEmpty());
@@ -118,7 +116,7 @@ public class SyncController {
         } catch (IOException e) {
             throw new IllegalStateException("GitHub 설정을 저장하지 못했습니다: " + e.getMessage(), e);
         }
-        log.info("GitHub 설정 입력: 프로그램 {} · 데이터 {} · 토큰 {}", prog, data.isEmpty() ? "(끔)" : data, token.isEmpty() ? "유지" : "새로 입력");
+        log.info("GitHub 설정 입력: 데이터 {} · 토큰 {}", data.isEmpty() ? "(끔)" : data, token.isEmpty() ? "유지" : "새로 입력");
         return get();
     }
 

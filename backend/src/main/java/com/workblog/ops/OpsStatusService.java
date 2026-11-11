@@ -21,7 +21,7 @@ import java.util.Map;
 @Service
 public class OpsStatusService {
     private static final Logger log = LoggerFactory.getLogger(OpsStatusService.class);
-    public static final String VERSION = "workblog-backend-0.1.14";
+    public static final String VERSION = "workblog-backend-0.1.15";
     static final int RECENT_ERRORS = 20;
 
     private final JdbcTemplate jdbc;

@@ -31,7 +31,7 @@ export default function AdminSyncPage() {
   const load = useCallback(() => syncApi.get()
     .then((i) => {
       setInfo(i); setForm((f) => f ?? i.settings); setErr(null)
-      setGh((g) => g ?? { programRepo: i.github.programRepo || 'vavibolivia/workblog', dataRepo: i.github.dataRepo, token: '' })
+      setGh((g) => g ?? { dataRepo: i.github.dataRepo, token: '' })
     })
     .catch((e) => setErr(errorMessage(e))), [])
 
@@ -54,7 +54,7 @@ export default function AdminSyncPage() {
     } catch (e) { toast(errorMessage(e), 'error') } finally { setBusy(false) }
   }
 
-  const ghDirty = !!info && !!gh && (gh.token !== '' || gh.programRepo !== (info.github.programRepo || 'vavibolivia/workblog') || gh.dataRepo !== info.github.dataRepo)
+  const ghDirty = !!info && !!gh && (gh.token !== '' || gh.dataRepo !== info.github.dataRepo)
 
   const saveGithub = async () => {
     if (!gh) return
@@ -123,11 +123,10 @@ export default function AdminSyncPage() {
             <div className="card">
               <div className="card__head"><h3>GitHub</h3>{info.github.pending ? <span className="small muted">적용 중…</span> : ghDirty && <span className="small muted">저장하지 않음</span>}</div>
               <div className="card__body stack">
-                <label className="field">
+                <div className="field">
                   <span className="field__label">프로그램 저장소 (공개)</span>
-                  <input className="input" value={gh.programRepo} disabled={!info.installed} placeholder="계정/저장소"
-                         onChange={(e) => setGh({ ...gh, programRepo: e.target.value })} />
-                </label>
+                  <span><code>{info.github.programRepo || '—'}</code> <span className="small muted">— 서버의 root 설정에서만 바꿀 수 있습니다(업데이트 장치가 이 저장소의 설치 스크립트를 실행하므로).</span></span>
+                </div>
                 <label className="field">
                   <span className="field__label">데이터 저장소 (비공개) — 비우면 데이터 받기 안 함</span>
                   <input className="input" value={gh.dataRepo} disabled={!info.installed} placeholder="예: vavibolivia/workblog-data"
@@ -142,7 +141,7 @@ export default function AdminSyncPage() {
                 </label>
                 <div className="row">
                   <button type="button" className="btn btn--primary" onClick={saveGithub} disabled={busy || !ghDirty || !info.installed || info.github.pending}>저장하고 확인</button>
-                  {ghDirty && <button type="button" className="btn" onClick={() => setGh({ programRepo: info.github.programRepo || 'vavibolivia/workblog', dataRepo: info.github.dataRepo, token: '' })}>되돌리기</button>}
+                  {ghDirty && <button type="button" className="btn" onClick={() => setGh({ dataRepo: info.github.dataRepo, token: '' })}>되돌리기</button>}
                 </div>
               </div>
             </div>

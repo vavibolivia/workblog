@@ -166,5 +166,5 @@ s, r = call("GET", "/api/admin/data/info", tok=A); check("DM cleanup import reco
 # ---------- 관리 › 업데이트 (SyncController) — 이 서버(20번)는 deploy.sh 배포라 장치 없음 ----------
 s, r = call("GET", "/api/admin/sync", tok=A)
 check("SYNC GET has github block (no token value)", s == 200 and isinstance(r, dict) and set(r.get("github", {})) == {"programRepo", "dataRepo", "tokenSet", "pending"}, r)
-s, r = call("PUT", "/api/admin/sync/github", {"programRepo": "vavibolivia/workblog", "dataRepo": "vavibolivia/workblog-data", "token": "github_pat_" + "x" * 30}, tok=A)
+s, r = call("PUT", "/api/admin/sync/github", {"dataRepo": "vavibolivia/workblog-data", "token": "github_pat_" + "x" * 30}, tok=A)
 check("SYNC PUT github refused without update device", s == 400, (s, r))

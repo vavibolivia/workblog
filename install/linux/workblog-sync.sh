@@ -10,7 +10,7 @@
 #      병합 폴더($DIR/data/import-on-start)에 넣는다 → 앱이 1분 안에 병합(없는 글은 추가, 원본에서 바뀐 글·사용자는 갱신, 지우지 않음)
 #
 # 설정: $DIR/config/sync.env (root 만 읽음 — 저장소 이름·토큰)   화면 설정: $DIR/data/sync/settings.json (주기·켜고 끄기)
-#   화면에서 GitHub 저장소·토큰을 넣으면 $DIR/data/sync/github.json 이 생긴다 → 여기서 sync.env 로 옮기고 지운다(토큰은 앱 폴더에 남지 않음)
+#   화면에서 데이터 저장소·토큰을 넣으면 $DIR/data/sync/github.json 이 생긴다 → 여기서 sync.env 로 옮기고 지운다(토큰은 앱 폴더에 남지 않음)
 # 상태: $DIR/data/sync/status.json (화면이 읽음)   수동 실행: sudo systemctl start workblog-sync   기록: journalctl -u workblog-sync
 set -euo pipefail
 
@@ -34,7 +34,8 @@ exec 9>"$STATE/.lock"
 flock -n 9 || { echo "다른 업데이트가 진행 중 — 건너뜀"; exit 0; }
 command -v python3 >/dev/null || { echo "python3 가 필요합니다"; exit 1; }
 
-# 화면에서 넣은 GitHub 설정 → sync.env (정해진 형식만 받는다: 저장소 '계정/이름', 토큰 영문·숫자·_)
+# 화면에서 넣은 데이터 저장소·토큰 → sync.env (정해진 형식만: 저장소 '계정/이름', 토큰 영문·숫자·_).
+# 프로그램 저장소는 화면에서 받지 않는다(그 저장소의 install.sh 를 root 로 실행하므로 root 만 sync.env 에서 바꾼다).
 GH_NOTE=""
 if [ -e "$UI/github.json" ] || [ -L "$UI/github.json" ]; then
   GH=$(asapp cat "$UI/github.json" 2>/dev/null | head -c 8192 | python3 -c '
@@ -42,13 +43,13 @@ import json, re, sys
 try: s = json.load(sys.stdin)
 except Exception: sys.exit(1)
 repo = re.compile(r"[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}")
-p, d, t = str(s.get("programRepo", "")), str(s.get("dataRepo", "")), str(s.get("token", ""))
-if not repo.fullmatch(p) or (d and not repo.fullmatch(d)) or (t and not re.fullmatch(r"[A-Za-z0-9_]{20,255}", t)): sys.exit(1)
-print(p, d or "-", t or "-", 1 if s.get("keepToken") else 0)
+d, t = str(s.get("dataRepo", "")), str(s.get("token", ""))
+if (d and not repo.fullmatch(d)) or (t and not re.fullmatch(r"[A-Za-z0-9_]{20,255}", t)): sys.exit(1)
+print(d or "-", t or "-", 1 if s.get("keepToken") else 0)
 ') || GH=""
   rm -f "$UI/github.json"
   if [ -n "$GH" ]; then
-    read -r G_PROG G_DATA G_TOKEN G_KEEP <<<"$GH"
+    read -r G_DATA G_TOKEN G_KEEP <<<"$GH"
     [ "$G_DATA" = - ] && G_DATA=""
     [ "$G_TOKEN" = - ] && G_TOKEN=""
     [ "$G_KEEP" = 1 ] && G_TOKEN="$DATA_TOKEN"
@@ -57,9 +58,9 @@ print(p, d or "-", t or "-", 1 if s.get("keepToken") else 0)
     mkdir -p "$DIR/config"
     ( umask 077
       { echo "# WorkBlog 업데이트 설정 (install.sh·화면 관리 › 업데이트의 GitHub 입력이 씀 — 다시 설치해도 값 유지). root 만 읽음."
-        printf 'PROGRAM_REPO=%s\nDATA_REPO=%s\nDATA_TOKEN=%s\n' "$G_PROG" "$G_DATA" "$G_TOKEN"; } > "$ENV_FILE.tmp" ) && mv -f "$ENV_FILE.tmp" "$ENV_FILE"
-    PROGRAM_REPO="$G_PROG"; DATA_REPO="$G_DATA"; DATA_TOKEN="$G_TOKEN"
-    GH_NOTE="GitHub 설정 바뀜 — 프로그램 $G_PROG · 데이터 ${G_DATA:-끔} · 토큰 $([ -n "$G_TOKEN" ] && echo 있음 || echo 없음)"
+        printf 'PROGRAM_REPO=%s\nDATA_REPO=%s\nDATA_TOKEN=%s\n' "$PROGRAM_REPO" "$G_DATA" "$G_TOKEN"; } > "$ENV_FILE.tmp" ) && mv -f "$ENV_FILE.tmp" "$ENV_FILE"
+    DATA_REPO="$G_DATA"; DATA_TOKEN="$G_TOKEN"
+    GH_NOTE="GitHub 설정 바뀜 — 데이터 ${G_DATA:-끔} · 토큰 $([ -n "$G_TOKEN" ] && echo 있음 || echo 없음)"
   else
     GH_NOTE="GitHub 설정 입력이 형식에 맞지 않아 버림"
   fi

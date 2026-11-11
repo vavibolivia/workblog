@@ -24,7 +24,7 @@ export interface SyncInfo {
   github: { programRepo: string; dataRepo: string; tokenSet: boolean; pending: boolean }
 }
 
-export interface GithubInput { programRepo: string; dataRepo: string; token: string }
+export interface GithubInput { dataRepo: string; token: string }
 
 export const syncApi = {
   get: () => http.get<SyncInfo>('/admin/sync').then((r) => r.data),
