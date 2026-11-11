@@ -607,12 +607,14 @@ if [ "$NO_SYNC" != 1 ] && [ -f "$SYNC_SRC" ]; then
   [ -n "$SYNC_REPO" ]  || SYNC_REPO="$(senv_get DATA_REPO)"
   [ -n "$SYNC_TOKEN" ] || SYNC_TOKEN="$(senv_get DATA_TOKEN)"
   [ -n "${WORKBLOG_REPO:-}" ] || { r="$(senv_get PROGRAM_REPO)"; [ -z "$r" ] || REPO="$r"; }   # 화면에서 바꾼 프로그램 저장소 유지
+  SENV_EXTRA="$([ -f "$SENV" ] && grep -vE '^(#|PROGRAM_REPO=|DATA_REPO=|DATA_TOKEN=)' "$SENV" || true)"   # 프록시 등 직접 적은 줄 유지
   ( umask 077; cat > "$SENV" <<SEOF
 # WorkBlog 업데이트 설정 (install.sh·화면 '관리 › 업데이트'의 GitHub 입력이 씀 — 다시 설치해도 값 유지). root 만 읽음.
 PROGRAM_REPO=$REPO
 DATA_REPO=$SYNC_REPO
 DATA_TOKEN=$SYNC_TOKEN
 SEOF
+    [ -z "$SENV_EXTRA" ] || printf '%s\n' "$SENV_EXTRA" >> "$SENV"
   )
   chown root:root "$SENV"; chmod 600 "$SENV"
   cat > /etc/systemd/system/workblog-sync.service <<SEOF

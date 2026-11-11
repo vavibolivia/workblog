@@ -22,6 +22,9 @@ MERGE_DIR="$DIR/data/import-on-start"
 PROGRAM_REPO=vavibolivia/workblog; DATA_REPO=""; DATA_TOKEN=""
 # shellcheck disable=SC1090
 [ -f "$ENV_FILE" ] && . "$ENV_FILE"
+# 사내 프록시가 필요하면 sync.env 에 https_proxy=http://프록시:포트 를 적는다(systemd 서비스는 셸의 프록시 설정을 물려받지 않음)
+[ -z "${https_proxy:-}${HTTPS_PROXY:-}" ] || export https_proxy="${https_proxy:-$HTTPS_PROXY}" HTTPS_PROXY="${HTTPS_PROXY:-$https_proxy}"
+[ -z "${no_proxy:-}" ] || export no_proxy
 
 API=https://api.github.com
 # $DIR/data 아래는 앱 계정(workblog)이 쓸 수 있다 → root 는 그 안의 파일을 직접 열거나 chown 하지 않고,
@@ -58,7 +61,8 @@ print(d or "-", t or "-", 1 if s.get("keepToken") else 0)
     mkdir -p "$DIR/config"
     ( umask 077
       { echo "# WorkBlog 업데이트 설정 (install.sh·화면 관리 › 업데이트의 GitHub 입력이 씀 — 다시 설치해도 값 유지). root 만 읽음."
-        printf 'PROGRAM_REPO=%s\nDATA_REPO=%s\nDATA_TOKEN=%s\n' "$PROGRAM_REPO" "$G_DATA" "$G_TOKEN"; } > "$ENV_FILE.tmp" ) && mv -f "$ENV_FILE.tmp" "$ENV_FILE"
+        printf 'PROGRAM_REPO=%s\nDATA_REPO=%s\nDATA_TOKEN=%s\n' "$PROGRAM_REPO" "$G_DATA" "$G_TOKEN"
+        [ ! -f "$ENV_FILE" ] || grep -vE '^(#|PROGRAM_REPO=|DATA_REPO=|DATA_TOKEN=)' "$ENV_FILE" || true; } > "$ENV_FILE.tmp" ) && mv -f "$ENV_FILE.tmp" "$ENV_FILE"   # 프록시 등 다른 줄은 유지
     DATA_REPO="$G_DATA"; DATA_TOKEN="$G_TOKEN"
     GH_NOTE="GitHub 설정 바뀜 — 데이터 ${G_DATA:-끔} · 토큰 $([ -n "$G_TOKEN" ] && echo 있음 || echo 없음)"
   else
@@ -123,6 +127,16 @@ else:
 
 TMP=$(mktemp -d); trap 'rm -rf "$TMP"' EXIT
 
+# 받기: 실패하면 curl 오류(HTTP 코드·연결 실패 주소 등)를 기록에 남긴다. 릴리스 파일은 github.com 에서
+# release-assets.githubusercontent.com / objects.githubusercontent.com 으로 넘겨지므로 방화벽·프록시에서 이 주소들도 열려 있어야 한다.
+fetch() {  # 주소 저장할파일 최대초
+  local err
+  if err=$(curl -fsSL --retry 2 --retry-delay 3 -m "$3" -o "$2" "$1" 2>&1); then return 0; fi
+  err="${err##*$'\n'}"   # 다시 시도한 만큼 같은 줄이 겹치므로 마지막 줄만
+  log "  $1 — ${err:-curl 실패}"
+  return 1
+}
+
 # ---------- 1) 프로그램 ----------
 if [ "$DO_PROGRAM" = 1 ]; then
   if P_LATEST=$(curl -fsS -m 30 "$API/repos/$PROGRAM_REPO/releases/latest" | jget tag) && [ -n "$P_LATEST" ]; then
@@ -132,8 +146,18 @@ if [ "$DO_PROGRAM" = 1 ]; then
       log "프로그램: $current → $P_LATEST 업그레이드"
       status running
       name="workblog-$P_LATEST-linux.tar.gz"; base="https://github.com/$PROGRAM_REPO/releases/download/v$P_LATEST"
-      if curl -fsSL -m 600 -o "$TMP/$name" "$base/$name" && curl -fsSL -m 60 -o "$TMP/SHA256SUMS.txt" "$base/SHA256SUMS.txt" \
-         && (cd "$TMP" && grep " $name\$" SHA256SUMS.txt | sha256sum -c --quiet -); then
+      # 받기와 체크섬을 나눠서, 실패하면 무엇이 왜 안 됐는지(curl 오류·크기·해시)를 기록에 남긴다
+      P_FAIL=""
+      if ! fetch "$base/SHA256SUMS.txt" "$TMP/SHA256SUMS.txt" 60; then P_FAIL="받기 실패: SHA256SUMS.txt"
+      elif ! grep -q " $name\$" "$TMP/SHA256SUMS.txt"; then P_FAIL="SHA256SUMS.txt 에 $name 이 없음"; log "  SHA256SUMS.txt 내용: $(head -c 300 "$TMP/SHA256SUMS.txt" | tr '\n' ' ')"
+      elif ! fetch "$base/$name" "$TMP/$name" 1800; then P_FAIL="받기 실패: $name"
+      else
+        want=$(grep " $name\$" "$TMP/SHA256SUMS.txt" | head -1 | cut -d' ' -f1); got=$(sha256sum "$TMP/$name" | cut -d' ' -f1)
+        if [ "$want" != "$got" ]; then
+          P_FAIL="체크섬 불일치"; log "  받은 크기 $(stat -c %s "$TMP/$name") bytes · 기대 ${want:0:16}… · 받음 ${got:0:16}… · 앞부분: $(head -c 120 "$TMP/$name" | tr -cd '[:print:]' | head -c 80)"
+        fi
+      fi
+      if [ -z "$P_FAIL" ]; then
         tar -xzf "$TMP/$name" -C "$TMP"
         if bash "$TMP/workblog-$P_LATEST/install.sh" --dir "$DIR" --no-data >"$STATE/program-upgrade.log" 2>&1; then
           P_RESULT="OK $current → $P_LATEST"; log "프로그램: $P_LATEST 설치 완료"
@@ -141,7 +165,7 @@ if [ "$DO_PROGRAM" = 1 ]; then
           P_RESULT="FAILED 설치 실패"; log "프로그램: 업그레이드 실패"; tail -15 "$STATE/program-upgrade.log" | tee -a "$LOG"
         fi
       else
-        P_RESULT="FAILED 받기·체크섬 실패"; log "프로그램: 받지 못했거나 체크섬 불일치 — 업그레이드 안 함"
+        P_RESULT="FAILED $P_FAIL"; log "프로그램: $P_FAIL — 업그레이드 안 함"
       fi
     else
       P_RESULT="OK 최신($current)"; log "프로그램: 최신($current)"
