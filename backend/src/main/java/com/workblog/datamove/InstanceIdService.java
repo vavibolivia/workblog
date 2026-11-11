@@ -44,4 +44,13 @@ public class InstanceIdService implements ApplicationRunner {
             return cached;
         }
     }
+
+    /** 새 ID 로 바꾼다(원본 DB 를 통째로 넣어 만든 서버가 원본과 같은 ID 를 갖게 된 경우). */
+    public synchronized String regenerate() {
+        get();
+        String fresh = UUID.randomUUID().toString();
+        jdbc.update("UPDATE app_instance SET instance_id = ? WHERE id = 1", fresh);
+        cached = fresh;
+        return fresh;
+    }
 }

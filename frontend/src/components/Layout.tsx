@@ -149,6 +149,7 @@ const ADMIN_ITEMS: { to: string; label: string; desc: string }[] = [
   { to: '/admin/status', label: '시스템 상태', desc: '서버·DB·저장소' },
   { to: '/admin/audit', label: '감사 로그', desc: '열람·변경 기록' },
   { to: '/admin/data', label: '데이터 이전', desc: '덤프 받기·가져오기' },
+  { to: '/admin/sync', label: '업데이트', desc: '프로그램·데이터 받기' },
 ]
 
 function AdminMenu() {

@@ -19,6 +19,9 @@
 #       --force-data     DB 에 글이 있어도 데이터로 바꿈(바꾸기 전 DB 를 /var/backups/workblog 에 덤프, root 만 읽음)
 #                        data/FORCE 파일이 들어 있는 묶음(package.py --data … --force 로 만든 것)은 이 옵션 없이도 데이터로 바꾼다(엎어치기)
 #       --pg-pass <비밀번호>  PostgreSQL 관리자(postgres) 비밀번호가 없을 때 만들 값 (기본 postgres — 사내 요청. 5432 를 외부에 열지 말 것)
+#       업데이트(workblog-sync — 프로그램은 공개 저장소 릴리스, 데이터는 비공개 저장소 릴리스에서. 주기·[지금 업데이트]는 화면 '관리 › 업데이트'):
+#       --data-repo <owner/name>  데이터를 받을 비공개 저장소   --data-token <토큰>  그 저장소 읽기 전용 토큰
+#       --no-sync                 업데이트 장치를 설치하지 않음
 #
 # 상황별로 알아서 처리한다:
 #   - podman 이 없으면 설치(apt/dnf). 컨테이너 이미지는 옆의 image/*.tar 에서 읽고(오프라인), 없으면 docker.io 에서 받는다
@@ -45,6 +48,7 @@ fi
 
 DIR=/opt/workblog; PORT=8080; PORT_SET=0; DB_URL=""; DB_USER=""; DB_PASS=""; ADMIN_PASS=""; PUBLIC_URL=""; MODE=install
 PG_PASS=postgres; DATA_DIR=""; NO_DATA=0; FORCE_DATA=0
+SYNC_REPO=""; SYNC_TOKEN=""; NO_SYNC=0
 IMAGE="${WORKBLOG_IMAGE:-docker.io/library/amazoncorretto:21-alpine}"; CONTAINER=workblog
 REPO="${WORKBLOG_REPO:-vavibolivia/workblog}"
 VER="${WORKBLOG_VERSION:-}"
@@ -66,9 +70,12 @@ while [ $# -gt 0 ]; do
     --data) DATA_DIR="$2"; shift 2 ;;
     --no-data) NO_DATA=1; shift ;;
     --force-data) FORCE_DATA=1; shift ;;
+    --data-repo) SYNC_REPO="$2"; shift 2 ;;
+    --data-token) SYNC_TOKEN="$2"; shift 2 ;;
+    --no-sync) NO_SYNC=1; shift ;;
     --upgrade) shift ;;   # 예전 옵션: 이제 설치가 알아서 업그레이드로 처리
     --uninstall) MODE=uninstall; shift ;;
-    -h|--help) sed -n '2,32p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,35p' "$0"; exit 0 ;;
     *) echo "알 수 없는 옵션: $1"; exit 2 ;;
   esac
 done
@@ -97,7 +104,8 @@ UNIT=/etc/systemd/system/workblog.service
 if [ "$MODE" = uninstall ]; then
   say "서비스 중지·제거"
   systemctl disable --now workblog 2>/dev/null || true
-  rm -f "$UNIT"; systemctl daemon-reload
+  systemctl disable --now workblog-sync.timer workblog-sync.path 2>/dev/null || true
+  rm -f "$UNIT" /etc/systemd/system/workblog-sync.service /etc/systemd/system/workblog-sync.timer /etc/systemd/system/workblog-sync.path; systemctl daemon-reload
   command -v podman >/dev/null && podman rm -f "$CONTAINER" >/dev/null 2>&1 || true
   rm -f "$DIR/workblog.jar"
   say "제거 완료. 설정($CONF)과 데이터($DIR/data), DB 는 남겼습니다. 필요 없으면 직접 지우세요."
@@ -492,6 +500,10 @@ umask 022
 say "프로그램 설치: $DIR/workblog.jar"
 [ -f "$DIR/workblog.jar" ] && cp "$DIR/workblog.jar" "$DIR/workblog.jar.bak"
 install -m 0644 "$JAR" "$DIR/workblog.jar"
+# 설치된 버전(업데이트가 새 릴리스와 비교). 받은 릴리스면 그 버전, 묶음이면 옆의 VERSION
+JAR_DIR="$(cd "$(dirname "$JAR")" && pwd)"
+INST_VER="${VER#v}"; [ -n "$INST_VER" ] || INST_VER=$(cat "$JAR_DIR/VERSION" 2>/dev/null || true)
+[ -n "$INST_VER" ] && printf '%s\n' "$INST_VER" > "$DIR/VERSION"
 no_link "$DIR" "$DIR/config" "$CONF" "$DIR/data" "$DIR/logs" "$DIR/static-extra"
 chown root:root "$DIR" "$DIR/workblog.jar"; chmod 755 "$DIR"
 [ -f "$DIR/workblog.jar.bak" ] && chown root:root "$DIR/workblog.jar.bak"
@@ -583,6 +595,66 @@ for n in ${MERGE_NAMES[@]+"${MERGE_NAMES[@]}"}; do
   DATA_INFO="${DATA_INFO:+$DATA_INFO / }병합 $r"
 done
 
+# ========== 9) 업데이트 장치 (프로그램·데이터를 GitHub 릴리스에서) ==========
+# workblog-sync.timer: 5분마다 깨어나 화면에서 정한 주기가 되었으면 확인. workblog-sync.path: 화면의 [지금 업데이트](요청 파일)를 보면 바로 실행.
+SYNC_INFO="설치 안 함"
+SYNC_SRC="$JAR_DIR/workblog-sync.sh"; [ -f "$SYNC_SRC" ] || SYNC_SRC="$HERE/workblog-sync.sh"
+if [ "$NO_SYNC" != 1 ] && [ -f "$SYNC_SRC" ]; then
+  install -m 0755 -o root -g root "$SYNC_SRC" "$DIR/workblog-sync.sh"
+  install -d -m 750 -o workblog -g workblog "$DIR/data/sync"
+  SENV="$DIR/config/sync.env"; no_link "$SENV"
+  senv_get() { [ -f "$SENV" ] && grep -E "^$1=" "$SENV" | tail -1 | cut -d= -f2- || true; }
+  [ -n "$SYNC_REPO" ]  || SYNC_REPO="$(senv_get DATA_REPO)"
+  [ -n "$SYNC_TOKEN" ] || SYNC_TOKEN="$(senv_get DATA_TOKEN)"
+  ( umask 077; cat > "$SENV" <<SEOF
+# WorkBlog 업데이트 설정 (install.sh 가 씀 — 다시 설치해도 값 유지). 주기·켜고 끄기는 화면 '관리 › 업데이트'.
+PROGRAM_REPO=$REPO
+DATA_REPO=$SYNC_REPO
+DATA_TOKEN=$SYNC_TOKEN
+SEOF
+  )
+  chown root:root "$SENV"; chmod 600 "$SENV"
+  cat > /etc/systemd/system/workblog-sync.service <<SEOF
+[Unit]
+Description=WorkBlog update (program + data from GitHub releases)
+After=network-online.target workblog.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+Environment=WORKBLOG_DIR=$DIR
+ExecStart=/usr/bin/env bash $DIR/workblog-sync.sh
+TimeoutStartSec=2h
+SEOF
+  cat > /etc/systemd/system/workblog-sync.timer <<SEOF
+[Unit]
+Description=WorkBlog update check (every 5 min; the interval set on screen decides)
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=5min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+SEOF
+  cat > /etc/systemd/system/workblog-sync.path <<SEOF
+[Unit]
+Description=WorkBlog update on request (screen button)
+
+[Path]
+PathExists=$DIR/data/sync/request
+Unit=workblog-sync.service
+
+[Install]
+WantedBy=paths.target
+SEOF
+  systemctl daemon-reload
+  systemctl enable workblog-sync.timer workblog-sync.path >/dev/null 2>&1
+  systemctl start workblog-sync.timer workblog-sync.path   # 서비스 자체는 여기서 돌리지 않는다(업데이트가 이 설치를 부른 경우 겹침)
+  SYNC_INFO="화면 '관리 › 업데이트' · 프로그램 $REPO · 데이터 ${SYNC_REPO:-없음}$([ -n "$SYNC_REPO" ] && [ -z "$SYNC_TOKEN" ] && echo ' (토큰 없음 — sync.env 의 DATA_TOKEN)')"
+fi
+
 cat <<EOF
 
   ┌──────────────────────────────────────────────┐
@@ -594,6 +666,7 @@ cat <<EOF
     DB          : ${DB_URL} (계정 ${DB_USER})${PG_SUPER_INFO:+
     DB 관리자   : ${PG_SUPER_INFO}}
     설정 파일   : ${CONF}
+    업데이트    : ${SYNC_INFO}
     로그        : podman logs -f ${CONTAINER}
     컨테이너    : ${CONTAINER} (${IMAGE}) · 재시작: systemctl restart workblog
   └──────────────────────────────────────────────┘

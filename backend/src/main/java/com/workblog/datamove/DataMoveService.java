@@ -71,6 +71,7 @@ public class DataMoveService {
     private final Path storageRoot;
     private final Path tmpDir;
     private final long importMaxMb;
+    private final long watchMs;
     private final ObjectMapper om = DumpFormat.mapper();
     private final Map<String, Pending> uploads = new ConcurrentHashMap<>();
     private final Map<String, ExportTicket> tickets = new ConcurrentHashMap<>();
@@ -80,7 +81,9 @@ public class DataMoveService {
     public DataMoveService(JdbcTemplate jdbc, DataSource ds, PlatformTransactionManager tm, InstanceIdService instance,
                            AttachmentTextService texts, WorkblogProperties props,
                            @Value("${workblog.datamove.import-max-mb:2048}") long importMaxMb,
-                           @Value("${workblog.datamove.tmp-dir:}") String tmpDir) {
+                           @Value("${workblog.datamove.tmp-dir:}") String tmpDir,
+                           @Value("${workblog.datamove.watch-ms:60000}") long watchMs) {
+        this.watchMs = watchMs;
         this.jdbc = jdbc;
         this.ds = ds;
         this.tm = tm;
@@ -295,13 +298,30 @@ public class DataMoveService {
         } catch (RuntimeException e) {
             log.error("설치 때 병합을 하지 못했습니다: {}", e.toString());
         }
+        ready = true;
+    }
+
+    private volatile boolean ready = false;
+
+    /**
+     * 주기 병합: 같은 폴더를 WATCH_SECONDS(기본 60초)마다 본다. 데이터 동기화(workblog-sync)가 새 덤프를 받아 여기에 넣으면
+     * 앱을 다시 띄우지 않아도 들어온다. 0 이면 끔(기동 때 한 번만).
+     */
+    @org.springframework.scheduling.annotation.Scheduled(initialDelay = 60_000, fixedDelayString = "${workblog.datamove.watch-ms:60000}")
+    public void importWatch() {
+        if (!ready || watchMs <= 0) return;
+        try {
+            importDir(startImportDir());
+        } catch (RuntimeException e) {
+            log.error("주기 병합을 하지 못했습니다: {}", e.toString());
+        }
     }
 
     /**
      * 폴더의 *.zip 덤프를 이름 순으로 적용한다. 덤프마다 결과 한 줄을 &lt;이름&gt;.result 에 남기고(install.sh 가 읽는다),
      * 처리한 덤프는 &lt;이름&gt;.done / .failed 로 바꿔 다음 기동 때 다시 넣지 않는다. 받는 서버 데이터는 지우지 않는다.
      */
-    public List<String> importDir(Path dir) {
+    public synchronized List<String> importDir(Path dir) {
         List<String> results = new ArrayList<>();
         if (!Files.isDirectory(dir)) return results;
         List<Path> zips = new ArrayList<>();
@@ -317,11 +337,12 @@ public class DataMoveService {
             String name = zip.getFileName().toString();
             String line; boolean ok = false;
             applyLock.lock();
-            try (DumpArchive a = openChecked(zip)) {
+            try (DumpArchive a = openForMerge(zip)) {
                 Manifest m = a.manifest();
                 long rec = startRecord("IMPORT", m.kind().name(), "APPLY", m.dumpName(), m.sourceInstanceId(), m.since(), m.exportedAt(), false, actor);
-                log.info("설치 때 병합 시작: {}", name);
-                ImportReport rep = new DumpImporter(jdbc, new TransactionTemplate(tm), storageRoot, a, true, texts::extractNow).run();
+                log.info("병합 시작: {}", name);
+                // 원본에서 바뀐 것은 이 서버에서 고쳤더라도 원본 것으로(이 서버 것은 이력에 남음)
+                ImportReport rep = new DumpImporter(jdbc, new TransactionTemplate(tm), storageRoot, a, true, true, texts::extractNow).run();
                 finishRecord(rec, rep.status, importSummary(rep), rep);
                 ok = "OK".equals(rep.status);
                 line = rep.status + " " + importSummary(rep) + ("OK".equals(rep.status) || rep.error == null ? "" : " — " + rep.error);
@@ -358,6 +379,25 @@ public class DataMoveService {
         jdbc.update("DELETE FROM data_transfers WHERE direction = 'IMPORT' AND source_instance = ?", sourceInstanceId);
         log.info("가져오기 매핑 삭제: 원본 {} ({}건)", sourceInstanceId, n);
         return n;
+    }
+
+    /**
+     * 병합용 열기. 인스턴스 ID 가 같아도 이 서버가 내보낸 기록이 없는 덤프면, 이 서버는 원본 DB 를 통째로 넣어 만든 복제본이다
+     * (ID 까지 복사됨) → 이 서버에 새 ID 를 주고 받는다. 정말 이 서버가 내보낸 덤프면 건너뛴다.
+     */
+    private DumpArchive openForMerge(Path file) {
+        DumpArchive a = DumpArchive.open(file, importMaxBytes() * 4);
+        Manifest m = a.manifest();
+        if (instance.get().equalsIgnoreCase(m.sourceInstanceId())) {
+            Integer mine = jdbc.queryForObject("SELECT count(*) FROM data_transfers WHERE direction = 'EXPORT' AND dump_name = ?", Integer.class, m.dumpName());
+            if (mine != null && mine > 0) {
+                a.close();
+                throw ApiException.badRequest("이 서버가 만든 덤프입니다.");
+            }
+            String fresh = instance.regenerate();
+            log.warn("이 서버의 인스턴스 ID 가 덤프 원본과 같습니다(원본 DB 를 통째로 넣어 만든 서버) → 새 ID {} 로 바꾸고 병합합니다", fresh);
+        }
+        return a;
     }
 
     private DumpArchive openChecked(Path file) {

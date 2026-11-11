@@ -68,7 +68,9 @@ def lf(b):
 
 
 bundles = {
-    "linux": [("workblog.jar", read(os.path.relpath(JAR, ROOT)), 0o644), ("install.sh", lf(read("install/linux/install.sh")), 0o755), ("README.txt", README.encode("utf-8"), 0o644)],
+    "linux": [("workblog.jar", read(os.path.relpath(JAR, ROOT)), 0o644), ("install.sh", lf(read("install/linux/install.sh")), 0o755),
+              ("workblog-sync.sh", lf(read("install/linux/workblog-sync.sh")), 0o755), ("VERSION", (VERSION + "\n").encode("utf-8"), 0o644),
+              ("README.txt", README.encode("utf-8"), 0o644)],
     "docker": [("workblog.jar", read(os.path.relpath(JAR, ROOT)), 0o644), ("Dockerfile", lf(read("install/docker/Dockerfile")), 0o644),
                ("docker-compose.yml", lf(read("install/docker/docker-compose.yml")), 0o644), (".env.example", lf(read("install/docker/.env.example")), 0o644),
                ("README.txt", README_DOCKER.encode("utf-8"), 0o644)],

@@ -69,6 +69,8 @@ workblog:
     # 데이터 이전(관리자 > 데이터 이전): 덤프 올리기 최대 크기(MB). 첨부 한도(MAX_FILE_MB)와 따로. 임시 폴더는 비우면 첨부 저장소 옆 imports
     import-max-mb: ${IMPORT_MAX_MB:2048}
     tmp-dir: ${IMPORT_TMP_DIR:}
+    # 병합 폴더({저장소 상위}/import-on-start)를 보는 주기(ms). 데이터 동기화가 넣은 덤프를 재시작 없이 병합. 0 이면 기동 때만
+    watch-ms: ${IMPORT_WATCH_MS:60000}
   review:
     # 오래된 글 재검토(com.workblog.review): 마지막 수정·내용 확인에서 이 일수가 지난 발행 글에 안내. 0 이면 끔
     stale-days: ${REVIEW_STALE_DAYS:180}

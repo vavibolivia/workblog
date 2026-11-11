@@ -138,6 +138,64 @@ class DataMoveTest {
         assertThat(count(j, "posts")).isEqualTo(2);
     }
 
+    /** 병합(설치·주기): 양쪽에서 고친 글은 원본 것으로, 이 서버에서 고친 것은 이력에 남는다. */
+    @Test
+    void mergeFolderOverwritesTargetEditWithSourceAndKeepsItInHistory() throws Exception {
+        importInto(b, export(a, null), true);
+        long tid = b.jdbc().queryForObject("SELECT id FROM posts", Long.class);
+        b.jdbc().update("UPDATE posts SET title = '받는 서버에서 고침', version = 2 WHERE id = ?", tid);
+        b.jdbc().update("INSERT INTO post_revisions (post_id, version, title, content, content_format, category, category_id, tags, status, change_type, edited_by) " +
+                "SELECT id, 2, title, content, 'HTML', '', category_id, tags, status, 'UPDATE', author_id FROM posts WHERE id = ?", tid);
+        Thread.sleep(5);
+        editOnA("원본에서 고침");
+        List<String> res = b.svc().importDir(drop(export(a, null)));
+        assertThat(res.get(0)).startsWith("OK ");
+        Map<String, Object> p = b.jdbc().queryForMap("SELECT title, version FROM posts WHERE id = ?", tid);
+        assertThat(p.get("title")).isEqualTo("원본에서 고침");
+        assertThat(p.get("version")).isEqualTo(3);
+        assertThat(b.jdbc().queryForList("SELECT title FROM post_revisions WHERE post_id = ? ORDER BY version", String.class, tid))
+                .containsExactly("엔진 점검", "받는 서버에서 고침", "원본에서 고침");
+        assertThat(count(b.jdbc(), "posts")).isEqualTo(1);
+    }
+
+    /** 원본 DB 를 통째로 넣어 만든 서버(인스턴스 ID 가 같고 매핑 기록이 없음): 새 ID 를 받고, 같은 글은 중복 없이 맞추고 바뀐 글은 갱신. */
+    @Test
+    void cloneWithSameInstanceIdAndNoMappingMergesWithoutDuplicates() throws Exception {
+        importInto(b, export(a, null), true);
+        b.jdbc().update("DELETE FROM data_import_map");
+        b.jdbc().update("DELETE FROM app_instance");
+        b.jdbc().update("INSERT INTO app_instance (id, instance_id) VALUES (1, ?)", a.svc().info().instanceId());
+        DataMoveService fresh = node2(b);
+        Thread.sleep(5);
+        editOnA("원본에서 고침");
+        a.jdbc().update("UPDATE users SET department = '품질', updated_at = ? WHERE username = 'kim'", ts(Instant.now()));
+        Map<String, Integer> before = counts(b.jdbc());
+        List<String> res = fresh.importDir(drop(export(a, null)));
+        assertThat(res.get(0)).startsWith("OK ");
+        assertThat(fresh.info().instanceId()).isNotEqualTo(a.svc().info().instanceId());
+        Map<String, Integer> after = counts(b.jdbc());
+        for (String t : List.of("users", "categories", "posts", "attachments", "comments", "post_likes", "post_templates", "notifications", "post_views"))
+            assertThat(after.get(t)).as(t).isEqualTo(before.get(t));
+        assertThat(b.jdbc().queryForObject("SELECT title FROM posts", String.class)).isEqualTo("원본에서 고침");
+        assertThat(b.jdbc().queryForObject("SELECT department FROM users WHERE username = 'kim'", String.class)).isEqualTo("품질");
+        // 한 번 더 넣어도 그대로
+        Map<String, Integer> again = counts(b.jdbc());
+        fresh.importDir(drop(export(a, null)));
+        assertThat(counts(b.jdbc())).isEqualTo(again);
+    }
+
+    @Test
+    void mergeUpdatesUsersFromSourceButKeepsLocalAdminPassword() throws Exception {
+        importInto(b, export(a, null), true);
+        Thread.sleep(5);
+        a.jdbc().update("UPDATE users SET display_name = '김정비2', password = 'new-hash', updated_at = ? WHERE username = 'kim'", ts(Instant.now()));
+        a.jdbc().update("UPDATE users SET password = 'hash-a2', updated_at = ? WHERE username = 'admin'", ts(Instant.now()));
+        b.svc().importDir(drop(export(a, null)));
+        assertThat(b.jdbc().queryForMap("SELECT display_name, password FROM users WHERE username = 'kim'"))
+                .containsEntry("display_name", "김정비2").containsEntry("password", "new-hash");
+        assertThat(b.jdbc().queryForObject("SELECT password FROM users WHERE username = 'admin'", String.class)).isEqualTo("hash-b");
+    }
+
     @Test
     void previewChangesNothing() throws Exception {
         Map<String, Integer> before = counts(b.jdbc());
@@ -275,7 +333,7 @@ class DataMoveTest {
 
     private void editOnA(String title) {
         JdbcTemplate j = a.jdbc();
-        j.update("UPDATE posts SET title = ?, version = 2 WHERE id = ?", title, postA);
+        j.update("UPDATE posts SET title = ?, version = 2, updated_at = ? WHERE id = ?", title, ts(Instant.now()), postA);
         j.update("INSERT INTO post_revisions (post_id, version, title, content, content_format, category, category_id, tags, status, change_type, change_note, edited_by, created_at) " +
                 "SELECT id, 2, title, content, 'HTML', '정비 > 엔진', category_id, tags, status, 'UPDATE', '제목 수정', author_id, ? FROM posts WHERE id = ?", ts(Instant.now()), postA);
     }
@@ -287,6 +345,22 @@ class DataMoveTest {
         Path z = tmp.resolve(UUID.randomUUID() + ".zip");
         Files.write(z, out.toByteArray());
         return z;
+    }
+
+    /** 병합 폴더 하나에 덤프를 넣고 그 폴더를 돌려준다. */
+    private Path drop(Path zip) throws Exception {
+        Path dir = tmp.resolve("drop-" + UUID.randomUUID());
+        Files.createDirectories(dir);
+        Files.copy(zip, dir.resolve("workblog-dump-x.zip"));
+        return dir;
+    }
+
+    /** 같은 DB 로 서비스만 새로(인스턴스 ID 캐시 없이) 만든다. */
+    private DataMoveService node2(Node n) {
+        WorkblogProperties props = new WorkblogProperties(null, null, null, new WorkblogProperties.Storage(n.storage().toString(), 25), null, null);
+        DriverManagerDataSource ds = (DriverManagerDataSource) n.jdbc().getDataSource();
+        return new DataMoveService(n.jdbc(), ds, new DataSourceTransactionManager(ds), new InstanceIdService(n.jdbc()),
+                new AttachmentTextService(n.jdbc(), props), props, 2048, tmp.resolve("imports2-" + UUID.randomUUID()).toString(), 0);
     }
 
     private ImportReport importInto(Node n, Path zip, boolean apply) throws Exception {
@@ -311,7 +385,7 @@ class DataMoveTest {
         Files.createDirectories(storage);
         WorkblogProperties props = new WorkblogProperties(null, null, null, new WorkblogProperties.Storage(storage.toString(), 25), null, null);
         DataMoveService svc = new DataMoveService(j, ds, new DataSourceTransactionManager(ds), new InstanceIdService(j),
-                new AttachmentTextService(j, props), props, 2048, tmp.resolve("imports-" + name).toString());
+                new AttachmentTextService(j, props), props, 2048, tmp.resolve("imports-" + name).toString(), 0);
         return new Node(j, svc, storage.toAbsolutePath().normalize(), admin);
     }
 

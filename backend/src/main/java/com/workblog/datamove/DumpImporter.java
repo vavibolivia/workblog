@@ -76,6 +76,8 @@ final class DumpImporter {
     private final Path storageRoot;
     private final DumpArchive dump;
     private final boolean apply;
+    /** 설치·주기 병합: 원본에서 바뀐 것은 이 서버에서도 고쳤더라도 원본 것으로 갱신한다(이 서버 것은 이력에 남는다). 관리 화면 적용은 false(충돌로 보고). */
+    private final boolean sourceWins;
     private final TextHook textHook;
     private final String src;
     private final String note;
@@ -105,11 +107,16 @@ final class DumpImporter {
     private String current;
 
     DumpImporter(JdbcTemplate jdbc, TransactionTemplate tx, Path storageRoot, DumpArchive dump, boolean apply, TextHook textHook) {
+        this(jdbc, tx, storageRoot, dump, apply, false, textHook);
+    }
+
+    DumpImporter(JdbcTemplate jdbc, TransactionTemplate tx, Path storageRoot, DumpArchive dump, boolean apply, boolean sourceWins, TextHook textHook) {
         this.jdbc = jdbc;
         this.tx = tx;
         this.storageRoot = storageRoot;
         this.dump = dump;
         this.apply = apply;
+        this.sourceWins = sourceWins;
         this.textHook = textHook;
         DumpFormat.Manifest m = dump.manifest();
         this.src = m.sourceInstanceId();
@@ -159,8 +166,33 @@ final class DumpImporter {
             if (tid == null) tid = first(jdbc.queryForList("SELECT id FROM users WHERE lower(username) = lower(?)", Long.class, uname));
             if (tid != null) {
                 users.put(sid, tid);
-                saveMap("USER", key(sid), new MapRow(tid, createdUsers.contains(tid) ? CREATED : null, null, null, inst(n, "updatedAt"), null));
-                rep.add("users", Action.SKIP, sid, tid, uname, "같은 아이디가 있어 이 서버의 값을 유지", true);
+                Instant sUpd = inst(n, "updatedAt");
+                if (sUpd != null) sUpd = sUpd.truncatedTo(ChronoUnit.MICROS);
+                boolean changed = false;
+                if (sourceWins && sUpd != null && tid > 0) {
+                    // 병합(설치·주기): 원본에서 바뀐 계정은 원본 값으로(이름·메일·부서·직급·권한·사용 여부·비밀번호). 이 서버의 admin 비밀번호는 그대로.
+                    Instant base = row != null && row.srcUpd() != null ? row.srcUpd()
+                            : jdbc.queryForObject("SELECT updated_at FROM users WHERE id = ?", (rs, i) -> instant(rs, "updated_at"), tid);
+                    if (base == null || sUpd.isAfter(base.truncatedTo(ChronoUnit.MICROS))) {
+                        String role = "ADMIN".equals(str(n, "role")) ? "ADMIN" : "USER";
+                        String hash = str(n, "password");
+                        boolean keepPw = "admin".equalsIgnoreCase(uname) || hash == null || hash.isEmpty();
+                        String display = str(n, "displayName");
+                        if (apply) {
+                            jdbc.update("UPDATE users SET display_name = ?, email = ?, department = ?, position = ?, role = ?, active = ?, " +
+                                            (keepPw ? "" : "password = ?, ") + "updated_at = ? WHERE id = ?",
+                                    keepPw
+                                            ? new Object[]{cut(display == null || display.isBlank() ? uname : display, 100), cut(str(n, "email"), 200), cut(str(n, "department"), 100),
+                                                    cut(str(n, "position"), 100), role, bool(n, "active"), ts(now()), tid}
+                                            : new Object[]{cut(display == null || display.isBlank() ? uname : display, 100), cut(str(n, "email"), 200), cut(str(n, "department"), 100),
+                                                    cut(str(n, "position"), 100), role, bool(n, "active"), cut(hash, 100), ts(now()), tid});
+                        }
+                        changed = true;
+                    }
+                }
+                saveMap("USER", key(sid), new MapRow(tid, createdUsers.contains(tid) ? CREATED : null, null, null, sUpd, null));
+                if (changed) rep.add("users", Action.UPDATE, sid, tid, uname, "원본 값으로 갱신", true);
+                else rep.add("users", Action.SKIP, sid, tid, uname, sourceWins ? "변경 없음" : "같은 아이디가 있어 이 서버의 값을 유지", true);
                 return;
             }
             String role = "ADMIN".equals(str(n, "role")) ? "ADMIN" : "USER";
@@ -283,7 +315,7 @@ final class DumpImporter {
                     return;
                 }
                 Instant tUpd = jdbc.queryForObject("SELECT updated_at FROM post_templates WHERE id = ?", (rs, i) -> instant(rs, "updated_at"), tid);
-                if (row.tgtUpd() != null && tUpd != null && !tUpd.equals(row.tgtUpd())) {
+                if (!sourceWins && row.tgtUpd() != null && tUpd != null && !tUpd.equals(row.tgtUpd())) {
                     rep.add("templates", Action.CONFLICT, sid, tid, name, "이 서버에서 지난 가져오기 뒤에 고친 템플릿 — 덮어쓰지 않음", true);
                     return;
                 }
@@ -361,27 +393,40 @@ final class DumpImporter {
                 rep.add("posts", Action.SKIP, sid, r.targetId(), title, "변경 없음", false);
                 return;
             }
-            if (cur.get(0).intValue() != r.tgtVer()) {
-                posts.put(sid, new PostState(r.targetId(), offset, r.srcVer(), r.srcVer(), PA.CONFLICT));
-                rep.add("posts", Action.CONFLICT, sid, r.targetId(), title,
-                        "이 서버에서 지난 가져오기(v" + r.tgtVer() + ") 뒤에 고친 글(현재 v" + cur.get(0) + ") — 원본 v" + sver + " 로 덮어쓰지 않음", true);
+            int curVer = cur.get(0);
+            String why = null;
+            if (curVer != r.tgtVer()) {
+                if (!sourceWins) {
+                    posts.put(sid, new PostState(r.targetId(), offset, r.srcVer(), r.srcVer(), PA.CONFLICT));
+                    rep.add("posts", Action.CONFLICT, sid, r.targetId(), title,
+                            "이 서버에서 지난 가져오기(v" + r.tgtVer() + ") 뒤에 고친 글(현재 v" + curVer + ") — 원본 v" + sver + " 로 덮어쓰지 않음", true);
+                    return;
+                }
+                // 원본이 바뀌었으면 원본 것으로. 이 서버에서 고친 v(지난 가져오기+1)~v현재 는 이력에 그대로 남고, 원본의 새 버전은 그 뒤에 붙는다.
+                offset = curVer - r.srcVer();
+                why = "이 서버 수정본 v" + curVer + " 은 이력에 남김";
+            }
+            updatePost(n, sid, r.targetId(), curVer, offset, r.srcVer(), title, format, tcat, status, vis, tauthor, why);
+            return;
+        }
+        Long same = sameOrigin(n, tauthor);
+        if (same != null) {
+            // 매핑은 없지만 같은 글(같은 작성자·같은 작성 시각): 예전에 DB 를 통째로 넣어 설치했거나 매핑 기록이 없는 서버
+            int tver = jdbc.queryForObject("SELECT version FROM posts WHERE id = ?", Integer.class, same);
+            Instant tUpd = jdbc.queryForObject("SELECT updated_at FROM posts WHERE id = ?", (rs, i) -> instant(rs, "updated_at"), same);
+            if (tUpd != null) tUpd = tUpd.truncatedTo(ChronoUnit.MICROS);
+            Instant sUpd = inst(n, "updatedAt");
+            if (sUpd != null) sUpd = sUpd.truncatedTo(ChronoUnit.MICROS);
+            boolean sourceNewer = sUpd != null && (tUpd == null || sUpd.isAfter(tUpd));
+            if (!sourceNewer) {
+                posts.put(sid, new PostState(same, tver - sver, sver, sver, PA.SKIP));
+                saveMap("POST", key(sid), new MapRow(same, null, sver, tver, inst(n, "updatedAt"), null));
+                rep.add("posts", Action.SKIP, sid, same, title, sUpd != null && sUpd.equals(tUpd) ? "같은 글 — 변경 없음" : "같은 글 — 이 서버 것이 더 최근이라 유지", false);
                 return;
             }
-            int newVer = sver + offset;
-            List<JsonNode> toCreate = planAttachments(sid, r.targetId());
-            String content = body(nz(str(n, "content")), format);
-            if (apply) {
-                // 읽은 뒤 누가 저장했으면(버전이 바뀌었으면) 덮어쓰지 않는다 → 이 묶음을 실패시켜 다시 가져오면 충돌로 잡힌다
-                int n2 = jdbc.update("UPDATE posts SET title = ?, content = ?, content_format = ?, summary = ?, category_id = ?, tags = ?, status = ?, visibility = ?, pinned = ?, " +
-                                " version = ?, updated_at = ?, published_at = ?, deleted_at = ?, reviewed_at = ? WHERE id = ? AND version = ?",
-                        title, content, format, cut(str(n, "summary"), 500), tcat, cut(nz(str(n, "tags")), 500), status, vis, bool(n, "pinned"),
-                        newVer, ts(now()), ts(inst(n, "publishedAt")), ts(inst(n, "deletedAt")), ts(inst(n, "reviewedAt")), r.targetId(), r.tgtVer());
-                if (n2 == 0) throw new IllegalStateException("가져오는 동안 이 서버에서 글이 고쳐졌습니다(#" + r.targetId() + "). 다시 가져오면 충돌로 표시됩니다.");
-                for (JsonNode a : toCreate) createAttachment(a, r.targetId(), tauthor);
-            }
-            posts.put(sid, new PostState(r.targetId(), offset, sver, r.srcVer(), PA.UPDATE));
-            saveMap("POST", key(sid), new MapRow(r.targetId(), null, sver, newVer, inst(n, "updatedAt"), null));
-            rep.add("posts", Action.UPDATE, sid, r.targetId(), title, "v" + r.tgtVer() + " → v" + newVer, true);
+            int newVer = Math.max(sver, tver + 1);
+            int offset = newVer - sver;
+            updatePost(n, sid, same, tver, offset, tver - offset, title, format, tcat, status, vis, tauthor, "같은 글 — 원본이 더 최근");
             return;
         }
         List<JsonNode> toCreate = planAttachments(sid, null);
@@ -400,6 +445,38 @@ final class DumpImporter {
         posts.put(sid, new PostState(tid, 0, sver, 0, PA.CREATE));
         saveMap("POST", key(sid), new MapRow(tid, null, sver, sver, inst(n, "updatedAt"), null));
         rep.add("posts", Action.CREATE, sid, tid, title, inst(n, "deletedAt") != null ? "휴지통 상태로" : null, true);
+    }
+
+    /**
+     * 원본 글로 대상 글을 갱신한다. expectVer = 지금 대상 버전(읽은 뒤 누가 저장했으면 덮어쓰지 않고 이 묶음을 실패시킨다),
+     * 새 버전 = 원본 버전 + offset, prevSrc = 이 서버에 이미 반영된 원본 버전(그 뒤 이력에 가져오기 표시).
+     */
+    private void updatePost(JsonNode n, long sid, long tid, int expectVer, int offset, int prevSrc, String title, String format, Long tcat,
+                            String status, String vis, long tauthor, String why) {
+        int sver = integer(n, "version", 1);
+        int newVer = sver + offset;
+        List<JsonNode> toCreate = planAttachments(sid, tid);
+        String content = body(nz(str(n, "content")), format);
+        if (apply) {
+            int n2 = jdbc.update("UPDATE posts SET title = ?, content = ?, content_format = ?, summary = ?, category_id = ?, tags = ?, status = ?, visibility = ?, pinned = ?, " +
+                            " version = ?, updated_at = ?, published_at = ?, deleted_at = ?, reviewed_at = ? WHERE id = ? AND version = ?",
+                    title, content, format, cut(str(n, "summary"), 500), tcat, cut(nz(str(n, "tags")), 500), status, vis, bool(n, "pinned"),
+                    newVer, ts(now()), ts(inst(n, "publishedAt")), ts(inst(n, "deletedAt")), ts(inst(n, "reviewedAt")), tid, expectVer);
+            if (n2 == 0) throw new IllegalStateException("가져오는 동안 이 서버에서 글이 고쳐졌습니다(#" + tid + "). 다시 가져오세요.");
+            for (JsonNode a : toCreate) createAttachment(a, tid, tauthor);
+        }
+        posts.put(sid, new PostState(tid, offset, sver, prevSrc, PA.UPDATE));
+        saveMap("POST", key(sid), new MapRow(tid, null, sver, newVer, inst(n, "updatedAt"), null));
+        rep.add("posts", Action.UPDATE, sid, tid, title, "v" + expectVer + " → v" + newVer + (why == null ? "" : " (" + why + ")"), true);
+    }
+
+    /** 매핑 없는 원본 글과 같은 글: 같은 작성자 · 같은 작성 시각(마이크로초)이고 이 원본의 다른 글에 아직 매핑되지 않은 것. */
+    private Long sameOrigin(JsonNode n, long tauthor) {
+        Instant created = inst(n, "createdAt");
+        if (created == null || tauthor <= 0) return null;
+        return first(jdbc.queryForList("SELECT p.id FROM posts p WHERE p.author_id = ? AND p.created_at = ? AND NOT EXISTS " +
+                        "(SELECT 1 FROM data_import_map m WHERE m.source_instance = ? AND m.entity = 'POST' AND m.target_id = p.id) ORDER BY p.id",
+                Long.class, tauthor, ts(created.truncatedTo(ChronoUnit.MICROS)), src));
     }
 
     /** 이 글의 첨부 중 새로 만들 것을 고르고 대상 public id 를 정한다(본문 주소 치환용). */
@@ -444,6 +521,16 @@ final class DumpImporter {
             if (!dump.has(str(a, "file"))) { rep.add("attachments", Action.FAIL, spub, null, str(a, "originalName"), "덤프에 파일이 없습니다", true); continue; }
             Long up = users.get(lng(a, "uploaderId"));
             if (up == null) { rep.add("attachments", Action.FAIL, spub, null, str(a, "originalName"), "올린 사람을 찾지 못했습니다", true); continue; }
+            String sha = dump.entry(str(a, "file")).sha256();
+            String samePub = up > 0 ? first(jdbc.queryForList("SELECT public_id FROM attachments WHERE post_id IS NULL AND uploader_id = ? AND content_sha256 = ?",
+                    String.class, up, sha)) : null;
+            if (samePub != null) {
+                filePub.put(spub, samePub);
+                Long aid = first(jdbc.queryForList("SELECT id FROM attachments WHERE public_id = ?", Long.class, samePub));
+                if (aid != null) saveMap("ATTACHMENT", spub, new MapRow(aid, samePub, null, null, null, null));
+                rep.add("attachments", Action.SKIP, spub, aid, str(a, "originalName"), "같은 파일(SHA-256)이 있음", false);
+                continue;
+            }
             filePub.put(spub, UUID.randomUUID().toString());
             if (apply) todo.add(a); else rep.add("attachments", Action.CREATE, spub, null, str(a, "originalName"), "글에 연결 안 된 업로드", false);
         }
@@ -608,14 +695,28 @@ final class DumpImporter {
             Long tid = mapped(r, "comments");
             Instant upd = inst(n, "updatedAt");
             if (upd != null) upd = upd.truncatedTo(ChronoUnit.MICROS);
+            Long author0 = users.get(lng(n, "authorId"));
+            if (tid == null && st.targetId() > 0 && author0 != null && author0 > 0 && inst(n, "createdAt") != null) {
+                // 매핑 없는 같은 댓글(같은 글 · 작성자 · 작성 시각): 이 서버 값을 기준으로 맞춘다(원본이 더 최근이면 아래에서 갱신)
+                Long same = first(jdbc.queryForList("SELECT c.id FROM comments c WHERE c.post_id = ? AND c.author_id = ? AND c.created_at = ? AND NOT EXISTS " +
+                                "(SELECT 1 FROM data_import_map m WHERE m.source_instance = ? AND m.entity = 'COMMENT' AND m.target_id = c.id) ORDER BY c.id",
+                        Long.class, st.targetId(), author0, ts(inst(n, "createdAt").truncatedTo(ChronoUnit.MICROS)), src));
+                if (same != null) {
+                    Instant tUpd = jdbc.queryForObject("SELECT updated_at FROM comments WHERE id = ?", (rs, i) -> instant(rs, "updated_at"), same);
+                    if (tUpd != null) tUpd = tUpd.truncatedTo(ChronoUnit.MICROS);
+                    tid = same;
+                    r = new MapRow(same, null, null, null, tUpd, tUpd);
+                }
+            }
             if (tid != null) {
                 comments.put(sid, tid);
                 if (r.srcUpd() == null || upd == null || !upd.isAfter(r.srcUpd())) {
+                    saveMap("COMMENT", key(sid), new MapRow(tid, null, null, null, r.srcUpd(), r.tgtUpd()));
                     rep.add("comments", Action.SKIP, sid, tid, null, "변경 없음", false);
                     return;
                 }
                 Instant tUpd = jdbc.queryForObject("SELECT updated_at FROM comments WHERE id = ?", (rs, i) -> instant(rs, "updated_at"), tid);
-                if (r.tgtUpd() != null && tUpd != null && !tUpd.equals(r.tgtUpd())) {
+                if (!sourceWins && r.tgtUpd() != null && tUpd != null && !tUpd.equals(r.tgtUpd())) {
                     rep.add("comments", Action.CONFLICT, sid, tid, null, "이 서버에서 지난 가져오기 뒤에 고친 댓글 — 덮어쓰지 않음", true);
                     return;
                 }
@@ -682,6 +783,16 @@ final class DumpImporter {
             if (st == null || rcpt == null || (scomment != null && tcomment == null) || (lng(n, "actorId") != null && actor == null)) {
                 rep.add("notifications", Action.SKIP, sid, null, null, "관련 글·댓글·사용자가 이 서버에 없음", false);
                 return;
+            }
+            Instant created = inst(n, "createdAt");
+            if (created != null && st.targetId() > 0 && rcpt > 0) {
+                Long same = first(jdbc.queryForList("SELECT id FROM notifications WHERE recipient_id = ? AND post_id = ? AND type = ? AND created_at = ?",
+                        Long.class, rcpt, st.targetId(), cut(nz(str(n, "type")), 20), ts(created.truncatedTo(ChronoUnit.MICROS))));
+                if (same != null) {
+                    saveMap("NOTIFICATION", key(sid), new MapRow(same, null, null, null, null, null));
+                    rep.add("notifications", Action.SKIP, sid, same, null, "같은 알림이 있음", false);
+                    return;
+                }
             }
             if (apply) {
                 tid = insert("INSERT INTO notifications (recipient_id, actor_id, type, post_id, comment_id, read_at, created_at) VALUES (?,?,?,?,?,?,?)",

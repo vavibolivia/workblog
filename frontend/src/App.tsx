@@ -23,6 +23,7 @@ const StatsPage = lazy(() => import('./pages/StatsPage'))
 const AdminTemplatesPage = lazy(() => import('./pages/AdminTemplatesPage'))
 const AdminReviewPage = lazy(() => import('./pages/AdminReviewPage'))
 const AdminDataPage = lazy(() => import('./pages/AdminDataPage'))
+const AdminSyncPage = lazy(() => import('./pages/AdminSyncPage'))
 const ManMonthListPage = lazy(() => import('./pages/ManMonthListPage'))
 const ManMonthPage = lazy(() => import('./pages/ManMonthPage'))
 const MmEventsPage = lazy(() => import('./pages/MmEventsPage'))
@@ -74,6 +75,7 @@ export default function App() {
         <Route path="admin/templates" element={<RequireAuth admin><AdminTemplatesPage /></RequireAuth>} />
         <Route path="admin/review" element={<RequireAuth admin><AdminReviewPage /></RequireAuth>} />
         <Route path="admin/data" element={<RequireAuth admin><AdminDataPage /></RequireAuth>} />
+        <Route path="admin/sync" element={<RequireAuth admin><AdminSyncPage /></RequireAuth>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
