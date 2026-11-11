@@ -123,7 +123,10 @@ if [ "$DO_DATA" != 1 ]; then
 elif [ -z "$DATA_REPO" ] || [ -z "$DATA_TOKEN" ]; then
   D_RESULT="설정 없음(sync.env 의 DATA_REPO·DATA_TOKEN)"; log "데이터: $D_RESULT"
 else
-  H=(-H "Authorization: Bearer $DATA_TOKEN" -H "X-GitHub-Api-Version: 2022-11-28")
+  # 토큰은 명령줄(ps 에 보임)이 아니라 root 전용 파일로 curl 에 넘긴다(-H @파일, curl 7.55+). 파일은 끝날 때 TMP 와 함께 지워진다
+  HDR="$TMP/.auth-hdr"
+  (umask 077; printf 'Authorization: Bearer %s\nX-GitHub-Api-Version: 2022-11-28\n' "$DATA_TOKEN" > "$HDR")
+  H=(-H @"$HDR")
   if curl -fsS -m 30 "${H[@]}" "$API/repos/$DATA_REPO/releases/latest" -o "$TMP/data.json"; then
     D_TAG=$(jget tag <"$TMP/data.json")
     aid=""; aname=""
