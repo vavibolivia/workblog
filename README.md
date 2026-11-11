@@ -110,6 +110,7 @@ sudo ./install.sh --uninstall        # 서비스·프로그램 제거 (설정·�
 | 데이터 | 별도 **비공개** 데이터 저장소의 최신 Release 에 붙은 전체 덤프 | 받아서 병합 — 없는 글·사용자는 추가, 원본에서 바뀐 글·사용자는 갱신(받는 서버에서 고친 내용은 글 이력에 남음), 지우지 않음 |
 
 - 데이터 저장소 지정: `sudo ./install.sh --data-repo <owner>/<name> --data-token <읽기 전용 토큰>` (값은 `/opt/workblog/config/sync.env`, root 만 읽음). 프로그램만 받으려면 생략.
+- 또는 설치 뒤 화면 **관리 › 업데이트 › GitHub** 에서 저장소와 토큰을 입력(저장하면 업데이트 장치가 `sync.env` 로 옮기고 바로 확인, 토큰은 화면에 다시 나오지 않음).
 - 데이터 올리기(원본 쪽): `python install/publish/publish-data.py` — 원본 WorkBlog 의 전체 덤프를 받아 바뀐 것이 있을 때만 데이터 저장소 Release 로 올립니다(설정 `~/.workblog-publish.env`, gh CLI 로그인 필요). 작업 스케줄러·cron 으로 주기 실행.
 - 동작: `workblog-sync.timer`(5분마다 깨어 화면 주기 확인) · `workblog-sync.path`(버튼 요청 즉시) → `/opt/workblog/workblog-sync.sh`. 기록 `journalctl -u workblog-sync`.
 

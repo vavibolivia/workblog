@@ -606,8 +606,9 @@ if [ "$NO_SYNC" != 1 ] && [ -f "$SYNC_SRC" ]; then
   senv_get() { [ -f "$SENV" ] && grep -E "^$1=" "$SENV" | tail -1 | cut -d= -f2- || true; }
   [ -n "$SYNC_REPO" ]  || SYNC_REPO="$(senv_get DATA_REPO)"
   [ -n "$SYNC_TOKEN" ] || SYNC_TOKEN="$(senv_get DATA_TOKEN)"
+  [ -n "${WORKBLOG_REPO:-}" ] || { r="$(senv_get PROGRAM_REPO)"; [ -z "$r" ] || REPO="$r"; }   # 화면에서 바꾼 프로그램 저장소 유지
   ( umask 077; cat > "$SENV" <<SEOF
-# WorkBlog 업데이트 설정 (install.sh 가 씀 — 다시 설치해도 값 유지). 주기·켜고 끄기는 화면 '관리 › 업데이트'.
+# WorkBlog 업데이트 설정 (install.sh·화면 '관리 › 업데이트'의 GitHub 입력이 씀 — 다시 설치해도 값 유지). root 만 읽음.
 PROGRAM_REPO=$REPO
 DATA_REPO=$SYNC_REPO
 DATA_TOKEN=$SYNC_TOKEN

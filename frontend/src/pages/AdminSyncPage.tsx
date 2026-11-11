@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { errorMessage, formatDate } from '../lib/api'
-import { syncApi, type SyncInfo, type SyncSettings } from '../lib/syncApi'
+import { syncApi, type GithubInput, type SyncInfo, type SyncSettings } from '../lib/syncApi'
 import { useToast } from '../lib/toast'
 
 const INTERVALS: { v: number; label: string }[] = [
@@ -26,12 +26,16 @@ export default function AdminSyncPage() {
   const [form, setForm] = useState<SyncSettings | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [gh, setGh] = useState<GithubInput | null>(null)
 
   const load = useCallback(() => syncApi.get()
-    .then((i) => { setInfo(i); setForm((f) => f ?? i.settings); setErr(null) })
+    .then((i) => {
+      setInfo(i); setForm((f) => f ?? i.settings); setErr(null)
+      setGh((g) => g ?? { programRepo: i.github.programRepo || 'vavibolivia/workblog', dataRepo: i.github.dataRepo, token: '' })
+    })
     .catch((e) => setErr(errorMessage(e))), [])
 
-  const running = !!info && (info.requested || info.status?.state === 'running')
+  const running = !!info && (info.requested || info.github.pending || info.status?.state === 'running')
   useEffect(() => {
     load()
     const t = window.setInterval(load, running ? 3_000 : 30_000)
@@ -47,6 +51,19 @@ export default function AdminSyncPage() {
       await syncApi.save(form)
       toast('업데이트 설정을 저장했습니다.', 'success')
       await load()
+    } catch (e) { toast(errorMessage(e), 'error') } finally { setBusy(false) }
+  }
+
+  const ghDirty = !!info && !!gh && (gh.token !== '' || gh.programRepo !== (info.github.programRepo || 'vavibolivia/workblog') || gh.dataRepo !== info.github.dataRepo)
+
+  const saveGithub = async () => {
+    if (!gh) return
+    setBusy(true)
+    try {
+      const i = await syncApi.github(gh)
+      setInfo(i)
+      setGh({ ...gh, token: '' })
+      toast('GitHub 설정을 넘겼습니다. 업데이트 장치가 적용하고 바로 확인합니다(결과는 아래).', 'success')
     } catch (e) { toast(errorMessage(e), 'error') } finally { setBusy(false) }
   }
 
@@ -77,7 +94,7 @@ export default function AdminSyncPage() {
       {!info && !err && <div className="empty">불러오는 중…</div>}
       {info && !info.installed && (
         <div className="alert alert--warn" style={{ marginBottom: 16 }}>
-          이 서버에는 업데이트 장치가 없습니다. <code>install.sh</code> 로 설치한 서버에서 쓸 수 있습니다(데이터 저장소는 <code>--data-repo</code>·<code>--data-token</code>).
+          이 서버에는 업데이트 장치가 없습니다. <code>install.sh</code> 로 설치한 서버에서 쓸 수 있습니다. 설치한 뒤 이 화면의 GitHub 칸에 데이터 저장소와 토큰을 넣으면 됩니다.
         </div>
       )}
 
@@ -101,6 +118,35 @@ export default function AdminSyncPage() {
               </div>
             </div>
           </div>
+
+          {gh && (
+            <div className="card">
+              <div className="card__head"><h3>GitHub</h3>{info.github.pending ? <span className="small muted">적용 중…</span> : ghDirty && <span className="small muted">저장하지 않음</span>}</div>
+              <div className="card__body stack">
+                <label className="field">
+                  <span className="field__label">프로그램 저장소 (공개)</span>
+                  <input className="input" value={gh.programRepo} disabled={!info.installed} placeholder="계정/저장소"
+                         onChange={(e) => setGh({ ...gh, programRepo: e.target.value })} />
+                </label>
+                <label className="field">
+                  <span className="field__label">데이터 저장소 (비공개) — 비우면 데이터 받기 안 함</span>
+                  <input className="input" value={gh.dataRepo} disabled={!info.installed} placeholder="예: vavibolivia/workblog-data"
+                         onChange={(e) => setGh({ ...gh, dataRepo: e.target.value })} />
+                </label>
+                <label className="field">
+                  <span className="field__label">데이터 저장소 토큰 {info.github.tokenSet ? <span className="chip chip--success">설정됨</span> : <span className="chip">없음</span>}</span>
+                  <input className="input" type="password" autoComplete="off" value={gh.token} disabled={!info.installed || !gh.dataRepo}
+                         placeholder={info.github.tokenSet ? '바꿀 때만 입력' : 'github_pat_… (Contents 읽기 전용)'}
+                         onChange={(e) => setGh({ ...gh, token: e.target.value })} />
+                  <span className="small muted">GitHub › Settings › Developer settings › Fine-grained tokens 에서 데이터 저장소만, Contents: Read-only 로 만듭니다. 토큰은 서버의 root 전용 설정 파일에만 저장되고 화면에는 다시 나오지 않습니다.</span>
+                </label>
+                <div className="row">
+                  <button type="button" className="btn btn--primary" onClick={saveGithub} disabled={busy || !ghDirty || !info.installed || info.github.pending}>저장하고 확인</button>
+                  {ghDirty && <button type="button" className="btn" onClick={() => setGh({ programRepo: info.github.programRepo || 'vavibolivia/workblog', dataRepo: info.github.dataRepo, token: '' })}>되돌리기</button>}
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="card">
             <div className="card__head"><h3>마지막 업데이트</h3>{st && <span className="small muted">{st.state === 'running' ? '진행 중' : '끝남'} · {TRIGGER[st.trigger] ?? st.trigger}</span>}</div>

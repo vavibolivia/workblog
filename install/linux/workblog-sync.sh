@@ -10,6 +10,7 @@
 #      병합 폴더($DIR/data/import-on-start)에 넣는다 → 앱이 1분 안에 병합(없는 글은 추가, 원본에서 바뀐 글·사용자는 갱신, 지우지 않음)
 #
 # 설정: $DIR/config/sync.env (root 만 읽음 — 저장소 이름·토큰)   화면 설정: $DIR/data/sync/settings.json (주기·켜고 끄기)
+#   화면에서 GitHub 저장소·토큰을 넣으면 $DIR/data/sync/github.json 이 생긴다 → 여기서 sync.env 로 옮기고 지운다(토큰은 앱 폴더에 남지 않음)
 # 상태: $DIR/data/sync/status.json (화면이 읽음)   수동 실행: sudo systemctl start workblog-sync   기록: journalctl -u workblog-sync
 set -euo pipefail
 
@@ -32,6 +33,37 @@ mkdir -p "$STATE"; chmod 700 "$STATE"
 exec 9>"$STATE/.lock"
 flock -n 9 || { echo "다른 업데이트가 진행 중 — 건너뜀"; exit 0; }
 command -v python3 >/dev/null || { echo "python3 가 필요합니다"; exit 1; }
+
+# 화면에서 넣은 GitHub 설정 → sync.env (정해진 형식만 받는다: 저장소 '계정/이름', 토큰 영문·숫자·_)
+GH_NOTE=""
+if [ -e "$UI/github.json" ] || [ -L "$UI/github.json" ]; then
+  GH=$(asapp cat "$UI/github.json" 2>/dev/null | head -c 8192 | python3 -c '
+import json, re, sys
+try: s = json.load(sys.stdin)
+except Exception: sys.exit(1)
+repo = re.compile(r"[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}")
+p, d, t = str(s.get("programRepo", "")), str(s.get("dataRepo", "")), str(s.get("token", ""))
+if not repo.fullmatch(p) or (d and not repo.fullmatch(d)) or (t and not re.fullmatch(r"[A-Za-z0-9_]{20,255}", t)): sys.exit(1)
+print(p, d or "-", t or "-", 1 if s.get("keepToken") else 0)
+') || GH=""
+  rm -f "$UI/github.json"
+  if [ -n "$GH" ]; then
+    read -r G_PROG G_DATA G_TOKEN G_KEEP <<<"$GH"
+    [ "$G_DATA" = - ] && G_DATA=""
+    [ "$G_TOKEN" = - ] && G_TOKEN=""
+    [ "$G_KEEP" = 1 ] && G_TOKEN="$DATA_TOKEN"
+    [ -n "$G_DATA" ] || G_TOKEN=""
+    [ ! -L "$ENV_FILE" ] || { echo "심볼릭 링크라 멈춥니다: $ENV_FILE"; exit 1; }
+    mkdir -p "$DIR/config"
+    ( umask 077
+      { echo "# WorkBlog 업데이트 설정 (install.sh·화면 관리 › 업데이트의 GitHub 입력이 씀 — 다시 설치해도 값 유지). root 만 읽음."
+        printf 'PROGRAM_REPO=%s\nDATA_REPO=%s\nDATA_TOKEN=%s\n' "$G_PROG" "$G_DATA" "$G_TOKEN"; } > "$ENV_FILE.tmp" ) && mv -f "$ENV_FILE.tmp" "$ENV_FILE"
+    PROGRAM_REPO="$G_PROG"; DATA_REPO="$G_DATA"; DATA_TOKEN="$G_TOKEN"
+    GH_NOTE="GitHub 설정 바뀜 — 프로그램 $G_PROG · 데이터 ${G_DATA:-끔} · 토큰 $([ -n "$G_TOKEN" ] && echo 있음 || echo 없음)"
+  else
+    GH_NOTE="GitHub 설정 입력이 형식에 맞지 않아 버림"
+  fi
+fi
 
 TRIGGER=timer
 if [ -e "$UI/request" ] || [ -L "$UI/request" ]; then TRIGGER=button; rm -f "$UI/request"; fi
@@ -60,20 +92,23 @@ log() { printf '%s %s\n' "$(date '+%F %T')" "$*" | tee -a "$LOG"; }
 P_RESULT=""; D_RESULT=""; P_LATEST=""; D_TAG=""
 status() {  # $1 = running|done
   P_CUR=$(cat "$DIR/VERSION" 2>/dev/null || true)
-  python3 - "$STATE/status.json" "$1" "$TRIGGER" "$P_CUR" "$P_LATEST" "$P_RESULT" "$DATA_REPO" "$D_TAG" "$D_RESULT" "$LOG" "$INTERVAL" <<'PY'
+  python3 - "$STATE/status.json" "$1" "$TRIGGER" "$P_CUR" "$P_LATEST" "$P_RESULT" "$DATA_REPO" "$D_TAG" "$D_RESULT" "$LOG" "$INTERVAL" \
+            "$PROGRAM_REPO" "$([ -n "$DATA_TOKEN" ] && echo 1 || echo 0)" <<'PY'
 import json, sys, datetime
 a = sys.argv
 log = open(a[10], encoding="utf-8", errors="replace").read().splitlines()[-40:]
 json.dump({"state": a[2], "trigger": a[3], "at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
            "intervalMinutes": int(a[11]),
            "program": {"current": a[4], "latest": a[5], "result": a[6]},
-           "data": {"repo": a[7], "tag": a[8], "result": a[9]}, "log": log},
+           "data": {"repo": a[7], "tag": a[8], "result": a[9]},
+           "github": {"programRepo": a[12], "dataRepo": a[7], "tokenSet": a[13] == "1"}, "log": log},
           open(a[1], "w", encoding="utf-8"), ensure_ascii=False)
 PY
   # 앱이 읽을 사본은 workblog 계정이 쓴다(root 가 앱 폴더에 직접 쓰지 않음)
   asapp sh -c 'cat > "$1.tmp" && mv -f "$1.tmp" "$1"' _ "$UI/status.json" < "$STATE/status.json"
 }
 log "업데이트 시작 ($TRIGGER)"
+[ -z "$GH_NOTE" ] || log "$GH_NOTE"
 status running
 
 jget() { python3 -c '
