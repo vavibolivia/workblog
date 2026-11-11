@@ -601,7 +601,7 @@ SYNC_INFO="설치 안 함"
 SYNC_SRC="$JAR_DIR/workblog-sync.sh"; [ -f "$SYNC_SRC" ] || SYNC_SRC="$HERE/workblog-sync.sh"
 if [ "$NO_SYNC" != 1 ] && [ -f "$SYNC_SRC" ]; then
   install -m 0755 -o root -g root "$SYNC_SRC" "$DIR/workblog-sync.sh"
-  install -d -m 750 -o workblog -g workblog "$DIR/data/sync"
+  no_link "$DIR/data/sync"; install -d -m 750 -o workblog -g workblog "$DIR/data/sync"
   SENV="$DIR/config/sync.env"; no_link "$SENV"
   senv_get() { [ -f "$SENV" ] && grep -E "^$1=" "$SENV" | tail -1 | cut -d= -f2- || true; }
   [ -n "$SYNC_REPO" ]  || SYNC_REPO="$(senv_get DATA_REPO)"

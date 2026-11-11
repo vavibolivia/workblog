@@ -186,14 +186,20 @@ class DataMoveTest {
 
     @Test
     void mergeUpdatesUsersFromSourceButKeepsLocalAdminPassword() throws Exception {
+        // 받는 서버에 원래 있던 같은 아이디의 다른 계정(생성 시각이 다름)은 비밀번호·권한을 덮어쓰지 않는다
+        b.jdbc().update("INSERT INTO users (username, password, display_name, role, created_at) VALUES ('lee', 'hash-lee-b', '이 서버 이', 'USER', ?)", ts(Instant.parse("2026-01-01T00:00:00Z")));
+        a.jdbc().update("INSERT INTO users (username, password, display_name, role) VALUES ('lee', 'hash-lee-a', '원본 이', 'ADMIN')");
         importInto(b, export(a, null), true);
         Thread.sleep(5);
         a.jdbc().update("UPDATE users SET display_name = '김정비2', password = 'new-hash', updated_at = ? WHERE username = 'kim'", ts(Instant.now()));
         a.jdbc().update("UPDATE users SET password = 'hash-a2', updated_at = ? WHERE username = 'admin'", ts(Instant.now()));
+        a.jdbc().update("UPDATE users SET password = 'hash-lee-a2', updated_at = ? WHERE username = 'lee'", ts(Instant.now()));
         b.svc().importDir(drop(export(a, null)));
         assertThat(b.jdbc().queryForMap("SELECT display_name, password FROM users WHERE username = 'kim'"))
                 .containsEntry("display_name", "김정비2").containsEntry("password", "new-hash");
         assertThat(b.jdbc().queryForObject("SELECT password FROM users WHERE username = 'admin'", String.class)).isEqualTo("hash-b");
+        assertThat(b.jdbc().queryForMap("SELECT password, role FROM users WHERE username = 'lee'"))
+                .containsEntry("password", "hash-lee-b").containsEntry("role", "USER");
     }
 
     @Test

@@ -169,7 +169,12 @@ final class DumpImporter {
                 Instant sUpd = inst(n, "updatedAt");
                 if (sUpd != null) sUpd = sUpd.truncatedTo(ChronoUnit.MICROS);
                 boolean changed = false;
-                if (sourceWins && sUpd != null && tid > 0) {
+                // 같은 계정: 같은 아이디 + 같은 생성 시각(가져오기로 만든 계정·통째 복제본). 아이디만 같은 이 서버 고유 계정은 건드리지 않는다.
+                Instant sCreated = inst(n, "createdAt");
+                Instant tCreated = tid > 0 ? jdbc.queryForObject("SELECT created_at FROM users WHERE id = ?", (rs, i) -> instant(rs, "created_at"), tid) : null;
+                boolean sameAccount = createdUsers.contains(tid) || (sCreated != null && tCreated != null
+                        && sCreated.truncatedTo(ChronoUnit.MICROS).equals(tCreated.truncatedTo(ChronoUnit.MICROS)));
+                if (sourceWins && sUpd != null && tid > 0 && sameAccount) {
                     // 병합(설치·주기): 원본에서 바뀐 계정은 원본 값으로(이름·메일·부서·직급·권한·사용 여부·비밀번호). 이 서버의 admin 비밀번호는 그대로.
                     Instant base = row != null && row.srcUpd() != null ? row.srcUpd()
                             : jdbc.queryForObject("SELECT updated_at FROM users WHERE id = ?", (rs, i) -> instant(rs, "updated_at"), tid);
@@ -192,7 +197,8 @@ final class DumpImporter {
                 }
                 saveMap("USER", key(sid), new MapRow(tid, createdUsers.contains(tid) ? CREATED : null, null, null, sUpd, null));
                 if (changed) rep.add("users", Action.UPDATE, sid, tid, uname, "원본 값으로 갱신", true);
-                else rep.add("users", Action.SKIP, sid, tid, uname, sourceWins ? "변경 없음" : "같은 아이디가 있어 이 서버의 값을 유지", true);
+                else rep.add("users", Action.SKIP, sid, tid, uname, !sourceWins ? "같은 아이디가 있어 이 서버의 값을 유지"
+                        : sameAccount ? "변경 없음" : "같은 아이디의 이 서버 고유 계정 — 이 서버 값 유지", true);
                 return;
             }
             String role = "ADMIN".equals(str(n, "role")) ? "ADMIN" : "USER";

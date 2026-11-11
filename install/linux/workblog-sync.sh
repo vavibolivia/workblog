@@ -23,25 +23,29 @@ PROGRAM_REPO=vavibolivia/workblog; DATA_REPO=""; DATA_TOKEN=""
 [ -f "$ENV_FILE" ] && . "$ENV_FILE"
 
 API=https://api.github.com
-mkdir -p "$STATE"; install -d -m 750 -o workblog -g workblog "$UI"
+# $DIR/data 아래는 앱 계정(workblog)이 쓸 수 있다 → root 는 그 안의 파일을 직접 열거나 chown 하지 않고,
+# 읽기·쓰기·받기는 모두 workblog 계정으로 한다(심볼릭 링크로 root 권한 쓰기를 유도하지 못하게). 폴더 자체가 링크면 멈춘다.
+asapp() { runuser -u workblog -- "$@"; }
+for d in "$DIR/data" "$UI" "$MERGE_DIR"; do [ ! -L "$d" ] || { echo "심볼릭 링크라 멈춥니다: $d"; exit 1; }; done
+mkdir -p "$STATE"; chmod 700 "$STATE"
+[ -d "$UI" ] || asapp mkdir -m 750 "$UI"
 exec 9>"$STATE/.lock"
 flock -n 9 || { echo "다른 업데이트가 진행 중 — 건너뜀"; exit 0; }
 command -v python3 >/dev/null || { echo "python3 가 필요합니다"; exit 1; }
 
 TRIGGER=timer
-if [ -e "$UI/request" ]; then TRIGGER=button; rm -f "$UI/request"; fi
+if [ -e "$UI/request" ] || [ -L "$UI/request" ]; then TRIGGER=button; rm -f "$UI/request"; fi
 [ "${1:-}" = "--now" ] && TRIGGER=manual
 
 # 화면 설정(앱이 쓴 파일 — 정해진 값만 받는다)
-read -r INTERVAL DO_PROGRAM DO_DATA < <(python3 - "$UI/settings.json" <<'PY'
+read -r INTERVAL DO_PROGRAM DO_DATA < <(asapp cat "$UI/settings.json" 2>/dev/null | head -c 4096 | python3 -c '
 import json, sys
-try: s = json.load(open(sys.argv[1], encoding="utf-8"))
+try: s = json.load(sys.stdin)
 except Exception: s = {}
 m = s.get("intervalMinutes", 0)
 m = m if m in (0, 15, 60, 360, 1440) else 0
 print(m, 1 if s.get("program", True) is not False else 0, 1 if s.get("data", True) is not False else 0)
-PY
-)
+')
 
 LAST_CHECK=$(cat "$STATE/last-check" 2>/dev/null || echo 0)
 NOW=$(date +%s)
@@ -56,7 +60,7 @@ log() { printf '%s %s\n' "$(date '+%F %T')" "$*" | tee -a "$LOG"; }
 P_RESULT=""; D_RESULT=""; P_LATEST=""; D_TAG=""
 status() {  # $1 = running|done
   P_CUR=$(cat "$DIR/VERSION" 2>/dev/null || true)
-  python3 - "$UI/status.json.tmp" "$1" "$TRIGGER" "$P_CUR" "$P_LATEST" "$P_RESULT" "$DATA_REPO" "$D_TAG" "$D_RESULT" "$LOG" "$INTERVAL" <<'PY'
+  python3 - "$STATE/status.json" "$1" "$TRIGGER" "$P_CUR" "$P_LATEST" "$P_RESULT" "$DATA_REPO" "$D_TAG" "$D_RESULT" "$LOG" "$INTERVAL" <<'PY'
 import json, sys, datetime
 a = sys.argv
 log = open(a[10], encoding="utf-8", errors="replace").read().splitlines()[-40:]
@@ -66,7 +70,8 @@ json.dump({"state": a[2], "trigger": a[3], "at": datetime.datetime.now(datetime.
            "data": {"repo": a[7], "tag": a[8], "result": a[9]}, "log": log},
           open(a[1], "w", encoding="utf-8"), ensure_ascii=False)
 PY
-  chown workblog:workblog "$UI/status.json.tmp"; chmod 640 "$UI/status.json.tmp"; mv -f "$UI/status.json.tmp" "$UI/status.json"
+  # 앱이 읽을 사본은 workblog 계정이 쓴다(root 가 앱 폴더에 직접 쓰지 않음)
+  asapp sh -c 'cat > "$1.tmp" && mv -f "$1.tmp" "$1"' _ "$UI/status.json" < "$STATE/status.json"
 }
 log "업데이트 시작 ($TRIGGER)"
 status running
@@ -131,17 +136,22 @@ else
     else
       log "데이터: $D_TAG 받기 ($aname)"
       status running
-      install -d -m 750 -o workblog -g workblog "$MERGE_DIR"
+      case "$aname" in *[!A-Za-z0-9._-]*|.*) D_RESULT="FAILED 덤프 이름이 이상함: $aname"; log "데이터: $D_RESULT"; aid="" ;; esac
+    fi
+    if [ -n "$aid" ] && [ "$D_TAG" != "$last" ]; then
+      [ -d "$MERGE_DIR" ] || asapp mkdir -m 750 "$MERGE_DIR"
       rm -f "$MERGE_DIR/$aname.result" "$MERGE_DIR/$aname.done" "$MERGE_DIR/$aname.failed"
-      part="$MERGE_DIR/.$aname.part"
+      part="$TMP/$aname"   # root 전용 임시 폴더에 받고, 앱 폴더에는 workblog 계정이 옮겨 놓는다
       if curl -fsSL -m 3600 "${H[@]}" -H "Accept: application/octet-stream" -o "$part" "$API/repos/$DATA_REPO/releases/assets/$aid"; then
-        chown workblog:workblog "$part"; chmod 600 "$part"
-        mv -f "$part" "$MERGE_DIR/$aname"   # 이름이 *.zip 이 되는 순간 앱이 집어 간다(받는 중에는 .part)
+        chgrp workblog "$part"; chmod 640 "$part"; chmod 711 "$TMP"
+        # 받는 중(.part)에는 앱이 집지 않는다. 이름이 *.zip 이 되는 순간 앱이 병합한다
+        asapp sh -c 'umask 077; cp "$1" "$2/.$3.part" && mv -f "$2/.$3.part" "$2/$3"' _ "$part" "$MERGE_DIR" "$aname"
+        rm -f "$part"
         log "데이터: 병합 기다리는 중"
         status running
         r=""
         for _ in $(seq 1 1800); do
-          [ -f "$MERGE_DIR/$aname.result" ] && { r=$(head -1 "$MERGE_DIR/$aname.result"); break; }
+          [ -f "$MERGE_DIR/$aname.result" ] && { r=$(asapp head -c 2000 "$MERGE_DIR/$aname.result" | head -1); break; }
           sleep 1
         done
         D_RESULT="${r:-FAILED 30분 안에 병합 결과 없음(podman logs workblog 확인)}"
