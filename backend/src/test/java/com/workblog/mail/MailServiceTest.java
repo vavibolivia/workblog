@@ -90,6 +90,23 @@ class MailServiceTest {
     }
 
     @Test
+    void signup_mail_omits_the_name_the_applicant_typed_and_is_limited_per_address() {
+        MailService m = service(true, "http://wb");
+        for (int i = 0; i < 5; i++) m.signedUp("victim@example.com", "kim" + i, "무료 쿠폰 http://evil.example", false);
+        List<SimpleMailMessage> all = sent();
+        assertThat(all).hasSize(3);
+        assertThat(all.get(0).getText()).doesNotContain("evil").contains("아이디 : kim0");
+    }
+
+    @Test
+    void line_breaks_in_user_text_cannot_add_lines_to_subject_or_body() {
+        service(true, "").signupRequested(List.of("x@example.com"), "kim", "김\r\nBcc: z@example.com", null, "운영\n권한 : 관리자");
+        SimpleMailMessage m = sent().get(0);
+        assertThat(m.getSubject()).doesNotContain("\n", "\r");
+        assertThat(m.getText()).contains("이름 : 김 Bcc: z@example.com\n", "부서(신청) : 운영 권한 : 관리자\n");
+    }
+
+    @Test
     void failure_for_one_recipient_does_not_stop_the_rest_or_throw() {
         doThrow(new MailSendException("x")).doNothing().when(sender).send(any(SimpleMailMessage.class));
         service(true, "").signupRequested(List.of("x@example.com", "y@example.com"), "kim", "김", null, null);

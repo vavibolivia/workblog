@@ -60,16 +60,33 @@ public class MailService {
 
     // ---------- 상황별 ----------
 
-    /** 회원 가입 → 본인에게. pending=true 면 관리자 승인 대기. */
+    /**
+     * 회원 가입 → 본인에게. pending=true 면 관리자 승인 대기.
+     * 가입은 로그인 없이 부를 수 있어 남의 주소로 메일을 보내게 할 수 있다 → 가입자가 적은 이름은 싣지 않고(아이디는 영문·숫자만),
+     * 주소 하나에 한 시간 3통 · 전체 한 시간 30통까지만 보낸다.
+     */
     public void signedUp(String to, String username, String displayName, boolean pending) {
-        String b = hello(displayName) + (pending
+        if (!enabled || to == null || to.isBlank()) return;
+        if (!signupSelf.allow(to.trim().toLowerCase(), SIGNUP_PER_ADDRESS) || !signupAll.allow("*", SIGNUP_PER_HOUR)) {
+            log.warn("가입 메일 한도 초과로 보내지 않음: {} → {}", username, to);
+            return;
+        }
+        String b = hello(null) + (pending
                 ? "WorkBlog 가입 신청을 받았습니다. 관리자가 승인하면 로그인할 수 있습니다.\n\n  아이디 : " + username + '\n'
                 : "WorkBlog 에 가입했습니다.\n\n  아이디 : " + username + '\n' + loginLine());
         queue(List.of(nz(to)), pending ? "[WorkBlog] 가입 신청 접수" : "[WorkBlog] 가입 완료", b);
     }
 
-    /** 가입 신청(승인제) → 관리자 모두에게 */
+    /** 가입 신청(승인제) → 관리자 모두에게. 한 시간 30건까지만(그 뒤 신청은 사용자 관리 화면에서 본다). */
     public void signupRequested(Collection<String> adminEmails, String username, String displayName, String email, String department) {
+        if (!enabled) return;
+        if (!signupAdmin.allow("*", SIGNUP_PER_HOUR)) {
+            log.warn("가입 신청 알림 메일 한도 초과로 보내지 않음: {}", username);
+            return;
+        }
+        displayName = clean(displayName);
+        email = clean(email);
+        department = clean(department);
         StringBuilder b = new StringBuilder("새 가입 신청이 있습니다. 승인하면 로그인할 수 있습니다.\n\n");
         b.append("  아이디 : ").append(username).append('\n');
         b.append("  이름 : ").append(displayName).append('\n');
@@ -102,7 +119,7 @@ public class MailService {
         StringBuilder b = new StringBuilder(hello(displayName));
         b.append(byAdmin ? "관리자가 WorkBlog 회원 정보를 바꿨습니다." : "WorkBlog 회원 정보가 바뀌었습니다.").append("\n\n");
         b.append("  아이디 : ").append(username).append('\n');
-        for (String c : changes) b.append("  ").append(c).append('\n');
+        for (String c : changes) b.append("  ").append(clean(c)).append('\n');
         b.append("\n직접 바꾼 것이 아니거나 내용이 다르면 관리자에게 알려 주세요.");
         String link = link("/me");
         if (link != null) b.append("\n\n▶ 내 정보: ").append(link);
@@ -120,6 +137,9 @@ public class MailService {
 
     /** 댓글에서 @아이디 로 지정한 사람에게. (일반 댓글·답글·글 본문 멘션은 화면 알림만) */
     public void commentMention(String to, String recipientName, String actorName, String postTitle, Long postId, Long commentId, String excerpt) {
+        actorName = clean(actorName);
+        postTitle = clean(postTitle);
+        excerpt = clean(excerpt);
         StringBuilder b = new StringBuilder(hello(recipientName));
         b.append(actorName).append(" 님이 댓글에서 나를 지정했습니다.\n\n");
         b.append("  글 : ").append(postTitle).append('\n');
@@ -137,7 +157,8 @@ public class MailService {
         for (String a : to) if (a != null && !a.isBlank()) rcpt.add(a.trim());
         if (rcpt.isEmpty()) return;
         String text = body + SIGNATURE;
-        Runnable job = () -> executor.execute(() -> deliver(rcpt, subject, text));
+        String subj = clean(subject);
+        Runnable job = () -> executor.execute(() -> deliver(rcpt, subj, text));
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override public void afterCommit() { job.run(); }
@@ -178,7 +199,37 @@ public class MailService {
     }
 
     private static String hello(String name) {
-        return (name == null || name.isBlank() ? "" : name + " 님, ") + "안녕하세요.\n\n";
+        String n = clean(name);
+        return (n == null || n.isBlank() ? "" : n + " 님, ") + "안녕하세요.\n\n";
+    }
+
+    /** 사용자가 적은 값을 메일에 넣기 전에: 줄바꿈·제어 문자를 빈칸으로(제목·본문에 줄을 끼워 넣지 못하게). */
+    static String clean(String s) {
+        return s == null ? null : s.replaceAll("[\\p{Cntrl}\u2028\u2029]+", " ").trim();
+    }
+
+    private static final int SIGNUP_PER_ADDRESS = 3;
+    private static final int SIGNUP_PER_HOUR = 30;
+    private final Throttle signupSelf = new Throttle();
+    private final Throttle signupAll = new Throttle();
+    private final Throttle signupAdmin = new Throttle();
+
+    /** 키마다 최근 한 시간의 횟수를 센다(메모리, 재시작하면 비워짐). */
+    static final class Throttle {
+        private static final long WINDOW_MS = 3_600_000L;
+        private final java.util.Map<String, java.util.ArrayDeque<Long>> hits = new java.util.HashMap<>();
+
+        synchronized boolean allow(String key, int max) {
+            long now = System.currentTimeMillis();
+            hits.values().removeIf(q -> {
+                while (!q.isEmpty() && now - q.peekFirst() > WINDOW_MS) q.pollFirst();
+                return q.isEmpty();
+            });
+            java.util.ArrayDeque<Long> q = hits.computeIfAbsent(key, k -> new java.util.ArrayDeque<>());
+            if (q.size() >= max) return false;
+            q.addLast(now);
+            return true;
+        }
     }
 
     private String loginLine() {
