@@ -2,6 +2,8 @@
 
 업무 지식을 블로그처럼 쓰고, 한곳에서 찾고, 이력으로 남기는 시스템입니다. 네이버 블로그와 같은 편집·읽기 경험을 목표로 합니다.
 
+만든 사람: 정석호 (Sukho Jung) · vavibolivia@gmail.com
+
 ![설치 한눈에 보기](backend/docs/images/install.png)
 
 ## 1. 빠른 설치
@@ -88,10 +90,26 @@ sudo ./install.sh --db-url jdbc:postgresql://db-host:5432/workblog --db-user wor
 | `ADMIN_USERNAME` · `ADMIN_PASSWORD` | admin · 설치 시 생성 | 초기 관리자 (사용자가 없을 때만) |
 | `PUBLIC_BASE_URL` | 설치 시 추정 | 도움말·CLI 문서에 들어갈 주소 |
 | `SIGNUP_ENABLED` · `SIGNUP_APPROVAL` | true · false | 회원 가입 허용 · 관리자 승인제 |
+| `MAIL_ENABLED` | false | 메일 보내기 (아래 "메일") |
+| `MAIL_HOST` · `MAIL_PORT` · `MAIL_USERNAME` · `MAIL_PASSWORD` | smtp.gmail.com · 587 · 비움 · 비움 | 메일 서버(SMTP) 주소·계정 |
+| `MAIL_FROM` · `MAIL_FROM_NAME` | `MAIL_USERNAME` · WorkBlog | 보내는 주소 · 표시 이름 |
+| `MAIL_SMTP_AUTH` · `MAIL_STARTTLS` | true · true | 인증 없는 사내 릴레이(25번 등)는 둘 다 false |
 | `STORAGE_DIR` · `MAX_FILE_MB` | 설치 폴더 data/files · 25 | 첨부 저장 위치·최대 크기 |
 | `DRAWIO_URL` | 비움(자동) | 비우면 `static-extra/drawio` 가 있을 때 같은 서버의 `/drawio`, 없으면 https://embed.diagrams.net |
 | `TRASH_RETENTION_DAYS` · `ORPHAN_ATTACHMENT_HOURS` | 30 · 24 | 휴지통·미연결 첨부 자동 정리 |
 | `IMPORT_MAX_MB` · `IMPORT_TMP_DIR` | 2048 · 저장소 옆 imports | 데이터 이전 덤프 올리기 최대 크기·임시 폴더 (첨부 한도와 별개) |
+
+**메일** — `MAIL_ENABLED=true` 와 메일 서버 값을 넣으면 아래 상황에 메일을 보냅니다(받는 사람의 [내 정보] 에 메일 주소가 있어야 함, 비밀번호는 싣지 않음).
+
+| 상황 | 받는 사람 |
+|---|---|
+| 회원 가입 (승인제면 "신청 접수") | 본인 · 승인제면 관리자 전원에게 신청 알림 |
+| 가입 승인 · 관리자가 계정 생성 | 본인 |
+| 회원 정보 수정 (이름·메일·부서·직급·권한·사용 중지, 바뀐 항목 표시) | 본인 — 메일 주소가 바뀌면 예전 주소에도 |
+| 비밀번호 변경 (본인 · 관리자) | 본인 |
+| 댓글에서 `@아이디` 로 지정 | 지정된 사람 (일반 댓글·답글은 화면 알림만) |
+
+메일은 저장이 끝난 뒤 따로 보내며, 실패해도 작업은 그대로 됩니다(실패는 로그에 남음). 본문의 바로 가기 주소는 `PUBLIC_BASE_URL` 을 씁니다.
 
 **폐쇄망(인터넷 없음)에서 쓰기** — 글꼴(Pretendard·나눔고딕·나눔명조)은 앱에 들어 있어 외부 주소를 부르지 않습니다. draw.io 만 따로 둡니다: 인터넷이 되는 PC 에서 [jgraph/drawio 릴리스](https://github.com/jgraph/drawio/releases)의 `draw.war` 를 받아 설치 폴더 `static-extra/drawio/` 에 풀면(war 는 zip) `DRAWIO_URL` 을 비워 둔 채로 자동으로 그것을 씁니다.
 

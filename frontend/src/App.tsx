@@ -18,6 +18,7 @@ const AdminCategoriesPage = lazy(() => import('./pages/AdminCategoriesPage'))
 const AdminStatusPage = lazy(() => import('./pages/AdminStatusPage'))
 const AdminAuditPage = lazy(() => import('./pages/AdminAuditPage'))
 const SignupPage = lazy(() => import('./pages/SignupPage'))
+const AboutPage = lazy(() => import('./pages/AboutPage'))
 const HelpPage = lazy(() => import('./pages/HelpPage'))
 const StatsPage = lazy(() => import('./pages/StatsPage'))
 const AdminTemplatesPage = lazy(() => import('./pages/AdminTemplatesPage'))
@@ -64,6 +65,7 @@ export default function App() {
         <Route path="trash" element={<TrashPage />} />
         <Route path="help" element={<HelpPage />} />
         <Route path="help/:doc" element={<HelpPage />} />
+        <Route path="about" element={<AboutPage />} />
         <Route path="stats" element={<StatsPage />} />
         <Route path="mm" element={<ManMonthListPage />} />
         <Route path="mm/events" element={<MmEventsPage />} />

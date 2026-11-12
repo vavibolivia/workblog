@@ -12,4 +12,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
     /** @아이디 멘션 대상 찾기(대소문자 무시) */
     Optional<User> findFirstByUsernameIgnoreCase(String username);
     List<User> findAllByOrderByCreatedAtAsc();
+    /** 가입 신청 메일을 받을 관리자 */
+    List<User> findAllByRoleAndActiveTrue(User.Role role);
 }

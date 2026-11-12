@@ -34,10 +34,12 @@ public class NotificationService {
 
     private final NotificationRepository repo;
     private final UserRepository users;
+    private final com.workblog.mail.MailService mail;
 
-    public NotificationService(NotificationRepository repo, UserRepository users) {
+    public NotificationService(NotificationRepository repo, UserRepository users, com.workblog.mail.MailService mail) {
         this.repo = repo;
         this.users = users;
+        this.mail = mail;
     }
 
     // ---------- 만들기 ----------
@@ -48,12 +50,21 @@ public class NotificationService {
         User actor = c.getAuthor();
         Map<Long, Target> targets = new LinkedHashMap<>();
         if (replyTarget != null && !replyTarget.isDeleted()) put(targets, replyTarget.getAuthor(), Notification.Type.REPLY);
+        java.util.Set<Long> mentioned = new java.util.HashSet<>();
         for (String name : MentionParser.parse(c.getContent())) {
-            users.findFirstByUsernameIgnoreCase(name).ifPresent(u -> put(targets, u, Notification.Type.MENTION));
+            users.findFirstByUsernameIgnoreCase(name).ifPresent(u -> {
+                put(targets, u, Notification.Type.MENTION);
+                mentioned.add(u.getId());
+            });
         }
         put(targets, post.getAuthor(), Notification.Type.COMMENT);
         for (Target t : targets.values()) {
-            if (deliverable(t.user, actor, post)) repo.save(new Notification(t.user, actor, t.type, post, c));
+            if (!deliverable(t.user, actor, post)) continue;
+            repo.save(new Notification(t.user, actor, t.type, post, c));
+            // 메일은 댓글에서 @아이디 로 지정한 사람에게만(답글 대상·글쓴이라도 지정됐을 때만)
+            if (mentioned.contains(t.user.getId())) {
+                mail.commentMention(t.user.getEmail(), t.user.getDisplayName(), actor.getDisplayName(), post.getTitle(), post.getId(), c.getId(), excerpt(c.getContent()));
+            }
         }
     }
 

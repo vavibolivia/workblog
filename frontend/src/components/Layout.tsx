@@ -79,6 +79,7 @@ export default function Layout() {
             <NavLink to="/stats" className="gnb__link">통계</NavLink>
             {user?.role === 'ADMIN' && <AdminMenu />}
             <NavLink to="/help" className="gnb__link">도움말</NavLink>
+            <NavLink to="/about" className="gnb__link">About</NavLink>
             <Link to="/write" className="btn btn--primary btn--sm" style={{ marginLeft: 8 }}>글쓰기</Link>
 
             <NotificationBell />
@@ -100,6 +101,7 @@ export default function Layout() {
                     <Link key={it.to} to={it.to} role="menuitem" className="menu__mobile" onClick={() => setOpen(false)}>관리 · {it.label}</Link>
                   ))}
                   <Link to="/help" role="menuitem" className="menu__mobile" onClick={() => setOpen(false)}>도움말</Link>
+                  <Link to="/about" role="menuitem" className="menu__mobile" onClick={() => setOpen(false)}>About</Link>
                   <Link to={`/?authorId=${user.id}`} role="menuitem" onClick={() => setOpen(false)}>내가 쓴 글</Link>
                   <Link to={`/?authorId=${user.id}&status=DRAFT`} role="menuitem" onClick={() => setOpen(false)}>임시 저장 글</Link>
                   <Link to="/trash" role="menuitem" onClick={() => setOpen(false)}>삭제한 글</Link>

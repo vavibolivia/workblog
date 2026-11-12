@@ -87,7 +87,7 @@ export default function LoginPage() {
             : <p className="small muted">계정이 없다면 시스템 관리자에게 요청하세요.</p>}
         </form>
 
-        <p className="intro__foot">사내 전용 · 글에 적힌 서버·계정 정보는 밖으로 내보내지 마세요.</p>
+        <p className="intro__foot">사내 전용 · 글에 적힌 서버·계정 정보는 밖으로 내보내지 마세요.<br />만든 사람 · 정석호 Sukho Jung · <a href="mailto:vavibolivia@gmail.com" className="login__link">vavibolivia@gmail.com</a></p>
       </div>
     </main>
   )

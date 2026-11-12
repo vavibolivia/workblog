@@ -17,11 +17,13 @@ public class UserService {
     private final com.workblog.attachment.AttachmentService attachments;
     private final PasswordPolicy passwordPolicy;
     private final org.springframework.jdbc.core.JdbcTemplate jdbc;
+    private final com.workblog.mail.MailService mail;
 
     public UserService(UserRepository users, PasswordEncoder encoder, com.workblog.post.PostRepository posts,
                        com.workblog.attachment.AttachmentService attachments, PasswordPolicy passwordPolicy,
-                       org.springframework.jdbc.core.JdbcTemplate jdbc) {
+                       org.springframework.jdbc.core.JdbcTemplate jdbc, com.workblog.mail.MailService mail) {
         this.jdbc = jdbc;
+        this.mail = mail;
         this.users = users;
         this.encoder = encoder;
         this.posts = posts;
@@ -47,7 +49,9 @@ public class UserService {
         User u = new User(req.username(), encoder.encode(req.password()), req.displayName(),
                 req.email(), req.department(), req.role());
         u.setPosition(req.position());
-        return UserResponse.from(users.save(u));
+        u = users.save(u);
+        mail.accountCreated(u.getEmail(), u.getUsername(), u.getDisplayName());
+        return UserResponse.from(u);
     }
 
     /**
@@ -63,7 +67,13 @@ public class UserService {
         User u = new User(username, encoder.encode(req.password()), req.displayName().trim(),
                 blankToNull(req.email()), active ? null : blankToNull(req.department()), User.Role.USER);
         u.setActive(active);
-        return users.save(u);
+        u = users.save(u);
+        mail.signedUp(u.getEmail(), u.getUsername(), u.getDisplayName(), !active);
+        if (!active) {
+            List<String> admins = users.findAllByRoleAndActiveTrue(User.Role.ADMIN).stream().map(User::getEmail).toList();
+            mail.signupRequested(admins, u.getUsername(), u.getDisplayName(), u.getEmail(), u.getDepartment());
+        }
+        return u;
     }
 
     private static String blankToNull(String s) {
@@ -72,6 +82,7 @@ public class UserService {
 
     public UserResponse update(Long id, UpdateUserRequest req, User actor) {
         User u = getById(id);
+        Snapshot before = new Snapshot(u);
         u.setDisplayName(req.displayName());
         u.setEmail(req.email());
         u.setDepartment(req.department());
@@ -91,15 +102,20 @@ public class UserService {
         if (req.newPassword() != null && !req.newPassword().isBlank()) {
             passwordPolicy.check(req.newPassword());
             u.setPassword(encoder.encode(req.newPassword()));
+            mail.passwordChanged(u.getEmail(), u.getUsername(), u.getDisplayName(), !u.getId().equals(actor.getId()));
         }
         syncPeople(u);
+        if (!before.active() && u.isActive()) mail.accountApproved(u.getEmail(), u.getUsername(), u.getDisplayName());
+        mail.profileChanged(before.recipients(u), u.getUsername(), u.getDisplayName(), before.changes(u, false), !u.getId().equals(actor.getId()));
         return UserResponse.from(u);
     }
 
     public void deactivate(Long id, User actor) {
         if (id.equals(actor.getId())) throw ApiException.badRequest("자기 자신을 비활성화할 수 없습니다.");
         User u = getById(id);
+        Snapshot before = new Snapshot(u);
         u.setActive(false);
+        mail.profileChanged(before.recipients(u), u.getUsername(), u.getDisplayName(), before.changes(u, true), true);
     }
 
     /** 영구 삭제(관리자): 글을 쓴 적 없는 계정만(테스트 계정·오가입 정리용). 글이 있으면 비활성화를 쓴다. */
@@ -125,6 +141,7 @@ public class UserService {
 
     public UserResponse updateProfile(User actor, UpdateProfileRequest req) {
         User u = getById(actor.getId());
+        Snapshot before = new Snapshot(u);
         u.setDisplayName(req.displayName());
         u.setEmail(req.email());
         // 부서는 열람 제한의 근거라 관리자만 바꾼다(관리 > 사용자). 관리자는 자기 부서도 여기서 바꿀 수 있다.
@@ -132,6 +149,7 @@ public class UserService {
         // 직급·직책은 열람 권한과 관계없어 본인이 고친다. 보내지 않으면(null) 그대로
         if (req.position() != null) u.setPosition(req.position());
         syncPeople(u);
+        mail.profileChanged(before.recipients(u), u.getUsername(), u.getDisplayName(), before.changes(u, true), false);
         return UserResponse.from(u);
     }
 
@@ -142,6 +160,42 @@ public class UserService {
         }
         passwordPolicy.check(req.newPassword());
         u.setPassword(encoder.encode(req.newPassword()));
+        mail.passwordChanged(u.getEmail(), u.getUsername(), u.getDisplayName(), false);
+    }
+
+    /** 수정 전 값. 메일에 "무엇이 어떻게 바뀌었는지"를 싣는 데 쓴다. */
+    record Snapshot(String displayName, String email, String department, String position, User.Role role, boolean active) {
+        Snapshot(User u) {
+            this(u.getDisplayName(), u.getEmail(), u.getDepartment(), u.getPosition(), u.getRole(), u.isActive());
+        }
+
+        /** withActivation=false 면 '사용 중지 → 사용'(승인)은 뺀다 — 승인 메일이 따로 간다. */
+        List<String> changes(User u, boolean withActivation) {
+            List<String> out = new java.util.ArrayList<>();
+            line(out, "이름", displayName, u.getDisplayName());
+            line(out, "메일", email, u.getEmail());
+            line(out, "부서", department, u.getDepartment());
+            line(out, "직급·직책", position, u.getPosition());
+            if (role != u.getRole()) line(out, "권한", label(role), label(u.getRole()));
+            if (active != u.isActive() && (withActivation || !u.isActive())) line(out, "계정 상태", label(active), label(u.isActive()));
+            return out;
+        }
+
+        /** 메일 주소가 바뀌면 예전 주소에도 알린다. */
+        List<String> recipients(User u) {
+            List<String> out = new java.util.ArrayList<>();
+            if (u.getEmail() != null) out.add(u.getEmail());
+            if (email != null && !email.equalsIgnoreCase(u.getEmail() == null ? "" : u.getEmail())) out.add(email);
+            return out;
+        }
+
+        private static void line(List<String> out, String name, String a, String b) {
+            String x = a == null ? "" : a.trim(), y = b == null ? "" : b.trim();
+            if (!x.equals(y)) out.add(name + " : " + (x.isEmpty() ? "(없음)" : x) + " → " + (y.isEmpty() ? "(없음)" : y));
+        }
+
+        private static String label(User.Role r) { return r == User.Role.ADMIN ? "관리자" : "사용자"; }
+        private static String label(boolean active) { return active ? "사용" : "사용 중지"; }
     }
 
     private long count(String sql, Long id) {

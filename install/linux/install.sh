@@ -488,6 +488,13 @@ EXTRA_STATIC_DIR=$DIR/static-extra
 PUBLIC_BASE_URL=$PUBLIC_URL
 SIGNUP_ENABLED=true
 SIGNUP_APPROVAL=false
+# 메일(회원 가입·정보 수정·비밀번호 변경·댓글 @지정). 켜려면 MAIL_ENABLED=true 와 메일 서버 값을 넣는다 (README 5절)
+MAIL_ENABLED=false
+#MAIL_HOST=smtp.gmail.com
+#MAIL_PORT=587
+#MAIL_USERNAME=
+#MAIL_PASSWORD=
+#MAIL_FROM=
 # 비워 두면 static-extra/drawio 가 있을 때 자체 호스팅(/drawio), 없으면 공개 embed.diagrams.net (README 참고)
 DRAWIO_URL=
 EOF
