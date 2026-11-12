@@ -30,6 +30,10 @@ public class AuthController {
     /** 로그인 전에도 볼 수 있는 공개 설정. drawioUrl: 다이어그램 편집기 주소. passwordMinLength: 새 비밀번호 최소 길이(글자 종류 제한 없음). */
     public record AuthOptions(boolean signupEnabled, boolean signupRequiresApproval, String drawioUrl, int passwordMinLength) {}
 
+    /** 같은 접속 IP 의 가입 요청 한도(한 시간). 사내 공유 IP 를 감안해 넉넉히 둔다. */
+    static final int SIGNUP_PER_IP_HOUR = 20;
+    private final com.workblog.common.HourlyThrottle signupThrottle = new com.workblog.common.HourlyThrottle();
+
     private final AuthenticationManager authManager;
     private final JwtService jwt;
     private final UserService users;
@@ -79,7 +83,11 @@ public class AuthController {
 
     @Operation(summary = "회원 가입", description = "아이디는 각자 정한다. 즉시 승인 설정이면 바로 로그인 토큰을 준다.")
     @PostMapping("/signup")
-    public ResponseEntity<SignupResponse> signup(@Valid @RequestBody SignupRequest req) {
+    public ResponseEntity<SignupResponse> signup(@Valid @RequestBody SignupRequest req, jakarta.servlet.http.HttpServletRequest http) {
+        // 가입은 로그인 없이 부른다 → 한 곳(IP)에서 계정·가입 메일을 쏟아 내지 못하게 한 시간 횟수를 제한
+        if (signup().enabled() && !signupThrottle.allow(http.getRemoteAddr(), SIGNUP_PER_IP_HOUR)) {
+            throw new ApiException(HttpStatus.TOO_MANY_REQUESTS, "같은 곳에서 가입 요청이 너무 많습니다. 한 시간 뒤에 다시 시도하거나 관리자에게 계정을 요청하세요.");
+        }
         WorkblogProperties.Signup s = signup();
         if (!s.enabled()) throw ApiException.forbidden("회원 가입이 닫혀 있습니다. 관리자에게 계정을 요청하세요.");
         User u = users.signup(req, !s.approval());

@@ -63,12 +63,19 @@ public class MailService {
     /**
      * 회원 가입 → 본인에게. pending=true 면 관리자 승인 대기.
      * 가입은 로그인 없이 부를 수 있어 남의 주소로 메일을 보내게 할 수 있다 → 가입자가 적은 이름은 싣지 않고(아이디는 영문·숫자만),
-     * 주소 하나에 한 시간 3통 · 전체 한 시간 30통까지만 보낸다.
+     * 주소 하나에 한 시간 3통 · 전체 한 시간 100통까지만 보낸다.
      */
     public void signedUp(String to, String username, String displayName, boolean pending) {
         if (!enabled || to == null || to.isBlank()) return;
-        if (!signupSelf.allow(to.trim().toLowerCase(), SIGNUP_PER_ADDRESS) || !signupAll.allow("*", SIGNUP_PER_HOUR)) {
-            log.warn("가입 메일 한도 초과로 보내지 않음: {} → {}", username, to);
+        // 전체 한도를 먼저 본다(전체가 찼는데 주소별 자리만 써 버리지 않게). 가입 자체는 AuthController 가 접속 IP 별로 제한한다.
+        String addr = to.trim().toLowerCase();
+        if (!signupAll.allow("*", SIGNUP_PER_HOUR)) {
+            log.warn("가입 메일 전체 한도 초과로 보내지 않음: {} → {}", username, to);
+            return;
+        }
+        if (!signupSelf.allow(addr, SIGNUP_PER_ADDRESS)) {
+            signupAll.undo("*");
+            log.warn("가입 메일 주소별 한도 초과로 보내지 않음: {} → {}", username, to);
             return;
         }
         String b = hello(null) + (pending
@@ -77,7 +84,7 @@ public class MailService {
         queue(List.of(nz(to)), pending ? "[WorkBlog] 가입 신청 접수" : "[WorkBlog] 가입 완료", b);
     }
 
-    /** 가입 신청(승인제) → 관리자 모두에게. 한 시간 30건까지만(그 뒤 신청은 사용자 관리 화면에서 본다). */
+    /** 가입 신청(승인제) → 관리자 모두에게. 한 시간 100건까지만(그 뒤 신청은 사용자 관리 화면에서 본다). */
     public void signupRequested(Collection<String> adminEmails, String username, String displayName, String email, String department) {
         if (!enabled) return;
         if (!signupAdmin.allow("*", SIGNUP_PER_HOUR)) {
@@ -209,28 +216,10 @@ public class MailService {
     }
 
     private static final int SIGNUP_PER_ADDRESS = 3;
-    private static final int SIGNUP_PER_HOUR = 30;
-    private final Throttle signupSelf = new Throttle();
-    private final Throttle signupAll = new Throttle();
-    private final Throttle signupAdmin = new Throttle();
-
-    /** 키마다 최근 한 시간의 횟수를 센다(메모리, 재시작하면 비워짐). */
-    static final class Throttle {
-        private static final long WINDOW_MS = 3_600_000L;
-        private final java.util.Map<String, java.util.ArrayDeque<Long>> hits = new java.util.HashMap<>();
-
-        synchronized boolean allow(String key, int max) {
-            long now = System.currentTimeMillis();
-            hits.values().removeIf(q -> {
-                while (!q.isEmpty() && now - q.peekFirst() > WINDOW_MS) q.pollFirst();
-                return q.isEmpty();
-            });
-            java.util.ArrayDeque<Long> q = hits.computeIfAbsent(key, k -> new java.util.ArrayDeque<>());
-            if (q.size() >= max) return false;
-            q.addLast(now);
-            return true;
-        }
-    }
+    private static final int SIGNUP_PER_HOUR = 100;
+    private final com.workblog.common.HourlyThrottle signupSelf = new com.workblog.common.HourlyThrottle();
+    private final com.workblog.common.HourlyThrottle signupAll = new com.workblog.common.HourlyThrottle();
+    private final com.workblog.common.HourlyThrottle signupAdmin = new com.workblog.common.HourlyThrottle();
 
     private String loginLine() {
         String link = link("/login");
