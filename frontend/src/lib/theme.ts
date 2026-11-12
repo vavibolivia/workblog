@@ -23,7 +23,9 @@ function systemTheme(): ResolvedTheme {
 }
 
 export function resolveTheme(pref: ThemePref = getThemePref()): ResolvedTheme {
-  return pref === 'system' ? systemTheme() : pref
+  // v0.1.20: 다크 테마만 쓴다(저장된 설정·시스템 설정과 관계없이). 인쇄는 CSS 가 계속 라이트로 낸다.
+  void pref; void systemTheme
+  return 'dark'
 }
 
 export function applyTheme(pref: ThemePref = getThemePref()) {

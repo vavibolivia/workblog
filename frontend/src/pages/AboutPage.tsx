@@ -4,6 +4,7 @@ export default function AboutPage() {
     <div className="shell">
       <section>
         <div className="page-head">
+          <p className="intro__eyebrow" style={{ marginBottom: 6 }}>Excellence in Flight</p>
           <h2>About</h2>
           <p>WorkBlog — 업무 지식을 블로그처럼 쓰고, 한곳에서 찾고, 이력으로 남기는 사내 지식 공유 블로그</p>
         </div>

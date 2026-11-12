@@ -85,7 +85,7 @@ public class AuthController {
     @PostMapping("/signup")
     public ResponseEntity<SignupResponse> signup(@Valid @RequestBody SignupRequest req, jakarta.servlet.http.HttpServletRequest http) {
         // 가입은 로그인 없이 부른다 → 한 곳(IP)에서 계정·가입 메일을 쏟아 내지 못하게 한 시간 횟수를 제한
-        if (signup().enabled() && !signupThrottle.allow(http.getRemoteAddr(), SIGNUP_PER_IP_HOUR)) {
+        if (signup().enabled() && !signupThrottle.allow(com.workblog.common.HourlyThrottle.clientKey(http.getRemoteAddr()), SIGNUP_PER_IP_HOUR)) {
             throw new ApiException(HttpStatus.TOO_MANY_REQUESTS, "같은 곳에서 가입 요청이 너무 많습니다. 한 시간 뒤에 다시 시도하거나 관리자에게 계정을 요청하세요.");
         }
         WorkblogProperties.Signup s = signup();

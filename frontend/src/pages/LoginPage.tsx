@@ -56,6 +56,7 @@ export default function LoginPage() {
         </div>
 
         <section className="intro__story" aria-label="WorkBlog 소개">
+          <p className="intro__eyebrow">Excellence in Flight</p>
           <h1 className="intro__title">흩어진 업무 지식이 이어져<br />회사의 두뇌가 됩니다.</h1>
 
           <BrainArt className="brain" />

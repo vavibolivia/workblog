@@ -1414,6 +1414,7 @@ body { word-break: keep-all; overflow-wrap: anywhere; }
 .intro__brand .brand__name { font-size: 21px; }
 .intro__story { grid-area: story; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .intro__box { grid-area: box; position: sticky; top: 28px; }
+.intro__eyebrow { font-size: 14px; font-weight: 700; letter-spacing: .22em; text-transform: uppercase; color: var(--sky); }
 .intro__title { font-size: 40px; line-height: 1.18; font-weight: 800; letter-spacing: -0.045em; color: var(--ink); word-break: keep-all; margin-top: 6px; }
 
 /* 두뇌 그림: 선은 남색을 옅게, 점은 남색. 꼬리표 점은 테두리 고리 + 글자. 처음 열릴 때 가운데서 바깥으로 그려진다 */

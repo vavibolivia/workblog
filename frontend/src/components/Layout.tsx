@@ -26,7 +26,7 @@ export default function Layout() {
   const [keysHelp, setKeysHelp] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const searchRef = useRef<HTMLInputElement>(null)
-  const theme = useTheme()
+  useTheme() // 다크 테마 적용(v0.1.20 부터 다크만 — 메뉴의 전환 버튼은 없앰)
 
   // X5 전역 단축키: / 검색, g h 홈, g n 새 글, g s 통계, ? 안내
   useGlobalShortcuts({
@@ -106,12 +106,6 @@ export default function Layout() {
                   <Link to={`/?authorId=${user.id}&status=DRAFT`} role="menuitem" onClick={() => setOpen(false)}>임시 저장 글</Link>
                   <Link to="/trash" role="menuitem" onClick={() => setOpen(false)}>삭제한 글</Link>
                   <Link to="/me" role="menuitem" onClick={() => setOpen(false)}>내 정보</Link>
-                  <button type="button" role="menuitemcheckbox" aria-checked={theme.resolved === 'dark'} className="menu__theme"
-                          onClick={() => theme.set(theme.resolved === 'dark' ? 'light' : 'dark')}>
-                    <span>다크 모드</span>
-                    <span className="small muted">{theme.resolved === 'dark' ? '켜짐' : '꺼짐'}{theme.pref === 'system' ? ' · 시스템' : ''}</span>
-                  </button>
-                  {theme.pref !== 'system' && <button type="button" role="menuitem" className="small" onClick={() => theme.set('system')}>시스템 설정 따르기</button>}
                   <button type="button" role="menuitem" onClick={() => { setOpen(false); setKeysHelp(true) }}>키보드 단축키 <span className="muted" style={{ marginLeft: 'auto' }}>?</span></button>
                   <button type="button" role="menuitem" className="menu__danger" onClick={() => { setOpen(false); logout(); navigate('/login') }}>로그아웃</button>
                 </div>
