@@ -117,6 +117,13 @@ export default function Layout() {
       <Suspense fallback={<div className="screen-center" style={{ minHeight: '50vh' }}><div className="spinner" aria-label="불러오는 중" /></div>}>
         <Outlet />
       </Suspense>
+      {/* 보안 안내(v0.1.21): 화면 오른쪽 아래에 늘 보인다. 누를 수 없고(뒤의 버튼을 가리지 않음) 인쇄에는 나오지 않는다. */}
+      <aside className="sec-note" aria-label="보안 안내">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" />
+        </svg>
+        <span><strong>사내 전용</strong> · 외부 공유 금지 · 검색엔진 차단{user ? ` · ${user.displayName}` : ''}</span>
+      </aside>
       {keysHelp && (
         <Modal title="키보드 단축키" onClose={() => setKeysHelp(false)}>
           <div className="keys">

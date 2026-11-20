@@ -36,7 +36,10 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http.csrf(csrf -> csrf.disable())
             // 같은 주소의 iframe 허용: 자체 호스팅 draw.io(/drawio/)를 에디터 대화상자 안에 띄운다. 다른 사이트의 프레임은 여전히 거부.
-            .headers(h -> h.frameOptions(fo -> fo.sameOrigin()))
+            .headers(h -> h.frameOptions(fo -> fo.sameOrigin())
+                // 검색엔진 차단: 화면·API·첨부(/api/files/*) 등 모든 응답을 색인하지 않게 한다.
+                .addHeaderWriter(new org.springframework.security.web.header.writers.StaticHeadersWriter(
+                    "X-Robots-Tag", "noindex, nofollow, noarchive, nosnippet")))
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth

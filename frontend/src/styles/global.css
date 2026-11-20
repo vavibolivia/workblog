@@ -136,6 +136,10 @@ code, pre, kbd { font-family: var(--mono); }
 .empty strong { display: block; color: var(--ink-2); font-size: 16px; margin-bottom: 6px; }
 
 .toast-stack { position: fixed; right: 20px; bottom: 20px; display: flex; flex-direction: column; gap: 8px; z-index: 1000; }
+/* 보안 안내: 오른쪽 아래 고정. 알림(toast)보다 아래에 깔리고 누를 수 없다. */
+.sec-note { position: fixed; right: 12px; bottom: 10px; z-index: 90; display: flex; align-items: center; gap: 6px; padding: 5px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--paper); color: var(--ink); font-size: 12px; line-height: 1.3; opacity: .82; pointer-events: none; max-width: calc(100vw - 24px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sec-note svg { flex: none; }
+@media print { .sec-note { display: none !important; } }
 .toast { padding: 12px 16px; border-radius: var(--radius); background: var(--ink); color: #fff; font-size: 14px; box-shadow: 0 8px 24px rgba(0,0,0,.18); animation: toast-in .2s ease-out; max-width: 360px; }
 .toast--success { background: var(--success); }
 .toast--error { background: var(--danger); }
